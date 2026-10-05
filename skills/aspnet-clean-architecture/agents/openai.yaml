@@ -1,0 +1,4 @@
+interface:
+  display_name: "ASP.NET Clean Architecture"
+  short_description: "Backend seguro e limpo para a Transjap"
+  default_prompt: "Use $aspnet-clean-architecture para implementar uma funcionalidade backend do Transjap Horimetros."

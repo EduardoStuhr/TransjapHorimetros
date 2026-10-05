@@ -1,0 +1,4 @@
+interface:
+  display_name: "Transjap Domain Architecture"
+  short_description: "Regras de dominio do Transjap Horimetros"
+  default_prompt: "Use $transjap-domain-architecture para orientar uma decisao de dominio do Transjap Horimetros."

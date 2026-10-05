@@ -1,0 +1,4 @@
+interface:
+  display_name: "Next.js Admin Dashboard"
+  short_description: "Painel administrativo web da Transjap"
+  default_prompt: "Use $nextjs-admin-dashboard para criar uma tela administrativa do Transjap Horimetros."

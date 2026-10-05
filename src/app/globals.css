@@ -1,0 +1,99 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+:root {
+  --background: #f4f6f8;
+  --foreground: #142033;
+  --card: #ffffff;
+  --card-foreground: #142033;
+  --popover: #ffffff;
+  --popover-foreground: #142033;
+  --primary: #173665;
+  --primary-foreground: #ffffff;
+  --secondary: #e9eef5;
+  --secondary-foreground: #173665;
+  --muted: #eef1f5;
+  --muted-foreground: #5f6b7c;
+  --accent: #f7bc35;
+  --accent-foreground: #172033;
+  --destructive: #b42318;
+  --border: #dce2e9;
+  --input: #cfd7e2;
+  --ring: #2c5b9e;
+  --radius: 0.5rem;
+  --sidebar: #10294d;
+  --sidebar-foreground: #eef4fc;
+  --sidebar-primary: #f7bc35;
+  --sidebar-primary-foreground: #172033;
+  --sidebar-accent: #193b6c;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #29466e;
+  --sidebar-ring: #f7bc35;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Aptos", "Segoe UI", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+}
+
+a,
+button,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(247, 188, 53, 0.35);
+  color: #10294d;
+}
+
+button,
+a,
+input,
+select {
+  outline-color: var(--ring);
+}

@@ -10,14 +10,22 @@ namespace TransjapHorimetros.IntegrationTests;
 
 public sealed class TransjapApiFactory : WebApplicationFactory<Program>
 {
-    private readonly string _connectionString =
-        Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")
-        ?? throw new InvalidOperationException(
-            "Defina TEST_POSTGRES_CONNECTION_STRING para executar os testes de integração.");
+    private readonly string _connectionString;
+    private readonly string? _originalAppConnectionString;
+
+    public TransjapApiFactory()
+    {
+        _connectionString =
+            Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")
+            ?? throw new InvalidOperationException(
+                "Defina TEST_POSTGRES_CONNECTION_STRING para executar os testes de integração.");
+
+        _originalAppConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres");
+        TestDatabaseGuard.EnsureSafeTestDatabase(_connectionString, _originalAppConnectionString);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", _connectionString);
         builder.UseEnvironment("Testing");
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
@@ -31,6 +39,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
 
     public async Task ResetDatabaseAsync()
     {
+        TestDatabaseGuard.EnsureSafeTestDatabase(_connectionString, _originalAppConnectionString);
+
         _ = Server;
         await using var scope = Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();

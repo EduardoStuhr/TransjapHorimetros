@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 import { DataSourceNotice } from "@/components/shared/data-source-notice";
 import { PageHeading } from "@/components/shared/page-heading";
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function FleetPage() {
+  await connection();
   const machines = await getMachines();
 
   return (
@@ -20,8 +22,8 @@ export default async function FleetPage() {
         description="Consulte as máquinas cadastradas e acesse os detalhes operacionais de cada equipamento."
       />
       <DataSourceNotice>
-        Exibindo {machines.length} máquinas do cadastro de frota fornecido. Os
-        campos operacionais permanecem sem registro até a integração com a API.
+        Exibindo {machines.length} máquinas consultadas na API e no PostgreSQL.
+        Campos sem dado operacional permanecem identificados como sem registro.
       </DataSourceNotice>
       <FleetTable data={machines} />
     </div>

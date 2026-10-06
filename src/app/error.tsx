@@ -17,11 +17,10 @@ export default function ErrorPage({
           <CircleAlert />
         </div>
         <h2 className="mt-5 text-xl font-bold text-slate-950">
-          Não foi possível carregar esta página
+          Não foi possível conectar à API.
         </h2>
         <p className="mt-2 text-slate-600">
-          Tente novamente. Se o problema continuar, verifique a disponibilidade
-          da integração de dados.
+          Verifique se a API e o PostgreSQL estão em execução e tente novamente.
         </p>
         <Button onClick={reset} className="mt-5">
           <RotateCcw />

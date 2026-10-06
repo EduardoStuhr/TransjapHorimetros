@@ -10,6 +10,17 @@
 # production
 /build
 
+# .NET
+**/bin/
+**/obj/
+**/TestResults/
+/.dotnet/
+/.tools/
+
+# PostgreSQL local
+/.postgres/
+/.postgres-data/
+
 # local
 .DS_Store
 *.pem

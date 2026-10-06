@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import {
   BellRing,
   Camera,
@@ -18,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ReadingsTable } from "@/features/readings/components/readings-table";
 import {
   formatDateTime,
   formatHourMeter,
@@ -34,10 +36,12 @@ export async function generateMetadata({
   params,
 }: MachinePageProps): Promise<Metadata> {
   const { fleetNumber } = await params;
-  const machine = await getMachineByFleetNumber(Number(fleetNumber));
+  const parsedFleetNumber = Number(fleetNumber);
 
   return {
-    title: machine ? "Frota " + machine.fleetNumber : "Máquina não encontrada",
+    title: Number.isInteger(parsedFleetNumber)
+      ? `Frota ${parsedFleetNumber}`
+      : "Máquina não encontrada",
   };
 }
 
@@ -64,6 +68,7 @@ function DetailItem({
 }
 
 export default async function MachineDetailPage({ params }: MachinePageProps) {
+  await connection();
   const { fleetNumber } = await params;
   const machine = await getMachineByFleetNumber(Number(fleetNumber));
 
@@ -89,7 +94,7 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
             variant="outline"
             className="border-slate-300 bg-white px-3 py-1.5 text-slate-600"
           >
-            Status sem registro
+            {formatMachineRegistrationStatus(machine.registrationStatus)}
           </Badge>
         }
       />
@@ -130,12 +135,20 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
               />
               <DetailItem
                 label="Horímetro atual"
-                value={formatHourMeter(machine.currentHourMeter)}
+                value={
+                  machine.currentHourMeter === null
+                    ? "Sem registro"
+                    : formatHourMeter(machine.currentHourMeter)
+                }
                 icon={CircleGauge}
               />
               <DetailItem
                 label="Última leitura"
-                value={formatDateTime(machine.lastReadingAt)}
+                value={
+                  machine.lastReadingAt
+                    ? formatDateTime(machine.lastReadingAt)
+                    : "Sem registro"
+                }
                 icon={CircleGauge}
               />
               <DetailItem
@@ -158,11 +171,15 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
             value="history"
             className="mt-4 rounded-lg border bg-white shadow-sm"
           >
-            <EmptyState
-              icon={CircleGauge}
-              title="Nenhum histórico de horímetros"
-              description="As leituras desta máquina serão exibidas após o recebimento dos primeiros registros."
-            />
+            {machine.recentReadings.length === 0 ? (
+              <EmptyState
+                icon={CircleGauge}
+                title="Nenhum histórico de horímetros"
+                description="Nenhuma leitura foi registrada para esta máquina."
+              />
+            ) : (
+              <ReadingsTable readings={machine.recentReadings} />
+            )}
           </TabsContent>
           <TabsContent
             value="evidence"
@@ -178,11 +195,22 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
             value="alerts"
             className="mt-4 rounded-lg border bg-white shadow-sm"
           >
-            <EmptyState
-              icon={BellRing}
-              title="Nenhum alerta identificado"
-              description="Possíveis inconsistências desta máquina serão exibidas nesta área."
-            />
+            {machine.alertCount === 0 ? (
+              <EmptyState
+                icon={BellRing}
+                title="Nenhum alerta identificado"
+                description="Nenhuma anomalia aberta foi detectada para esta máquina."
+              />
+            ) : (
+              <div className="p-6">
+                <p className="font-semibold text-slate-900">
+                  {machine.alertCount} alerta(s) aberto(s) para esta máquina.
+                </p>
+                <Button asChild variant="outline" className="mt-4">
+                  <Link href="/alertas">Consultar alertas</Link>
+                </Button>
+              </div>
+            )}
           </TabsContent>
           <TabsContent
             value="information"

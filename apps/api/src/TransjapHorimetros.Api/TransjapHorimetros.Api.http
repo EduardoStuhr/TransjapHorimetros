@@ -1,0 +1,16 @@
+@TransjapHorimetros.Api_HostAddress = http://localhost:5080
+
+GET {{TransjapHorimetros.Api_HostAddress}}/health
+Accept: application/json
+
+###
+
+GET {{TransjapHorimetros.Api_HostAddress}}/api/v1/machines?page=1&pageSize=100
+Accept: application/json
+
+###
+
+GET {{TransjapHorimetros.Api_HostAddress}}/api/v1/machines/by-fleet/68
+Accept: application/json
+
+###

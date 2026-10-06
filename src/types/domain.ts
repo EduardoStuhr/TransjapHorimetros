@@ -1,4 +1,5 @@
 export interface Machine {
+  id: string;
   fleetNumber: number;
   model: string;
   manufacturer?: string | null;
@@ -8,6 +9,12 @@ export interface Machine {
   lastReadingAt?: string | null;
   workSiteName?: string | null;
   qrCodeStatus?: "REGISTERED" | "MISSING" | null;
+}
+
+export interface MachineDetails extends Machine {
+  recentReadings: readonly HourMeterReading[];
+  alertCount: number;
+  qrCode: string | null;
 }
 
 export type ReadingType =
@@ -37,6 +44,7 @@ export interface HourMeterReading {
   syncedAt: string | null;
   clientEventId: string;
   operatorName: string | null;
+  workSiteId: string | null;
   workSiteName: string | null;
   status: ReadingStatus;
   photoEvidenceUrl: string | null;
@@ -47,6 +55,10 @@ export interface HourMeterReading {
 export interface WorkSite {
   id: string;
   name: string;
+  code: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MachineQrCode {
@@ -92,7 +104,23 @@ export interface Anomaly {
   id: string;
   type: AnomalyType;
   readingId: string;
+  machineId: string;
+  machineFleetNumber: number;
+  severity: "INFO" | "WARNING" | "CRITICAL";
+  description: string;
+  status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED";
   createdAt: string;
+}
+
+export interface DashboardSummary {
+  totalMachines: number;
+  updatedToday: number;
+  withoutReading: number;
+  withoutReadingIsDefined: boolean;
+  withoutReadingDefinition: string;
+  pendingReadings: number;
+  suspectReadings: number;
+  alerts: number;
 }
 
 export interface AuditLog {

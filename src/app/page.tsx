@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import {
   BellRing,
   CircleGauge,
@@ -16,13 +17,15 @@ import { PageHeading } from "@/components/shared/page-heading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/features/dashboard/components/metric-card";
+import { ReadingsTable } from "@/features/readings/components/readings-table";
 import { getAnomalies } from "@/services/anomalies.service";
-import { getMachines } from "@/services/machines.service";
+import { getDashboardSummary } from "@/services/dashboard.service";
 import { getReadings } from "@/services/readings.service";
 
 export default async function DashboardPage() {
-  const [machines, readings, anomalies] = await Promise.all([
-    getMachines(),
+  await connection();
+  const [summary, readings, anomalies] = await Promise.all([
+    getDashboardSummary(),
     getReadings(),
     getAnomalies(),
   ]);
@@ -32,7 +35,7 @@ export default async function DashboardPage() {
       <PageHeading
         eyebrow="Visão geral"
         title="Controle operacional da frota"
-        description="Acompanhe o cadastro de máquinas e, após a integração com a API, as leituras e inconsistências operacionais."
+        description="Acompanhe o cadastro de máquinas, as leituras e as inconsistências registradas no banco operacional."
       />
 
       <section aria-labelledby="indicadores-title">
@@ -42,39 +45,43 @@ export default async function DashboardPage() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           <MetricCard
             label="Total de máquinas"
-            value={machines.length}
-            helper="Cadastro de frota fornecido"
+            value={summary.totalMachines}
+            helper="Cadastro real no PostgreSQL"
             icon={HardHat}
             emphasized
           />
           <MetricCard
             label="Atualizadas hoje"
-            value={0}
-            helper="Aguardando leituras"
+            value={summary.updatedToday}
+            helper="Recebidas pelo servidor hoje"
             icon={RadioTower}
           />
           <MetricCard
             label="Sem leitura"
-            value={0}
-            helper="Aguardando integração"
+            value={summary.withoutReading}
+            helper={
+              summary.withoutReadingIsDefined
+                ? "Conforme regra operacional"
+                : "Regra diária não definida"
+            }
             icon={ClipboardClock}
           />
           <MetricCard
             label="Leituras pendentes"
-            value={readings.filter((item) => item.status === "PENDING").length}
-            helper="Nenhum registro recebido"
+            value={summary.pendingReadings}
+            helper="Aguardando validação"
             icon={History}
           />
           <MetricCard
             label="Leituras suspeitas"
-            value={readings.filter((item) => item.status === "SUSPECT").length}
-            helper="Nenhum registro recebido"
+            value={summary.suspectReadings}
+            helper="Exigem revisão humana"
             icon={TriangleAlert}
           />
           <MetricCard
             label="Alertas"
-            value={anomalies.length}
-            helper="Nenhum alerta identificado"
+            value={summary.alerts}
+            helper="Anomalias abertas"
             icon={BellRing}
           />
         </div>
@@ -86,12 +93,16 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Últimas leituras</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <EmptyState
-              icon={CircleGauge}
-              title="Nenhuma leitura registrada"
-              description="Os registros aparecerão aqui quando forem enviados pelo aplicativo de campo ou cadastrados pela API."
-              compact
-            />
+            {readings.length === 0 ? (
+              <EmptyState
+                icon={CircleGauge}
+                title="Nenhuma leitura registrada"
+                description="Nenhum horímetro foi recebido pela API até o momento."
+                compact
+              />
+            ) : (
+              <ReadingsTable readings={readings.slice(0, 5)} />
+            )}
           </CardContent>
         </Card>
 
@@ -128,12 +139,27 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Alertas recentes</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <EmptyState
-              icon={BellRing}
-              title="Nenhum alerta identificado"
-              description="Inconsistências serão exibidas quando o processamento de leituras estiver disponível."
-              compact
-            />
+            {anomalies.length === 0 ? (
+              <EmptyState
+                icon={BellRing}
+                title="Nenhum alerta identificado"
+                description="Nenhuma anomalia aberta foi detectada nas leituras."
+                compact
+              />
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {anomalies.slice(0, 5).map((anomaly) => (
+                  <div key={anomaly.id} className="px-5 py-4">
+                    <p className="text-sm font-bold text-slate-900">
+                      Frota {anomaly.machineFleetNumber} · {anomaly.type}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {anomaly.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -146,8 +172,8 @@ export default async function DashboardPage() {
           <CardContent className="p-0">
             <EmptyState
               icon={ClipboardClock}
-              title="Nenhuma máquina sem atualização"
-              description="Os indicadores serão atualizados conforme os registros forem recebidos."
+              title="Métrica ainda não definida"
+              description={summary.withoutReadingDefinition}
               compact
             />
           </CardContent>

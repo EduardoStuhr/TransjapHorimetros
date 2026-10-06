@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Cable } from "lucide-react";
 
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
 
@@ -45,13 +44,6 @@ export function Header() {
           </div>
         </div>
 
-        <div
-          className="hidden items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 sm:flex"
-          title="A API será integrada em uma etapa futura"
-        >
-          <Cable className="size-4 text-slate-500" aria-hidden="true" />
-          <span>API pendente</span>
-        </div>
       </div>
     </header>
   );

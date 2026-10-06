@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import {
   AlertTriangle,
   Building2,
@@ -42,6 +43,7 @@ const reportTypes = [
 ] as const;
 
 export default async function ReportsPage() {
+  await connection();
   const availability = await getReportAvailability();
 
   return (

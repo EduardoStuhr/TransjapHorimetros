@@ -14,11 +14,10 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(auditLog => auditLog.Action).HasColumnName("action").HasMaxLength(64).IsRequired();
         builder.Property(auditLog => auditLog.Entity).HasColumnName("entity").HasMaxLength(80).IsRequired();
         builder.Property(auditLog => auditLog.EntityId).HasColumnName("entity_id").HasMaxLength(80).IsRequired();
-        builder.Property(auditLog => auditLog.OldValue).HasColumnName("old_value").HasColumnType("jsonb");
-        builder.Property(auditLog => auditLog.NewValue).HasColumnName("new_value").HasColumnType("jsonb");
+        builder.Property(auditLog => auditLog.OldValue).HasColumnName("old_value").HasColumnType("nvarchar(max)");
+        builder.Property(auditLog => auditLog.NewValue).HasColumnName("new_value").HasColumnType("nvarchar(max)");
         builder.Property(auditLog => auditLog.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.Property(auditLog => auditLog.CorrelationId)
             .HasColumnName("correlation_id")

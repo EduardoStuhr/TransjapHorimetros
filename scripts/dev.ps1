@@ -10,7 +10,7 @@ if (-not (Test-Path -LiteralPath $environmentFile))
 {
     Write-Host "Arquivo .env não encontrado. Copiando de .env.example..." -ForegroundColor Yellow
     Copy-Item -LiteralPath (Join-Path $repositoryRoot ".env.example") -Destination $environmentFile
-    Write-Host "Arquivo .env criado a partir de .env.example. Verifique as credenciais se necessário." -ForegroundColor Green
+    Write-Host "Arquivo .env criado. Defina uma senha forte do SQL Server antes de continuar." -ForegroundColor Yellow
 }
 
 $envVars = @{}
@@ -33,7 +33,34 @@ foreach ($line in Get-Content -LiteralPath $environmentFile)
     [Environment]::SetEnvironmentVariable($name, $value, "Process")
 }
 
-$postgresPort = if ($envVars.ContainsKey("POSTGRES_PORT")) { [int]$envVars["POSTGRES_PORT"] } else { 5432 }
+$requiredVariables = @(
+    "SQLSERVER_HOST",
+    "SQLSERVER_PORT",
+    "SQLSERVER_DATABASE",
+    "SQLSERVER_USER",
+    "SQLSERVER_PASSWORD",
+    "ConnectionStrings__DefaultConnection"
+)
+foreach ($requiredVariable in $requiredVariables)
+{
+    if (-not $envVars.ContainsKey($requiredVariable) -or [string]::IsNullOrWhiteSpace($envVars[$requiredVariable]))
+    {
+        Write-Error "A variável $requiredVariable deve ser definida no arquivo .env."
+        exit 1
+    }
+}
+
+if ($envVars["SQLSERVER_PASSWORD"] -eq "your_secure_password_here" -or
+    $envVars["ConnectionStrings__DefaultConnection"].Contains("your_secure_password_here"))
+{
+    Write-Error "Substitua a senha de exemplo do SQL Server no arquivo .env antes de iniciar o ambiente."
+    exit 1
+}
+
+$sqlServerHost = $envVars["SQLSERVER_HOST"]
+$sqlServerPort = [int]$envVars["SQLSERVER_PORT"]
+$useDocker = -not $envVars.ContainsKey("SQLSERVER_USE_DOCKER") -or
+    [bool]::Parse($envVars["SQLSERVER_USE_DOCKER"])
 
 function Test-TcpPort([string]$HostAddress, [int]$Port, [int]$TimeoutMs = 1500)
 {
@@ -47,6 +74,7 @@ function Test-TcpPort([string]$HostAddress, [int]$Port, [int]$TimeoutMs = 1500)
             $tcpClient.Close()
             return $false
         }
+
         $tcpClient.EndConnect($asyncResult)
         $tcpClient.Close()
         return $true
@@ -57,64 +85,51 @@ function Test-TcpPort([string]$HostAddress, [int]$Port, [int]$TimeoutMs = 1500)
     }
 }
 
-# 1. Verifica PostgreSQL
-Write-Host "==> Verificando PostgreSQL (porta $postgresPort)..." -ForegroundColor Cyan
-if (-not (Test-TcpPort -HostAddress "127.0.0.1" -Port $postgresPort))
+Write-Host "==> Verificando SQL Server ($sqlServerHost`:$sqlServerPort)..." -ForegroundColor Cyan
+if (-not (Test-TcpPort -HostAddress $sqlServerHost -Port $sqlServerPort))
 {
-    Write-Host "PostgreSQL não detectado na porta $postgresPort. Tentando inicializar..." -ForegroundColor Yellow
-    
-    $localPgCtl = Join-Path $repositoryRoot ".postgres\pgsql\bin\pg_ctl.exe"
-    $localPgData = Join-Path $repositoryRoot ".postgres-data"
-    
-    if ((Test-Path -LiteralPath $localPgCtl) -and (Test-Path -LiteralPath $localPgData))
+    if (-not $useDocker)
     {
-        Write-Host "Iniciando PostgreSQL local via pg_ctl..." -ForegroundColor Cyan
-        & $localPgCtl -D $localPgData -l (Join-Path $repositoryRoot ".tools\postgres.log") start
-    }
-    elseif (Get-Command "docker" -ErrorAction SilentlyContinue)
-    {
-        Write-Host "Iniciando PostgreSQL via Docker Compose..." -ForegroundColor Cyan
-        docker compose up -d postgres
-    }
-    else
-    {
-        Write-Error "PostgreSQL não está rodando e não foi possível iniciá-lo automaticamente. Inicie o PostgreSQL manualmente."
+        Write-Error "SQL Server não está acessível e SQLSERVER_USE_DOCKER está desabilitado."
         exit 1
     }
 
-    # Aguarda o Postgres responder
-    $deadline = (Get-Date).AddSeconds(20)
-    $pgOk = $false
-    while ((Get-Date) -lt $deadline)
+    if (-not (Get-Command "docker" -ErrorAction SilentlyContinue))
     {
-        if (Test-TcpPort -HostAddress "127.0.0.1" -Port $postgresPort)
-        {
-            $pgOk = $true
-            break
-        }
-        Start-Sleep -Milliseconds 500
+        Write-Error "SQL Server não está acessível e o Docker não está instalado. Inicie um SQL Server local ou instale o Docker."
+        exit 1
     }
 
-    if (-not $pgOk)
+    Write-Host "SQL Server não detectado. Iniciando via Docker Compose..." -ForegroundColor Yellow
+    & docker compose up -d sqlserver
+    if ($LASTEXITCODE -ne 0)
     {
-        Write-Error "Tempo limite esgotado aguardando o PostgreSQL responder na porta $postgresPort."
+        exit $LASTEXITCODE
+    }
+
+    $deadline = (Get-Date).AddSeconds(90)
+    while ((Get-Date) -lt $deadline -and -not (Test-TcpPort -HostAddress $sqlServerHost -Port $sqlServerPort))
+    {
+        Start-Sleep -Milliseconds 750
+    }
+
+    if (-not (Test-TcpPort -HostAddress $sqlServerHost -Port $sqlServerPort))
+    {
+        Write-Error "Tempo limite esgotado aguardando o SQL Server em $sqlServerHost`:$sqlServerPort."
         exit 1
     }
 }
-Write-Host "PostgreSQL operacional na porta $postgresPort." -ForegroundColor Green
+Write-Host "SQL Server operacional em $sqlServerHost`:$sqlServerPort." -ForegroundColor Green
 
-# 2. Inicia a API ASP.NET Core
-Write-Host "==> Verificando API ASP.NET Core..." -ForegroundColor Cyan
+Write-Host "==> Iniciando API ASP.NET Core..." -ForegroundColor Cyan
 $startApiScript = Join-Path $repositoryRoot "scripts\start-api.ps1"
 & powershell -ExecutionPolicy Bypass -File $startApiScript
-
 if ($LASTEXITCODE -ne 0)
 {
     Write-Error "Falha ao iniciar a API."
     exit $LASTEXITCODE
 }
 
-# 3. Verifica / Inicia o Frontend Next.js
 Write-Host "==> Verificando Frontend Next.js..." -ForegroundColor Cyan
 $frontendPort = 3000
 $frontendRunning = Test-TcpPort -HostAddress "127.0.0.1" -Port $frontendPort
@@ -125,19 +140,18 @@ if ($frontendRunning)
 }
 elseif (-not $NoFrontend)
 {
-    Write-Host "Iniciando Frontend Next.js em segundo plano..." -ForegroundColor Cyan
+    $npm = (Get-Command "npm" -ErrorAction Stop).Source
     $frontProcess = Start-Process `
-        -FilePath "npm" `
+        -FilePath $npm `
         -ArgumentList @("run", "dev") `
         -WorkingDirectory $repositoryRoot `
-        -WindowStyle Minimized `
+        -WindowStyle Hidden `
         -PassThru
-
     Write-Host "Frontend iniciado (PID: $($frontProcess.Id))." -ForegroundColor Green
 }
 
 Write-Host "`n========================================================" -ForegroundColor Magenta
-Write-Host "  TRANSJAP HORÍMETROS — AMBIENTE DE DESENVOLVIMENTO ATIVO" -ForegroundColor Magenta
+Write-Host "  TRANSJAP HORÍMETROS - AMBIENTE DE DESENVOLVIMENTO ATIVO" -ForegroundColor Magenta
 Write-Host "========================================================" -ForegroundColor Magenta
 Write-Host "  Frontend Web:  http://localhost:3000" -ForegroundColor Cyan
 Write-Host "  API Backend:   http://127.0.0.1:5080" -ForegroundColor Cyan

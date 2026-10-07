@@ -16,7 +16,7 @@ public static class DatabaseInitialization
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger("DatabaseInitialization");
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
-        logger.LogInformation("Aplicando migrations do PostgreSQL.");
+        logger.LogInformation("Aplicando migrations do SQL Server.");
         await dbContext.Database.MigrateAsync(cancellationToken);
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
         await seeder.SeedAsync(cancellationToken);

@@ -40,7 +40,6 @@ public sealed class AnomalyConfiguration : IEntityTypeConfiguration<Anomaly>
             .IsRequired();
         builder.Property(anomaly => anomaly.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.HasOne(anomaly => anomaly.Reading)
             .WithMany(reading => reading.Anomalies)

@@ -4,7 +4,28 @@ Este documento registra as decisões tomadas, convenções adotadas e itens com 
 
 ---
 
-## 1. Princípios e Regras Fundamentais Adotadas
+## 1. ADR — SQL Server e Azure SQL Database
+
+**Data:** 2026-10-07
+**Status:** Aceita
+
+O banco oficial de produção passa a ser o **Azure SQL Database**. O ambiente de desenvolvimento usa **SQL Server 2022**, local ou via Docker, e a persistência usa `Microsoft.EntityFrameworkCore.SqlServer`.
+
+A assinatura Azure for Students disponível para o projeto não permite provisionar Azure Database for PostgreSQL nas regiões disponíveis, enquanto Azure SQL Database está disponível. A mudança é uma decisão de compatibilidade com a infraestrutura da assinatura, não uma limitação técnica do PostgreSQL.
+
+Consequências técnicas:
+
+- a API recebe a conexão por `ConnectionStrings__DefaultConnection` e aceita uma connection string Azure SQL sem alteração de código;
+- falhas transitórias usam `EnableRetryOnFailure` com até cinco tentativas;
+- GUIDs usam `uniqueidentifier`, valores de horímetro usam `decimal(12,2)` e textos usam `nvarchar`;
+- datas de domínio continuam como `DateTimeOffset`, são normalizadas para UTC e persistidas como `datetime2(7)`;
+- enums continuam persistidos como strings, sem enum nativo de banco;
+- snapshots JSON de auditoria usam `nvarchar(max)`;
+- a baseline ativa é `InitialCreateSqlServer`; a migration PostgreSQL de desenvolvimento não é reaproveitada.
+
+Os diretórios locais legados `.postgres/`, `.postgres-data/` e `.postgres-backups/` detectados na migração foram preservados. Nenhum dado legado é removido ou importado automaticamente.
+
+## 2. Princípios e Regras Fundamentais Adotadas
 
 1. **Prioridade Máxima à Integridade e Rastreabilidade ("A foto é a prova, o texto é a leitura, o servidor é a verdade")**
    - Registros de leitura originais são estritamente **imutáveis**. Nenhuma leitura é atualizada via `UPDATE`. Correções são efetuadas criando um novo registro vinculado com justificativa obrigatória, operador/usuário e timestamp.
@@ -15,7 +36,7 @@ Este documento registra as decisões tomadas, convenções adotadas e itens com 
    - Unidade de medição identificada explicitamente: máquinas pesadas em horas (`MeterUnit.HOURS`) e veículos leves da frota em quilômetros (`MeterUnit.KM`).
 
 3. **Política de Migrations e Proteção do Banco de Dados**
-   - **Backup obrigatório antes de migrações:** Antes de aplicar qualquer migration futura em banco de dados existente, deve ser executado o script [scripts/backup-db.ps1](file:///c:/Users/fabio/Downloads/TransjapHorimetros/TransjapHorimetros/scripts/backup-db.ps1), gerando dump SQL completo com timestamp.
+   - **Backup obrigatório antes de migrações:** Antes de aplicar qualquer migration futura em banco de dados existente, deve ser executado o script [scripts/backup-db.ps1](../scripts/backup-db.ps1), gerando e validando um backup SQL Server `.bak` com timestamp.
    - **Migrations estritamente aditivas:** Novas colunas, tabelas e constraints nunca devem excluir dados ou colunas existentes sem procedimento explícito de transição.
    - **Trava de segurança nos testes de integração:** A classe `TestDatabaseGuard` impede a execução do `ResetDatabaseAsync` caso a connection string aponte para o banco da aplicação ou para qualquer banco diferente de `transjap_horimetros_tests`.
 
@@ -25,7 +46,7 @@ Este documento registra as decisões tomadas, convenções adotadas e itens com 
 
 ---
 
-## 2. Parâmetros Configuráveis e Itens Pendentes de Decisão do Usuário
+## 3. Parâmetros Configuráveis e Itens Pendentes de Decisão do Usuário
 
 Enquanto as respostas aos itens de negócio não forem fornecidas, foram adotados padrões conservadores e configuráveis em `appsettings.json` (`HourMeterRules`):
 

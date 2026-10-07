@@ -1,7 +1,7 @@
 param(
     [switch]$Foreground,
     [switch]$NoBuild,
-    [int]$TimeoutSeconds = 30
+    [int]$TimeoutSeconds = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,7 +34,23 @@ foreach ($line in Get-Content -LiteralPath $environmentFile)
     [Environment]::SetEnvironmentVariable($name, $value, "Process")
 }
 
-$postgresPort = if ($envVars.ContainsKey("POSTGRES_PORT")) { [int]$envVars["POSTGRES_PORT"] } else { 5432 }
+foreach ($requiredVariable in @("SQLSERVER_HOST", "SQLSERVER_PORT", "ConnectionStrings__DefaultConnection"))
+{
+    if (-not $envVars.ContainsKey($requiredVariable) -or [string]::IsNullOrWhiteSpace($envVars[$requiredVariable]))
+    {
+        Write-Error "A variável $requiredVariable deve ser definida no arquivo .env."
+        exit 1
+    }
+}
+
+if ($envVars["ConnectionStrings__DefaultConnection"].Contains("your_secure_password_here"))
+{
+    Write-Error "Substitua a senha de exemplo do SQL Server no arquivo .env antes de iniciar a API."
+    exit 1
+}
+
+$sqlServerHost = $envVars["SQLSERVER_HOST"]
+$sqlServerPort = [int]$envVars["SQLSERVER_PORT"]
 
 function Test-TcpPort([string]$HostAddress, [int]$Port, [int]$TimeoutMs = 1500)
 {
@@ -48,6 +64,7 @@ function Test-TcpPort([string]$HostAddress, [int]$Port, [int]$TimeoutMs = 1500)
             $tcpClient.Close()
             return $false
         }
+
         $tcpClient.EndConnect($asyncResult)
         $tcpClient.Close()
         return $true
@@ -58,13 +75,13 @@ function Test-TcpPort([string]$HostAddress, [int]$Port, [int]$TimeoutMs = 1500)
     }
 }
 
-Write-Host "Verificando se o PostgreSQL está respondendo em 127.0.0.1:$postgresPort..." -ForegroundColor Cyan
-if (-not (Test-TcpPort -HostAddress "127.0.0.1" -Port $postgresPort))
+Write-Host "Verificando SQL Server em $sqlServerHost`:$sqlServerPort..." -ForegroundColor Cyan
+if (-not (Test-TcpPort -HostAddress $sqlServerHost -Port $sqlServerPort))
 {
-    Write-Error "PostgreSQL não está acessível em 127.0.0.1:$postgresPort. Inicie o PostgreSQL local ou execute 'docker compose up -d' antes de subir a API."
+    Write-Error "SQL Server não está acessível em $sqlServerHost`:$sqlServerPort. Inicie o serviço ou execute 'docker compose up -d sqlserver'."
     exit 1
 }
-Write-Host "PostgreSQL está ativo." -ForegroundColor Green
+Write-Host "SQL Server está acessível." -ForegroundColor Green
 
 $localDotnet = Join-Path $repositoryRoot ".dotnet\dotnet.exe"
 $dotnet = if (Test-Path -LiteralPath $localDotnet) { $localDotnet } else { "dotnet" }
@@ -93,13 +110,10 @@ if (-not (Test-Path -LiteralPath $toolsDirectory))
 
 $stdout = Join-Path $toolsDirectory "api.stdout.log"
 $stderr = Join-Path $toolsDirectory "api.stderr.log"
-
-# Limpa logs anteriores
 Set-Content -LiteralPath $stdout -Value ""
 Set-Content -LiteralPath $stderr -Value ""
 
 Write-Host "Iniciando Transjap Horímetros API em segundo plano..." -ForegroundColor Cyan
-
 $process = Start-Process `
     -FilePath $dotnet `
     -ArgumentList $arguments `
@@ -112,16 +126,15 @@ $process = Start-Process `
 $pidFile = Join-Path $toolsDirectory "api.pid"
 Set-Content -LiteralPath $pidFile -Value $process.Id
 
-Write-Host "Aguardando inicialização da API (PID: $($process.Id)) em http://127.0.0.1:5080/health/ready..." -ForegroundColor Cyan
-
 $healthUrl = "http://127.0.0.1:5080/health/ready"
+Write-Host "Aguardando /health/ready responder 200 (PID: $($process.Id))..." -ForegroundColor Cyan
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 $isReady = $false
 
 while ((Get-Date) -lt $deadline)
 {
     $procCheck = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
-    if ($procCheck -eq $null -or $procCheck.HasExited)
+    if ($null -eq $procCheck -or $procCheck.HasExited)
     {
         Write-Host "O processo da API encerrou inesperadamente." -ForegroundColor Red
         break
@@ -138,7 +151,6 @@ while ((Get-Date) -lt $deadline)
     }
     catch
     {
-        # Ainda inicializando
     }
 
     Start-Sleep -Milliseconds 800
@@ -146,33 +158,21 @@ while ((Get-Date) -lt $deadline)
 
 if ($isReady)
 {
-    Write-Host "Transjap Horímetros API está pronta e saudável!" -ForegroundColor Green
+    Write-Host "Transjap Horímetros API está pronta e saudável." -ForegroundColor Green
     Write-Host "URL Base: http://127.0.0.1:5080" -ForegroundColor Green
-    Write-Host "Health:   http://127.0.0.1:5080/health/ready" -ForegroundColor Green
+    Write-Host "Health:   $healthUrl" -ForegroundColor Green
     Write-Host "Swagger:  http://127.0.0.1:5080/swagger" -ForegroundColor Green
     Write-Output $process.Id
     exit 0
 }
-else
+
+Write-Host "FALHA NA INICIALIZAÇÃO DA API." -ForegroundColor Red
+if (Test-Path -LiteralPath $stderr)
 {
-    Write-Host "FALHA NA INICIALIZAÇÃO DA API." -ForegroundColor Red
-    if (Test-Path -LiteralPath $stderr)
-    {
-        $stderrContent = Get-Content -LiteralPath $stderr -Tail 20
-        if (-not [string]::IsNullOrWhiteSpace($stderrContent))
-        {
-            Write-Host "--- Últimas linhas de api.stderr.log ---" -ForegroundColor Red
-            Write-Host ($stderrContent -join "`n") -ForegroundColor Red
-        }
-    }
-    if (Test-Path -LiteralPath $stdout)
-    {
-        $stdoutContent = Get-Content -LiteralPath $stdout -Tail 20
-        if (-not [string]::IsNullOrWhiteSpace($stdoutContent))
-        {
-            Write-Host "--- Últimas linhas de api.stdout.log ---" -ForegroundColor Yellow
-            Write-Host ($stdoutContent -join "`n") -ForegroundColor Yellow
-        }
-    }
-    exit 1
+    Get-Content -LiteralPath $stderr -Tail 20 | Write-Host -ForegroundColor Red
 }
+if (Test-Path -LiteralPath $stdout)
+{
+    Get-Content -LiteralPath $stdout -Tail 20 | Write-Host -ForegroundColor Yellow
+}
+exit 1

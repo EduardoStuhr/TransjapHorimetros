@@ -31,9 +31,14 @@ foreach ($line in Get-Content -LiteralPath $environmentFile)
     [Environment]::SetEnvironmentVariable($name, $value, "Process")
 }
 
-if ([string]::IsNullOrWhiteSpace($env:TEST_POSTGRES_CONNECTION_STRING))
+if ([string]::IsNullOrWhiteSpace($env:TEST_SQLSERVER_CONNECTION_STRING))
 {
-    Write-Error "A variável TEST_POSTGRES_CONNECTION_STRING não foi definida no arquivo .env."
+    Write-Error "A variável TEST_SQLSERVER_CONNECTION_STRING não foi definida no arquivo .env."
+    exit 1
+}
+if ($env:TEST_SQLSERVER_CONNECTION_STRING.Contains("your_secure_password_here"))
+{
+    Write-Error "Substitua a senha de exemplo em TEST_SQLSERVER_CONNECTION_STRING antes de rodar os testes."
     exit 1
 }
 
@@ -51,6 +56,6 @@ if (-not [string]::IsNullOrWhiteSpace($Filter))
     $arguments += @("--filter", $Filter)
 }
 
-Write-Host "Executando testes da solução Transjap Horímetros com variáveis de ambiente carregadas..." -ForegroundColor Cyan
+Write-Host "Executando testes da solução Transjap Horímetros com SQL Server..." -ForegroundColor Cyan
 & $dotnet @arguments
 exit $LASTEXITCODE

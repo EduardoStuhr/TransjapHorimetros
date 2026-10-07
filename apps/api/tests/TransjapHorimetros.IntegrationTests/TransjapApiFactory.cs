@@ -16,11 +16,11 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
     public TransjapApiFactory()
     {
         _connectionString =
-            Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")
+            Environment.GetEnvironmentVariable("TEST_SQLSERVER_CONNECTION_STRING")
             ?? throw new InvalidOperationException(
-                "Defina TEST_POSTGRES_CONNECTION_STRING para executar os testes de integração.");
+                "Defina TEST_SQLSERVER_CONNECTION_STRING para executar os testes de integração.");
 
-        _originalAppConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres");
+        _originalAppConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
         TestDatabaseGuard.EnsureSafeTestDatabase(_connectionString, _originalAppConnectionString);
     }
 
@@ -31,7 +31,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Postgres"] = _connectionString,
+                ["ConnectionStrings:DefaultConnection"] = _connectionString,
                 ["Database:ApplyMigrationsOnStartup"] = "true",
             });
         });
@@ -45,7 +45,13 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         await using var scope = Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         await dbContext.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE anomalies, audit_logs, hour_meter_readings, work_sites, machines CASCADE;");
+            """
+            DELETE FROM anomalies;
+            DELETE FROM audit_logs;
+            DELETE FROM hour_meter_readings;
+            DELETE FROM work_sites;
+            DELETE FROM machines;
+            """);
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
         await seeder.SeedAsync();
     }

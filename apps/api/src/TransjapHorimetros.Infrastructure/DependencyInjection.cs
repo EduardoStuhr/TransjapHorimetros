@@ -14,14 +14,19 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("Postgres")
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException(
-                "A connection string 'Postgres' deve ser configurada por variável de ambiente ou appsettings.");
+                "A connection string 'DefaultConnection' deve ser configurada por variável de ambiente ou appsettings.");
 
         services.AddDbContextPool<TransjapDbContext>(options =>
-            options.UseNpgsql(
+            options.UseSqlServer(
                 connectionString,
-                npgsql => npgsql.MigrationsAssembly(typeof(TransjapDbContext).Assembly.FullName)));
+                sqlServer => sqlServer
+                    .MigrationsAssembly(typeof(TransjapDbContext).Assembly.FullName)
+                    .EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(30),
+                        errorNumbersToAdd: null)));
         services.AddScoped<TransjapRepository>();
         services.AddScoped<IMachineRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IWorkSiteRepository>(provider => provider.GetRequiredService<TransjapRepository>());

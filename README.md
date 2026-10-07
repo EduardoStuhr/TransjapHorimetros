@@ -3,92 +3,114 @@
 Sistema de controle e integridade de registros de horímetros e odômetros de máquinas pesadas e veículos da **TRANSJAP Terraplenagem e Construções**.
 
 > [!IMPORTANT]
-> **Aviso de Segurança e Publicação:**
-> Nada será publicado no Azure nem exposto à internet antes da conclusão e validação completa da **Fase 3 (Segurança e Autenticação)**. O ambiente atual opera estritamente em rede local/desenvolvimento.
+> O sistema não deve ser publicado no Azure nem exposto à internet antes da conclusão e validação da Fase 3 (Segurança e Autenticação).
 
----
+## Arquitetura de dados
 
-## 1. Pré-requisitos
+- Banco oficial de produção: **Azure SQL Database**.
+- Banco de desenvolvimento: **SQL Server 2022** local ou em container.
+- Provider: **Microsoft.EntityFrameworkCore.SqlServer**.
+- Configuração: `ConnectionStrings__DefaultConnection`, sem credenciais versionadas.
+- Resiliência: retry transiente do EF Core habilitado para Azure SQL.
 
-- **.NET SDK:** Versão `10.0.401` (fixada em [global.json](file:///c:/Users/fabio/Downloads/TransjapHorimetros/TransjapHorimetros/global.json); o repositório inclui runtime local em `.dotnet/` para conveniência).
-- **Node.js:** Versão `20.9` ou superior e `npm`.
-- **PostgreSQL:** Versão `16` ou superior (executável local em `.postgres/`, serviço do sistema ou via Docker).
-- **Docker e Docker Compose:** Opcional (caso opte por subir o PostgreSQL em container).
+## Pré-requisitos
 
----
+- .NET SDK `10.0.401` (o repositório também inclui o runtime local em `.dotnet/`).
+- Node.js `20.9` ou superior e npm.
+- SQL Server 2022 ou Docker com Docker Compose.
+- `sqlcmd` somente quando o backup for executado contra uma instalação local fora do Docker.
 
-## 2. Configuração Inicial
+## Configuração inicial
 
-1. Copie o arquivo de exemplo de variáveis de ambiente:
+1. Crie o arquivo local de ambiente:
+
    ```powershell
    Copy-Item .env.example .env
    ```
-2. Caso necessário, ajuste credenciais no `.env` (a API e os scripts utilizam `127.0.0.1` para conexões locais).
 
----
+2. Substitua `your_secure_password_here` por uma senha forte compatível com a política do SQL Server.
+3. Mantenha `SQLSERVER_USE_DOCKER=true` para usar o container ou altere para `false` quando houver um SQL Server local já configurado.
 
-## 3. Como Executar Localmente
+O `.env` não é versionado. Nunca inclua nele credenciais reais do Azure em commits.
 
-### Opção 1: Inicialização Unificada (Recomendado)
-Para subir o PostgreSQL, a API ASP.NET Core e preparar o Frontend em um único comando:
+## Execução local
+
+Para validar o `.env`, iniciar o SQL Server quando necessário, subir a API, aguardar `/health/ready` e iniciar o frontend:
+
 ```powershell
 .\scripts\dev.ps1
 ```
 
-### Opção 2: Inicialização Passo a Passo
+Para iniciar apenas banco e API:
 
-1. **Subir o Banco de Dados (se optar por Docker):**
-   ```bash
-   docker compose up -d postgres
-   ```
-2. **Iniciar a API ASP.NET Core:**
-   ```powershell
-   .\scripts\start-api.ps1
-   ```
-   *O script valida o `.env`, checa se o PostgreSQL está ativo na porta 5432, sobe a API em segundo plano e aguarda `/health/ready` responder 200 OK.*
-3. **Iniciar o Frontend Web:**
-   ```bash
-   npm run dev
-   ```
+```powershell
+docker compose up -d sqlserver
+.\scripts\start-api.ps1
+```
 
-### URLs de Acesso Local:
-- **Painel Administrativo:** [http://localhost:3000](http://localhost:3000)
-- **API ASP.NET Core:** [http://127.0.0.1:5080](http://127.0.0.1:5080)
-- **Health Check:** [http://127.0.0.1:5080/health/ready](http://127.0.0.1:5080/health/ready)
-- **Swagger / OpenAPI:** [http://127.0.0.1:5080/swagger](http://127.0.0.1:5080/swagger)
+A API aplica `InitialCreateSqlServer` e executa o seed idempotente das 52 máquinas na inicialização.
 
----
+### URLs locais
 
-## 4. Testes Automatizados
+- Painel: [http://localhost:3000](http://localhost:3000)
+- API: [http://127.0.0.1:5080](http://127.0.0.1:5080)
+- Readiness: [http://127.0.0.1:5080/health/ready](http://127.0.0.1:5080/health/ready)
+- Liveness: [http://127.0.0.1:5080/health/live](http://127.0.0.1:5080/health/live)
+- Swagger: [http://127.0.0.1:5080/swagger](http://127.0.0.1:5080/swagger)
 
-O repositório possui suíte de testes unitários e de integração protegidos contra exclusão acidental do banco de aplicação (`TestDatabaseGuard`):
+## Testes
+
+`TEST_SQLSERVER_CONNECTION_STRING` deve apontar exatamente para o banco `transjap_horimetros_tests` em uma instância local. O `TestDatabaseGuard` bloqueia outro nome, o banco principal e endpoints `*.database.windows.net`.
+
 ```powershell
 .\scripts\test.ps1
 ```
-*O script carrega o `.env` (incluindo `TEST_POSTGRES_CONNECTION_STRING`) e roda todos os testes.*
 
----
+## Migrations
 
-## 5. Rotinas de Banco de Dados
+A migration PostgreSQL de desenvolvimento foi substituída por uma nova baseline SQL Server:
 
-### Backup Preventivo (pg_dump)
-Antes de qualquer alteração estrutural ou aplicação de migrations futuras, gere um backup completo:
+```text
+InitialCreateSqlServer
+```
+
+Para criar uma migration futura:
+
+```powershell
+.\.dotnet\dotnet.exe ef migrations add NomeDaMigration `
+  --project apps/api/src/TransjapHorimetros.Infrastructure `
+  --startup-project apps/api/src/TransjapHorimetros.Api
+```
+
+As datas são persistidas como `datetime2(7)` e convertidas para UTC; GUIDs usam `uniqueidentifier`, horímetros usam `decimal(12,2)`, enums usam strings e os snapshots JSON de auditoria usam `nvarchar(max)`.
+
+## Backup local
+
+O backup gera um `.bak` real com `BACKUP DATABASE` e valida o arquivo com `RESTORE VERIFYONLY`:
+
 ```powershell
 .\scripts\backup-db.ps1
 ```
-Os backups são gravados na pasta `.postgres-backups/` (ignorada pelo Git).
 
-### Reset e Reaplicação do Banco de Desenvolvimento
-Para reinicializar o banco de dados e reaplicar as migrations e os seeds das 52 máquinas:
-1. Pare a API.
-2. No PostgreSQL, recrie o banco `transjap_horimetros`.
-3. Inicie a API com `.\scripts\start-api.ps1` (as migrations e o seed serão aplicados automaticamente na inicialização).
+No Docker, o arquivo é criado no container e copiado para `.sqlserver-backups/`. Em uma instalação local, o script usa `sqlcmd`; a conta do serviço SQL Server precisa ter permissão de escrita no diretório informado.
 
----
+### Dados PostgreSQL legados
 
-## 6. Estrutura do Projeto
+Diretórios locais `.postgres/`, `.postgres-data/` e `.postgres-backups/` foram encontrados durante a migração e permaneceram intocados e ignorados pelo Git. A nova migration não importa esses dados automaticamente. Antes de remover esses diretórios manualmente, confira os backups existentes e exporte qualquer dado útil da instância antiga.
 
-- `apps/api/`: Solução ASP.NET Core Clean Architecture (`Domain`, `Application`, `Infrastructure`, `Api`, `UnitTests`, `IntegrationTests`).
-- `src/`: Aplicação Web Next.js 16 (App Router, Tailwind CSS, shadcn/ui).
-- `scripts/`: Scripts PowerShell de automação (`dev.ps1`, `start-api.ps1`, `test.ps1`, `backup-db.ps1`).
-- `docs/`: Documentação de arquitetura, decisões e regras (`docs/decisoes.md`).
+## Azure SQL Database
+
+No Azure App Service, configure `ConnectionStrings__DefaultConnection` sem alterar o código. Formato esperado:
+
+```text
+Server=tcp:<servidor>.database.windows.net,1433;Initial Catalog=transjap_horimetros;Persist Security Info=False;User ID=<usuario>;Password=<segredo>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+```
+
+Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Nenhum deploy é realizado por este repositório nesta etapa.
+
+## Estrutura
+
+- `apps/api/`: solução ASP.NET Core em Clean Architecture.
+- `src/`: frontend Next.js 16.
+- `scripts/`: automações de desenvolvimento, testes e backup.
+- `docs/`: decisões arquiteturais e regras de engenharia.

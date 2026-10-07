@@ -32,71 +32,113 @@ foreach ($line in Get-Content -LiteralPath $environmentFile)
     $envVars[$name] = $value
 }
 
-$dbUser = if ($envVars.ContainsKey("POSTGRES_USER")) { $envVars["POSTGRES_USER"] } else { "postgres" }
-$dbPass = if ($envVars.ContainsKey("POSTGRES_PASSWORD")) { $envVars["POSTGRES_PASSWORD"] } else { "postgres" }
-$dbPort = if ($envVars.ContainsKey("POSTGRES_PORT")) { $envVars["POSTGRES_PORT"] } else { "5432" }
-$targetDb = if (-not [string]::IsNullOrWhiteSpace($Database)) { $Database } elseif ($envVars.ContainsKey("POSTGRES_DB")) { $envVars["POSTGRES_DB"] } else { "transjap_horimetros" }
+foreach ($requiredVariable in @("SQLSERVER_HOST", "SQLSERVER_PORT", "SQLSERVER_DATABASE", "SQLSERVER_USER", "SQLSERVER_PASSWORD"))
+{
+    if (-not $envVars.ContainsKey($requiredVariable) -or [string]::IsNullOrWhiteSpace($envVars[$requiredVariable]))
+    {
+        Write-Error "A variável $requiredVariable deve ser definida no arquivo .env."
+        exit 1
+    }
+}
+
+if ($envVars["SQLSERVER_PASSWORD"] -eq "your_secure_password_here")
+{
+    Write-Error "Substitua a senha de exemplo do SQL Server no arquivo .env antes de executar o backup."
+    exit 1
+}
+
+$dbHost = $envVars["SQLSERVER_HOST"]
+$dbPort = $envVars["SQLSERVER_PORT"]
+$dbUser = $envVars["SQLSERVER_USER"]
+$dbPassword = $envVars["SQLSERVER_PASSWORD"]
+$targetDb = if ([string]::IsNullOrWhiteSpace($Database)) { $envVars["SQLSERVER_DATABASE"] } else { $Database }
 
 if ([string]::IsNullOrWhiteSpace($OutputFolder))
 {
-    $OutputFolder = Join-Path $repositoryRoot ".postgres-backups"
+    $OutputFolder = Join-Path $repositoryRoot ".sqlserver-backups"
 }
-
 if (-not (Test-Path -LiteralPath $OutputFolder))
 {
     New-Item -ItemType Directory -Force -Path $OutputFolder | Out-Null
 }
 
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$backupFile = Join-Path $OutputFolder "${targetDb}_backup_${timestamp}.sql"
+$backupFile = Join-Path ([IO.Path]::GetFullPath($OutputFolder)) "${targetDb}_backup_${timestamp}.bak"
+$escapedDatabase = $targetDb.Replace("]", "]]")
+$docker = Get-Command "docker" -ErrorAction SilentlyContinue
+$containerId = $null
 
-$localPgDump = Join-Path $repositoryRoot ".postgres\pgsql\bin\pg_dump.exe"
-$pgDumpCmd = if (Test-Path -LiteralPath $localPgDump)
+if ($docker)
 {
-    $localPgDump
-}
-elseif (Get-Command "pg_dump" -ErrorAction SilentlyContinue)
-{
-    "pg_dump"
-}
-else
-{
-    $null
+    $containerId = (& $docker.Source compose ps -q sqlserver 2>$null | Select-Object -First 1)
 }
 
 Write-Host "Iniciando backup preventivo do banco '$targetDb'..." -ForegroundColor Cyan
 
-if ($pgDumpCmd)
+if (-not [string]::IsNullOrWhiteSpace($containerId))
 {
-    $env:PGPASSWORD = $dbPass
-    & $pgDumpCmd -h 127.0.0.1 -p $dbPort -U $dbUser -d $targetDb -F p --clean --if-exists -f $backupFile
+    $serverBackupPath = "/var/opt/mssql/backup/$(Split-Path -Leaf $backupFile)"
+    $escapedServerPath = $serverBackupPath.Replace("'", "''")
+    $query = "BACKUP DATABASE [$escapedDatabase] TO DISK = N'$escapedServerPath' WITH COPY_ONLY, INIT, CHECKSUM; RESTORE VERIFYONLY FROM DISK = N'$escapedServerPath' WITH CHECKSUM;"
+
+    & $docker.Source compose exec -T sqlserver mkdir -p /var/opt/mssql/backup
     if ($LASTEXITCODE -ne 0)
     {
-        Write-Error "Falha ao executar pg_dump (código de saída $LASTEXITCODE)."
+        Write-Error "Não foi possível preparar o diretório de backup no container."
         exit $LASTEXITCODE
+    }
+
+    & $docker.Source compose exec -T -e "SQLCMDPASSWORD=$dbPassword" sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U $dbUser -C -b -Q $query
+    if ($LASTEXITCODE -ne 0)
+    {
+        Write-Error "Falha ao criar ou validar o backup dentro do container SQL Server."
+        exit $LASTEXITCODE
+    }
+
+    & $docker.Source cp "${containerId}:${serverBackupPath}" $backupFile
+    $copyExitCode = $LASTEXITCODE
+    & $docker.Source compose exec -T sqlserver rm -f $serverBackupPath
+    if ($copyExitCode -ne 0)
+    {
+        Write-Error "O backup foi criado no container, mas não pôde ser copiado para o host."
+        exit $copyExitCode
     }
 }
 else
 {
-    # Tenta via docker compose se pg_dump não estiver no host
-    Write-Host "pg_dump local não encontrado. Tentando via docker compose..." -ForegroundColor Yellow
-    docker compose exec -T postgres pg_dump -U $dbUser -d $targetDb -F p --clean --if-exists > $backupFile
-    if ($LASTEXITCODE -ne 0)
+    $sqlCmd = Get-Command "sqlcmd" -ErrorAction SilentlyContinue
+    if (-not $sqlCmd)
     {
-        Write-Error "Não foi possível executar o backup nem via executável local nem via Docker."
-        exit $LASTEXITCODE
+        Write-Error "Backup não executado: use o serviço Docker 'sqlserver' ou instale o utilitário sqlcmd."
+        exit 1
+    }
+
+    $escapedBackupPath = $backupFile.Replace("'", "''")
+    $query = "BACKUP DATABASE [$escapedDatabase] TO DISK = N'$escapedBackupPath' WITH COPY_ONLY, INIT, CHECKSUM; RESTORE VERIFYONLY FROM DISK = N'$escapedBackupPath' WITH CHECKSUM;"
+    $previousSqlCmdPassword = $env:SQLCMDPASSWORD
+    try
+    {
+        $env:SQLCMDPASSWORD = $dbPassword
+        & $sqlCmd.Source -S "$dbHost,$dbPort" -U $dbUser -C -b -Q $query
+        if ($LASTEXITCODE -ne 0)
+        {
+            Write-Error "Falha ao criar ou validar o backup com sqlcmd. Confirme que o serviço SQL Server pode gravar em '$OutputFolder'."
+            exit $LASTEXITCODE
+        }
+    }
+    finally
+    {
+        $env:SQLCMDPASSWORD = $previousSqlCmdPassword
     }
 }
 
-if (Test-Path -LiteralPath $backupFile)
-{
-    $size = (Get-Item -LiteralPath $backupFile).Length
-    Write-Host "Backup concluído com sucesso!" -ForegroundColor Green
-    Write-Host "Arquivo: $backupFile" -ForegroundColor Green
-    Write-Host "Tamanho: $([math]::Round($size / 1KB, 2)) KB" -ForegroundColor Green
-}
-else
+if (-not (Test-Path -LiteralPath $backupFile))
 {
     Write-Error "Arquivo de backup não foi gerado."
     exit 1
 }
+
+$size = (Get-Item -LiteralPath $backupFile).Length
+Write-Host "Backup SQL Server criado e verificado com sucesso." -ForegroundColor Green
+Write-Host "Arquivo: $backupFile" -ForegroundColor Green
+Write-Host "Tamanho: $([math]::Round($size / 1MB, 2)) MB" -ForegroundColor Green

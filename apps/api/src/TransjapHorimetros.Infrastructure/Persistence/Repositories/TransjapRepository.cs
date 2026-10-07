@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using Microsoft.Data.SqlClient;
+using System.Text.RegularExpressions;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.Anomalies;
 using TransjapHorimetros.Application.Common;
@@ -62,7 +63,7 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         if (!string.IsNullOrWhiteSpace(query.Model))
         {
             var model = $"%{query.Model.Trim()}%";
-            machines = machines.Where(machine => EF.Functions.ILike(machine.Model, model));
+            machines = machines.Where(machine => EF.Functions.Like(machine.Model, model));
         }
 
         if (query.Status.HasValue)
@@ -287,16 +288,22 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
             return await dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (
-            exception.InnerException is PostgresException
-            {
-                SqlState: PostgresErrorCodes.UniqueViolation,
-            } postgresException)
+            exception.InnerException is SqlException { Number: 2601 or 2627 } sqlException)
         {
-            throw new UniqueConstraintException(postgresException.ConstraintName, exception);
+            throw new UniqueConstraintException(GetUniqueConstraintName(sqlException), exception);
         }
     }
 
     public void ClearChanges() => dbContext.ChangeTracker.Clear();
+
+    private static string? GetUniqueConstraintName(SqlException exception)
+    {
+        var match = Regex.Match(
+            exception.Message,
+            "'(?<constraint>ux_[^']+)'",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success ? match.Groups["constraint"].Value : null;
+    }
 
     private IQueryable<HourMeterReading> ReadingsWithReferences() =>
         dbContext.HourMeterReadings

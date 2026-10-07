@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitialCreateSqlServer : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,15 +15,15 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                 name: "audit_logs",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    action = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    entity = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: false),
-                    entity_id = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: false),
-                    old_value = table.Column<string>(type: "jsonb", nullable: true),
-                    new_value = table.Column<string>(type: "jsonb", nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    correlation_id = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: true)
+                    id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    action = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    entity = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
+                    entity_id = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
+                    old_value = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    new_value = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false),
+                    correlation_id = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    user_id = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -34,12 +34,12 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                 name: "machines",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    fleet_number = table.Column<int>(type: "integer", nullable: false),
-                    model = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: false),
-                    status = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    fleet_number = table.Column<int>(type: "int", nullable: false),
+                    model = table.Column<string>(type: "nvarchar(160)", maxLength: 160, nullable: false),
+                    status = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    created_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -51,12 +51,12 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                 name: "work_sites",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    name = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: false),
-                    code = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
-                    active = table.Column<bool>(type: "boolean", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    name = table.Column<string>(type: "nvarchar(160)", maxLength: 160, nullable: false),
+                    code = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
+                    active = table.Column<bool>(type: "bit", nullable: false),
+                    created_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -67,18 +67,18 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                 name: "hour_meter_readings",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    machine_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    work_site_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    value = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    reading_type = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    captured_at_device = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    received_at_server = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    synced_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    client_event_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    machine_id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    work_site_id = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    value = table.Column<decimal>(type: "decimal(12,2)", precision: 12, scale: 2, nullable: false),
+                    reading_type = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
+                    status = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
+                    captured_at_device = table.Column<DateTime>(type: "datetime2(7)", nullable: false),
+                    received_at_server = table.Column<DateTime>(type: "datetime2(7)", nullable: false),
+                    synced_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false),
+                    client_event_id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    created_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -102,13 +102,13 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                 name: "anomalies",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    reading_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    type = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    severity = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
-                    status = table.Column<string>(type: "character varying(24)", maxLength: 24, nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    reading_id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    type = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    severity = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
+                    status = table.Column<string>(type: "nvarchar(24)", maxLength: 24, nullable: false),
+                    created_at = table.Column<DateTime>(type: "datetime2(7)", nullable: false)
                 },
                 constraints: table =>
                 {

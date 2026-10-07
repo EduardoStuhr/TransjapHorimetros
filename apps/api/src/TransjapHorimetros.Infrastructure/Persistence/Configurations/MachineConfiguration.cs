@@ -24,11 +24,9 @@ public sealed class MachineConfiguration : IEntityTypeConfiguration<Machine>
             .IsRequired();
         builder.Property(machine => machine.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.Property(machine => machine.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.HasIndex(machine => machine.FleetNumber)
             .IsUnique()

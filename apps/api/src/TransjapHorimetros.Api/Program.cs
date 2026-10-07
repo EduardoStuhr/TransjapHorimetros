@@ -105,7 +105,7 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), ["live", "ready"])
-    .AddCheck<PostgresHealthCheck>("postgresql", tags: ["ready"]);
+    .AddCheck<SqlServerHealthCheck>("sqlserver", tags: ["ready"]);
 
 var app = builder.Build();
 

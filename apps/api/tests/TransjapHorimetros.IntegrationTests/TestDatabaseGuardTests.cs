@@ -2,9 +2,9 @@ namespace TransjapHorimetros.IntegrationTests;
 
 public sealed class TestDatabaseGuardTests
 {
-    private const string SafeTestConn = "Host=127.0.0.1;Port=5432;Database=transjap_horimetros_tests;Username=postgres;Password=secret";
-    private const string AppConn = "Host=127.0.0.1;Port=5432;Database=transjap_horimetros;Username=postgres;Password=secret";
-    private const string DangerProdConn = "Host=127.0.0.1;Port=5432;Database=transjap_horimetros;Username=postgres;Password=secret";
+    private const string SafeTestConn = "Server=127.0.0.1,1433;Database=transjap_horimetros_tests;User Id=sa;Password=secret;Encrypt=False";
+    private const string AppConn = "Server=127.0.0.1,1433;Database=transjap_horimetros;User Id=sa;Password=secret;Encrypt=False";
+    private const string DangerProdConn = "Server=127.0.0.1,1433;Database=transjap_horimetros;User Id=sa;Password=secret;Encrypt=False";
 
     [Fact]
     public void EnsureSafeTestDatabase_WhenPointsToRealApplicationDatabase_ThrowsInvalidOperationException()
@@ -19,7 +19,7 @@ public sealed class TestDatabaseGuardTests
     [Fact]
     public void EnsureSafeTestDatabase_WhenPointsToArbitraryDatabase_ThrowsInvalidOperationException()
     {
-        const string otherConn = "Host=127.0.0.1;Port=5432;Database=transjap_other;Username=postgres";
+        const string otherConn = "Server=127.0.0.1,1433;Database=transjap_other;User Id=sa;Encrypt=False";
         var ex = Assert.Throws<InvalidOperationException>(() =>
             TestDatabaseGuard.EnsureSafeTestDatabase(otherConn, AppConn));
 
@@ -30,7 +30,7 @@ public sealed class TestDatabaseGuardTests
     [Fact]
     public void EnsureSafeTestDatabase_WhenTestAndAppDatabasesAreIdentical_ThrowsInvalidOperationException()
     {
-        const string identicalConn = "Host=127.0.0.1;Port=5432;Database=transjap_horimetros_tests;Username=postgres";
+        const string identicalConn = "Server=127.0.0.1,1433;Database=transjap_horimetros_tests;User Id=sa;Encrypt=False";
         var ex = Assert.Throws<InvalidOperationException>(() =>
             TestDatabaseGuard.EnsureSafeTestDatabase(identicalConn, identicalConn));
 
@@ -42,6 +42,16 @@ public sealed class TestDatabaseGuardTests
     public void EnsureSafeTestDatabase_WhenValidTestDatabase_SucceedsWithoutException()
     {
         TestDatabaseGuard.EnsureSafeTestDatabase(SafeTestConn, AppConn);
+    }
+
+    [Fact]
+    public void EnsureSafeTestDatabase_WhenAzureSqlIsUsed_ThrowsInvalidOperationException()
+    {
+        const string azureConn = "Server=tcp:example.database.windows.net,1433;Database=transjap_horimetros_tests;User Id=test;Password=secret;Encrypt=True";
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            TestDatabaseGuard.EnsureSafeTestDatabase(azureConn, AppConn));
+
+        Assert.Contains("Azure SQL Database", ex.Message);
     }
 
     [Theory]

@@ -17,7 +17,10 @@
 /.dotnet/
 /.tools/
 
-# PostgreSQL local
+# SQL Server local
+/.sqlserver-backups/
+
+# Dados locais legados preservados durante a migração
 /.postgres/
 /.postgres-data/
 /.postgres-backups/

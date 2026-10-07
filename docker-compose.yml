@@ -1,23 +1,23 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: transjap_postgres
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: transjap_sqlserver
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${SQLSERVER_PORT:-1433}:1433"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-transjap_horimetros}
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: ${SQLSERVER_PASSWORD:?Defina SQLSERVER_PASSWORD no arquivo .env}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - sqlserver_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-transjap_horimetros}"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q \"SELECT 1\" || exit 1"]
       interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 20
+      start_period: 30s
 
 volumes:
-  postgres_data:
+  sqlserver_data:
     driver: local

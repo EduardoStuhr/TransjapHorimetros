@@ -35,26 +35,21 @@ public sealed class HourMeterReadingConfiguration : IEntityTypeConfiguration<Hou
             .IsRequired();
         builder.Property(reading => reading.CapturedAtDevice)
             .HasColumnName("captured_at_device")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.Property(reading => reading.ReceivedAtServer)
             .HasColumnName("received_at_server")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.Property(reading => reading.SyncedAt)
             .HasColumnName("synced_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.Property(reading => reading.ClientEventId)
             .HasColumnName("client_event_id")
             .IsRequired();
         builder.Property(reading => reading.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.Property(reading => reading.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.HasOne(reading => reading.Machine)

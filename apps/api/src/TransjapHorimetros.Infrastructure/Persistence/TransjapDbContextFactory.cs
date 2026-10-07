@@ -7,10 +7,10 @@ public sealed class TransjapDbContextFactory : IDesignTimeDbContextFactory<Trans
 {
     public TransjapDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres")
-            ?? "Host=127.0.0.1;Port=5432;Database=transjap_horimetros;Username=postgres";
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+            ?? "Server=127.0.0.1,1433;Database=transjap_horimetros;User Id=sa;Encrypt=False;TrustServerCertificate=True";
         var options = new DbContextOptionsBuilder<TransjapDbContext>()
-            .UseNpgsql(connectionString)
+            .UseSqlServer(connectionString)
             .Options;
         return new TransjapDbContext(options);
     }

@@ -2,9 +2,9 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TransjapHorimetros.Infrastructure.Persistence;
 
 #nullable disable
@@ -12,8 +12,8 @@ using TransjapHorimetros.Infrastructure.Persistence;
 namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TransjapDbContext))]
-    [Migration("20261006185640_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20261007184553_InitialCreateSqlServer")]
+    partial class InitialCreateSqlServer
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -21,46 +21,46 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "10.0.4")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.Anomaly", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("created_at");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("nvarchar(1000)")
                         .HasColumnName("description");
 
                     b.Property<Guid>("ReadingId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("reading_id");
 
                     b.Property<string>("Severity")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("nvarchar(16)")
                         .HasColumnName("severity");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(24)
-                        .HasColumnType("character varying(24)")
+                        .HasColumnType("nvarchar(24)")
                         .HasColumnName("status");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("nvarchar(64)")
                         .HasColumnName("type");
 
                     b.HasKey("Id")
@@ -75,47 +75,47 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("nvarchar(64)")
                         .HasColumnName("action");
 
                     b.Property<string>("CorrelationId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasColumnName("correlation_id");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("created_at");
 
                     b.Property<string>("Entity")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
+                        .HasColumnType("nvarchar(80)")
                         .HasColumnName("entity");
 
                     b.Property<string>("EntityId")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
+                        .HasColumnType("nvarchar(80)")
                         .HasColumnName("entity_id");
 
                     b.Property<string>("NewValue")
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("new_value");
 
                     b.Property<string>("OldValue")
-                        .HasColumnType("jsonb")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("old_value");
 
                     b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id")
@@ -130,56 +130,56 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.HourMeterReading", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset>("CapturedAtDevice")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("CapturedAtDevice")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("captured_at_device");
 
                     b.Property<Guid>("ClientEventId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("client_event_id");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("created_at");
 
                     b.Property<Guid>("MachineId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("machine_id");
 
                     b.Property<string>("ReadingType")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("nvarchar(32)")
                         .HasColumnName("reading_type");
 
-                    b.Property<DateTimeOffset>("ReceivedAtServer")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("ReceivedAtServer")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("received_at_server");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("nvarchar(32)")
                         .HasColumnName("status");
 
-                    b.Property<DateTimeOffset>("SyncedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("SyncedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("synced_at");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("updated_at");
 
                     b.Property<decimal>("Value")
                         .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)")
+                        .HasColumnType("decimal(12,2)")
                         .HasColumnName("value");
 
                     b.Property<Guid?>("WorkSiteId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("work_site_id");
 
                     b.HasKey("Id")
@@ -208,31 +208,31 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.Machine", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("created_at");
 
                     b.Property<int>("FleetNumber")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasColumnName("fleet_number");
 
                     b.Property<string>("Model")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
+                        .HasColumnType("nvarchar(160)")
                         .HasColumnName("model");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("nvarchar(16)")
                         .HasColumnName("status");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id")
@@ -251,31 +251,31 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.WorkSite", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                        .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
                     b.Property<bool>("Active")
-                        .HasColumnType("boolean")
+                        .HasColumnType("bit")
                         .HasColumnName("active");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("nvarchar(40)")
                         .HasColumnName("code");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("created_at");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
+                        .HasColumnType("nvarchar(160)")
                         .HasColumnName("name");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2(7)")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id")

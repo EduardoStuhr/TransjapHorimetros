@@ -16,11 +16,9 @@ public sealed class WorkSiteConfiguration : IEntityTypeConfiguration<WorkSite>
         builder.Property(workSite => workSite.Active).HasColumnName("active").IsRequired();
         builder.Property(workSite => workSite.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.Property(workSite => workSite.UpdatedAt)
             .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
             .IsRequired();
         builder.HasIndex(workSite => workSite.Code).HasDatabaseName("ix_work_sites_code");
     }

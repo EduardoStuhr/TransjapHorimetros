@@ -30,6 +30,9 @@ public sealed record CreateMachineRequest
     public string Model { get; init; } = string.Empty;
 
     public MachineStatus Status { get; init; } = MachineStatus.Active;
+
+    /// <remarks>null indica que a unidade ainda não foi confirmada pela Transjap (RN-007).</remarks>
+    public MeterUnit? MeterUnit { get; init; }
 }
 
 public sealed record UpdateMachineRequest
@@ -42,6 +45,9 @@ public sealed record UpdateMachineRequest
     public string Model { get; init; } = string.Empty;
 
     public MachineStatus Status { get; init; }
+
+    /// <remarks>null indica que a unidade ainda não foi confirmada pela Transjap (RN-007).</remarks>
+    public MeterUnit? MeterUnit { get; init; }
 }
 
 public sealed record LatestReadingResponse(
@@ -56,6 +62,7 @@ public sealed record MachineListItemResponse(
     int FleetNumber,
     string Model,
     MachineStatus Status,
+    MeterUnit? MeterUnit,
     LatestReadingResponse? LatestReading,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
@@ -65,6 +72,7 @@ public sealed record MachineDetailsResponse(
     int FleetNumber,
     string Model,
     MachineStatus Status,
+    MeterUnit? MeterUnit,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     ReadingResponse? LatestReading,

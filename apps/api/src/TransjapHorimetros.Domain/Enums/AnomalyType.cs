@@ -6,7 +6,10 @@ public enum AnomalyType
     ImpossibleHourIncrease,
     DuplicateReading,
     MissingReading,
+    ClockSkew,
     LateSync,
+    DayTransitionMismatch,
     LowOcrConfidence,
     OcrOperatorDivergence,
+    WrongWorkSite,
 }

@@ -83,6 +83,13 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
     public Task<int> CountAsync(CancellationToken cancellationToken) =>
         dbContext.Machines.CountAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Guid>> GetActiveIdsAsync(CancellationToken cancellationToken) =>
+        await dbContext.Machines
+            .AsNoTracking()
+            .Where(machine => machine.Status == MachineStatus.Active)
+            .Select(machine => machine.Id)
+            .ToListAsync(cancellationToken);
+
     public void Add(Machine machine) => dbContext.Machines.Add(machine);
 
     Task<WorkSite?> IWorkSiteRepository.GetByIdAsync(
@@ -228,6 +235,42 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
             .Distinct()
             .CountAsync(cancellationToken);
 
+    public Task<bool> ExistsSimilarAsync(
+        Guid machineId,
+        decimal value,
+        DateTimeOffset capturedAt,
+        Guid excludingClientEventId,
+        CancellationToken cancellationToken) =>
+        dbContext.HourMeterReadings
+            .AsNoTracking()
+            .AnyAsync(
+                reading => reading.MachineId == machineId
+                    && reading.Value == value
+                    && reading.CapturedAtDevice == capturedAt
+                    && reading.ClientEventId != excludingClientEventId,
+                cancellationToken);
+
+    public async Task<int> CountActiveMachinesWithoutReadingSinceAsync(
+        IReadOnlyCollection<Guid> activeMachineIds,
+        DateTimeOffset receivedSince,
+        CancellationToken cancellationToken)
+    {
+        if (activeMachineIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var machinesWithReadings = await dbContext.HourMeterReadings
+            .AsNoTracking()
+            .Where(reading => activeMachineIds.Contains(reading.MachineId)
+                && reading.ReceivedAtServer >= receivedSince)
+            .Select(reading => reading.MachineId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        return activeMachineIds.Count - machinesWithReadings;
+    }
+
     public void Add(HourMeterReading reading) => dbContext.HourMeterReadings.Add(reading);
 
     Task<Anomaly?> IAnomalyRepository.GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
@@ -243,7 +286,7 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         if (query.MachineId.HasValue)
         {
             anomalies = anomalies.Where(
-                anomaly => anomaly.Reading.MachineId == query.MachineId.Value);
+                anomaly => anomaly.MachineId == query.MachineId.Value);
         }
 
         if (query.Type.HasValue)
@@ -271,7 +314,7 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         var anomalies = dbContext.Anomalies.Where(anomaly => anomaly.Status == AnomalyStatus.Open);
         if (machineId.HasValue)
         {
-            anomalies = anomalies.Where(anomaly => anomaly.Reading.MachineId == machineId.Value);
+            anomalies = anomalies.Where(anomaly => anomaly.MachineId == machineId.Value);
         }
 
         return anomalies.CountAsync(cancellationToken);
@@ -314,8 +357,9 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
     private IQueryable<Anomaly> AnomaliesWithReferences() =>
         dbContext.Anomalies
             .AsNoTracking()
+            .Include(anomaly => anomaly.Machine)
             .Include(anomaly => anomaly.Reading)
-                .ThenInclude(reading => reading.Machine);
+                .ThenInclude(reading => reading == null ? null : reading.Machine);
 
     private static async Task<RepositoryPage<HourMeterReading>> PageReadingsAsync(
         IQueryable<HourMeterReading> readings,

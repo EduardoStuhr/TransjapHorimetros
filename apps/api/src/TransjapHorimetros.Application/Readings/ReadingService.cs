@@ -2,7 +2,6 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.Common;
-using TransjapHorimetros.Application.Configuration;
 using TransjapHorimetros.Application.Exceptions;
 using TransjapHorimetros.Domain.Entities;
 using TransjapHorimetros.Domain.Enums;
@@ -89,6 +88,7 @@ public sealed class ReadingService(
                 ?? throw new EntityNotFoundException("Obra", request.WorkSiteId.Value);
         }
 
+        // RN-003 — ClientEventId garante idempotência: mesmo evento retorna leitura existente sem criar nova
         var existing = await readingRepository.GetByClientEventIdAsync(
             request.ClientEventId,
             cancellationToken);
@@ -102,14 +102,30 @@ public sealed class ReadingService(
             request.MachineId,
             capturedAt,
             cancellationToken);
-        var assessment = policy.Assess(
-            previous?.Value,
-            previous?.CapturedAtDevice,
+
+        // Detectar possível duplicata: mesmo valor+horário com ClientEventId diferente (RN-005)
+        var isPotentialDuplicate = await readingRepository.ExistsSimilarAsync(
+            request.MachineId,
             request.Value,
             capturedAt,
-            rulesOptions.ElapsedTimeToleranceHours);
+            request.ClientEventId,
+            cancellationToken);
 
+        // RN-002 — ReceivedAtServer sempre definido pelo servidor; nunca substitui pelo horário do cliente
         var receivedAtServer = timeProvider.GetUtcNow();
+
+        var context = new ReadingAssessmentContext(
+            PreviousValue: previous?.Value,
+            PreviousCapturedAt: previous?.CapturedAtDevice,
+            PreviousReadingType: previous?.ReadingType,
+            CurrentValue: request.Value,
+            CurrentCapturedAt: capturedAt,
+            CurrentReadingType: request.ReadingType!.Value,
+            ReceivedAtServer: receivedAtServer,
+            IsPotentialDuplicate: isPotentialDuplicate);
+
+        var assessment = policy.Assess(context, rulesOptions);
+
         var syncedAt = timeProvider.GetUtcNow();
         var reading = new HourMeterReading(
             request.MachineId,
@@ -123,20 +139,22 @@ public sealed class ReadingService(
             request.ClientEventId);
         readingRepository.Add(reading);
 
-        if (assessment.AnomalyType.HasValue)
+        // RN-010 — leitura suspeita permanece auditável; uma Anomaly por detecção
+        foreach (var anomalyDetection in assessment.Anomalies)
         {
             var anomaly = new Anomaly(
+                reading.MachineId,
                 reading.Id,
-                assessment.AnomalyType.Value,
-                assessment.Severity ?? AnomalySeverity.Warning,
-                assessment.Description ?? "Inconsistência detectada na leitura.",
+                anomalyDetection.Type,
+                anomalyDetection.Severity,
+                anomalyDetection.Description,
                 syncedAt);
             anomalyRepository.Add(anomaly);
             logger.LogWarning(
                 "Leitura suspeita detectada. MachineId={MachineId} ReadingId={ReadingId} AnomalyType={AnomalyType} CorrelationId={CorrelationId}",
                 reading.MachineId,
                 reading.Id,
-                anomaly.Type,
+                anomalyDetection.Type,
                 correlationId);
         }
 

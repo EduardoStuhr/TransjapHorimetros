@@ -12,7 +12,8 @@ public sealed class AnomalyConfiguration : IEntityTypeConfiguration<Anomaly>
         builder.ToTable("anomalies");
         builder.HasKey(anomaly => anomaly.Id).HasName("pk_anomalies");
         builder.Property(anomaly => anomaly.Id).HasColumnName("id").ValueGeneratedNever();
-        builder.Property(anomaly => anomaly.ReadingId).HasColumnName("reading_id").IsRequired();
+        builder.Property(anomaly => anomaly.MachineId).HasColumnName("machine_id").IsRequired();
+        builder.Property(anomaly => anomaly.ReadingId).HasColumnName("reading_id");
         builder.Property(anomaly => anomaly.Type)
             .HasColumnName("type")
             .HasMaxLength(64)
@@ -41,13 +42,23 @@ public sealed class AnomalyConfiguration : IEntityTypeConfiguration<Anomaly>
         builder.Property(anomaly => anomaly.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
+
+        builder.HasOne(anomaly => anomaly.Machine)
+            .WithMany()
+            .HasForeignKey(anomaly => anomaly.MachineId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_anomalies_machines_machine_id");
+
         builder.HasOne(anomaly => anomaly.Reading)
             .WithMany(reading => reading.Anomalies)
             .HasForeignKey(anomaly => anomaly.ReadingId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_anomalies_hour_meter_readings_reading_id");
+
         builder.HasIndex(anomaly => anomaly.ReadingId)
             .HasDatabaseName("ix_anomalies_reading_id");
+        builder.HasIndex(anomaly => anomaly.MachineId)
+            .HasDatabaseName("ix_anomalies_machine_id");
     }
 
     private static string ToDatabaseValue(AnomalyType value)

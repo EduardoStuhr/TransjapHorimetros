@@ -9,12 +9,18 @@ public sealed class Machine : AuditableEntity
     {
     }
 
-    public Machine(int fleetNumber, string model, MachineStatus status, DateTimeOffset now)
+    public Machine(
+        int fleetNumber,
+        string model,
+        MachineStatus status,
+        DateTimeOffset now,
+        MeterUnit? meterUnit = null)
     {
         Id = Guid.NewGuid();
         FleetNumber = fleetNumber;
         Model = model.Trim();
         Status = status;
+        MeterUnit = meterUnit;
         CreatedAt = now.ToUniversalTime();
         UpdatedAt = CreatedAt;
     }
@@ -25,13 +31,21 @@ public sealed class Machine : AuditableEntity
 
     public MachineStatus Status { get; private set; }
 
+    public MeterUnit? MeterUnit { get; private set; }
+
     public ICollection<HourMeterReading> Readings { get; } = new List<HourMeterReading>();
 
-    public void Update(int fleetNumber, string model, MachineStatus status, DateTimeOffset now)
+    public void Update(
+        int fleetNumber,
+        string model,
+        MachineStatus status,
+        MeterUnit? meterUnit,
+        DateTimeOffset now)
     {
         FleetNumber = fleetNumber;
         Model = model.Trim();
         Status = status;
+        MeterUnit = meterUnit;
         UpdatedAt = now.ToUniversalTime();
     }
 }

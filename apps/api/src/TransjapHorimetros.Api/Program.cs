@@ -24,11 +24,12 @@ builder.Logging.AddJsonConsole();
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1_048_576);
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton(new HourMeterRulesOptions
-{
-    ElapsedTimeToleranceHours = builder.Configuration.GetValue<decimal?>(
-        $"{HourMeterRulesOptions.SectionName}:ElapsedTimeToleranceHours") ?? 0.25m,
-});
+
+// Vincula todas as opções de regras operacionais a partir do appsettings.json (seção HourMeterRules)
+var rulesOptions = builder.Configuration
+    .GetSection(HourMeterRulesOptions.SectionName)
+    .Get<HourMeterRulesOptions>() ?? new HourMeterRulesOptions();
+builder.Services.AddSingleton(rulesOptions);
 builder.Services.AddSingleton<HourMeterReadingPolicy>();
 builder.Services.AddScoped<IMachineService, MachineService>();
 builder.Services.AddScoped<IWorkSiteService, WorkSiteService>();

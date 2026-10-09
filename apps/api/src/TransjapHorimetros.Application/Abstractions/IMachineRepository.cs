@@ -16,5 +16,11 @@ public interface IMachineRepository
 
     Task<int> CountAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Retorna os IDs de todas as máquinas com status ACTIVE.
+    /// Usado pelo DashboardService para calcular máquinas sem leitura (RN-006).
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetActiveIdsAsync(CancellationToken cancellationToken);
+
     void Add(Machine machine);
 }

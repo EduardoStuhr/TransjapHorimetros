@@ -6,42 +6,101 @@ namespace TransjapHorimetros.Domain.Rules;
 public sealed class HourMeterReadingPolicy
 {
     public ReadingAssessment Assess(
-        decimal? previousValue,
-        DateTimeOffset? previousCapturedAt,
-        decimal currentValue,
-        DateTimeOffset currentCapturedAt,
-        decimal elapsedTimeToleranceHours)
+        ReadingAssessmentContext context,
+        HourMeterRulesOptions options)
     {
-        if (previousValue is null || previousCapturedAt is null)
+        if (context.CurrentValue < 0m)
         {
-            return ReadingAssessment.Validated;
+            return ReadingAssessment.Rejected("O valor da leitura não pode ser negativo.");
         }
 
-        if (currentValue < previousValue.Value)
+        var anomalies = new List<AnomalyDetection>();
+
+        if (context.IsPotentialDuplicate)
         {
-            return new ReadingAssessment(
-                ReadingStatus.Suspect,
-                AnomalyType.ReadingDecrease,
-                AnomalySeverity.Warning,
-                $"A leitura {Format(currentValue)} é menor que a leitura válida anterior {Format(previousValue.Value)}.");
+            anomalies.Add(Detect(
+                AnomalyType.DuplicateReading,
+                "Outra leitura da mesma máquina possui exatamente o mesmo valor e horário de captura."));
         }
 
-        var elapsedHours = Math.Max(
-            0m,
-            (decimal)(currentCapturedAt.ToUniversalTime() - previousCapturedAt.Value.ToUniversalTime()).TotalHours);
-        var readingDelta = currentValue - previousValue.Value;
+        DetectClockSkew(context, options, anomalies);
 
-        if (readingDelta > elapsedHours + elapsedTimeToleranceHours)
+        if (context.PreviousValue.HasValue && context.PreviousCapturedAt.HasValue)
         {
-            return new ReadingAssessment(
-                ReadingStatus.Suspect,
-                AnomalyType.ImpossibleHourIncrease,
-                AnomalySeverity.Warning,
-                $"O aumento de {Format(readingDelta)} h excede as {Format(elapsedHours)} h transcorridas mais a tolerância configurada.");
+            DetectSequenceAnomalies(context, options, anomalies);
         }
 
-        return ReadingAssessment.Validated;
+        return anomalies.Count == 0
+            ? ReadingAssessment.Validated
+            : new ReadingAssessment(ReadingStatus.Suspect, anomalies);
     }
+
+    private static void DetectClockSkew(
+        ReadingAssessmentContext context,
+        HourMeterRulesOptions options,
+        ICollection<AnomalyDetection> anomalies)
+    {
+        var clockSkewSeconds = Math.Abs(
+            (context.ReceivedAtServer.ToUniversalTime() - context.CurrentCapturedAt.ToUniversalTime())
+            .TotalSeconds);
+
+        if (clockSkewSeconds > options.ClockSkewToleranceSeconds)
+        {
+            anomalies.Add(Detect(
+                AnomalyType.ClockSkew,
+                $"O horário do dispositivo diverge {Format((decimal)clockSkewSeconds)} segundos do horário de recebimento do servidor."));
+        }
+    }
+
+    private static void DetectSequenceAnomalies(
+        ReadingAssessmentContext context,
+        HourMeterRulesOptions options,
+        ICollection<AnomalyDetection> anomalies)
+    {
+        var previousValue = context.PreviousValue!.Value;
+        var previousCapturedAt = context.PreviousCapturedAt!.Value;
+        var readingDelta = context.CurrentValue - previousValue;
+
+        if (readingDelta < 0m)
+        {
+            anomalies.Add(Detect(
+                AnomalyType.ReadingDecrease,
+                $"A leitura {Format(context.CurrentValue)} é menor que a leitura válida anterior {Format(previousValue)}."));
+        }
+        else
+        {
+            var elapsedHours = Math.Max(
+                0m,
+                (decimal)(context.CurrentCapturedAt.ToUniversalTime() - previousCapturedAt.ToUniversalTime()).TotalHours);
+            var elapsedLimit =
+                (elapsedHours * options.MaxPlausibleHoursPerElapsedHour)
+                + options.ElapsedTimeToleranceHours;
+            var elapsedDays = Math.Max(1m, Math.Ceiling(elapsedHours / 24m));
+            var dailyLimit =
+                (elapsedDays * options.MaxPlausibleDailyHours)
+                + options.ElapsedTimeToleranceHours;
+            var maximumPlausibleIncrease = Math.Min(elapsedLimit, dailyLimit);
+
+            if (readingDelta > maximumPlausibleIncrease)
+            {
+                anomalies.Add(Detect(
+                    AnomalyType.ImpossibleHourIncrease,
+                    $"O aumento de {Format(readingDelta)} excede o limite plausível de {Format(maximumPlausibleIncrease)} para {Format(elapsedHours)} horas transcorridas."));
+            }
+        }
+
+        if (context.PreviousReadingType == ReadingType.Closing
+            && context.CurrentReadingType == ReadingType.Opening
+            && Math.Abs(readingDelta) > options.DayTransitionToleranceHours)
+        {
+            anomalies.Add(Detect(
+                AnomalyType.DayTransitionMismatch,
+                $"A diferença entre o fechamento e a abertura seguinte é de {Format(Math.Abs(readingDelta))}, acima da tolerância de {Format(options.DayTransitionToleranceHours)}."));
+        }
+    }
+
+    private static AnomalyDetection Detect(AnomalyType type, string description) =>
+        new(type, AnomalySeverityPolicy.For(type), description);
 
     private static string Format(decimal value) =>
         value.ToString("0.##", CultureInfo.InvariantCulture);

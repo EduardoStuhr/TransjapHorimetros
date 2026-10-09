@@ -20,7 +20,7 @@ public sealed record AnomalyQuery
 
 public sealed record AnomalyResponse(
     Guid Id,
-    Guid ReadingId,
+    Guid? ReadingId,
     Guid MachineId,
     int MachineFleetNumber,
     AnomalyType Type,

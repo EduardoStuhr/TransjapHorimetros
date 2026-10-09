@@ -1,5 +1,6 @@
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Domain.Enums;
+using TransjapHorimetros.Domain.Rules;
 
 namespace TransjapHorimetros.Application.Dashboard;
 
@@ -7,6 +8,7 @@ public sealed class DashboardService(
     IMachineRepository machineRepository,
     IReadingRepository readingRepository,
     IAnomalyRepository anomalyRepository,
+    HourMeterRulesOptions rulesOptions,
     TimeProvider timeProvider) : IDashboardService
 {
     public async Task<DashboardSummaryResponse> GetSummaryAsync(CancellationToken cancellationToken)
@@ -21,12 +23,25 @@ public sealed class DashboardService(
         var suspect = await readingRepository.CountByStatusAsync(ReadingStatus.Suspect, cancellationToken);
         var alerts = await anomalyRepository.CountOpenAsync(null, cancellationToken);
 
+        // RN-006 — máquina ativa sem leitura nos últimos N dias gera alerta (configurável)
+        var thresholdDays = rulesOptions.MissingReadingThresholdDays;
+        var thresholdDate = now.AddDays(-thresholdDays);
+        var activeMachineIds = await machineRepository.GetActiveIdsAsync(cancellationToken);
+        var withoutReading = await readingRepository.CountActiveMachinesWithoutReadingSinceAsync(
+            activeMachineIds,
+            thresholdDate,
+            cancellationToken);
+
+        var withoutReadingDefinition = thresholdDays == 1
+            ? "Máquinas ativas sem leitura recebida hoje"
+            : $"Máquinas ativas sem leitura nos últimos {thresholdDays} dias (padrão operacional provisório — pendente validação Transjap)";
+
         return new DashboardSummaryResponse(
             totalMachines,
             updatedToday,
-            0,
-            false,
-            "Métrica neutra: ainda não existe regra operacional que exija leitura diária para toda a frota.",
+            withoutReading,
+            withoutReadingIsDefined: true,
+            withoutReadingDefinition,
             pending,
             suspect,
             alerts);

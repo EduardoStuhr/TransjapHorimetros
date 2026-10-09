@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.Anomalies;
 using TransjapHorimetros.Application.Common;
-using TransjapHorimetros.Application.Configuration;
 using TransjapHorimetros.Application.Exceptions;
 using TransjapHorimetros.Application.Machines;
 using TransjapHorimetros.Application.Readings;
@@ -130,6 +129,9 @@ public sealed class ReadingServiceTests
 
         public Task<int> CountAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<Guid>> GetActiveIdsAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public void Add(Machine machineToAdd) => throw new NotSupportedException();
     }
 
@@ -170,6 +172,20 @@ public sealed class ReadingServiceTests
             throw new NotSupportedException();
 
         public Task<int> CountDistinctMachinesReceivedSinceAsync(DateTimeOffset receivedSince, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<bool> ExistsSimilarAsync(
+            Guid machineId,
+            decimal value,
+            DateTimeOffset capturedAt,
+            Guid excludingClientEventId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<int> CountActiveMachinesWithoutReadingSinceAsync(
+            IReadOnlyCollection<Guid> activeMachineIds,
+            DateTimeOffset receivedSince,
+            CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public void Add(HourMeterReading reading) => AddedReadings.Add(reading);

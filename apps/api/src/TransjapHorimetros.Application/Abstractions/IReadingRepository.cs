@@ -36,5 +36,25 @@ public interface IReadingRepository
         DateTimeOffset receivedSince,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Verifica se já existe outra leitura da mesma máquina com valor e horário de captura idênticos
+    /// mas com ClientEventId diferente. Usado para detectar DUPLICATE_READING (RN-005).
+    /// </summary>
+    Task<bool> ExistsSimilarAsync(
+        Guid machineId,
+        decimal value,
+        DateTimeOffset capturedAt,
+        Guid excludingClientEventId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Conta máquinas ativas que não tiveram nenhuma leitura recebida desde a data informada.
+    /// Usado para calcular a métrica MissingReadingThresholdDays do dashboard (RN-006).
+    /// </summary>
+    Task<int> CountActiveMachinesWithoutReadingSinceAsync(
+        IReadOnlyCollection<Guid> activeMachineIds,
+        DateTimeOffset receivedSince,
+        CancellationToken cancellationToken);
+
     void Add(HourMeterReading reading);
 }

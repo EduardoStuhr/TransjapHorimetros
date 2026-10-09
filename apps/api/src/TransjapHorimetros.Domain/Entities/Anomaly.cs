@@ -9,13 +9,15 @@ public sealed class Anomaly
     }
 
     public Anomaly(
-        Guid readingId,
+        Guid machineId,
+        Guid? readingId,
         AnomalyType type,
         AnomalySeverity severity,
         string description,
         DateTimeOffset createdAt)
     {
         Id = Guid.NewGuid();
+        MachineId = machineId;
         ReadingId = readingId;
         Type = type;
         Severity = severity;
@@ -26,9 +28,13 @@ public sealed class Anomaly
 
     public Guid Id { get; private set; }
 
-    public Guid ReadingId { get; private set; }
+    public Guid MachineId { get; private set; }
 
-    public HourMeterReading Reading { get; private set; } = null!;
+    public Machine Machine { get; private set; } = null!;
+
+    public Guid? ReadingId { get; private set; }
+
+    public HourMeterReading? Reading { get; private set; }
 
     public AnomalyType Type { get; private set; }
 

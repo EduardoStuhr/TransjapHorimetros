@@ -74,7 +74,7 @@ public sealed class MachineService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var machine = new Machine(request.FleetNumber, request.Model, request.Status, now);
+        var machine = new Machine(request.FleetNumber, request.Model, request.Status, now, request.MeterUnit);
         machineRepository.Add(machine);
         auditLogRepository.Add(new AuditLog(
             AuditActions.MachineCreated,
@@ -115,7 +115,7 @@ public sealed class MachineService(
 
         var oldValue = Serialize(machine);
         var now = timeProvider.GetUtcNow();
-        machine.Update(request.FleetNumber, request.Model, request.Status, now);
+        machine.Update(request.FleetNumber, request.Model, request.Status, request.MeterUnit, now);
         auditLogRepository.Add(new AuditLog(
             AuditActions.MachineUpdated,
             nameof(Machine),
@@ -151,6 +151,7 @@ public sealed class MachineService(
             machine.FleetNumber,
             machine.Model,
             machine.Status,
+            machine.MeterUnit,
             machine.CreatedAt,
             machine.UpdatedAt,
             responses.FirstOrDefault(),
@@ -165,6 +166,7 @@ public sealed class MachineService(
             machine.FleetNumber,
             machine.Model,
             machine.Status,
+            machine.MeterUnit,
             machine.CreatedAt,
             machine.UpdatedAt,
             null,
@@ -178,6 +180,7 @@ public sealed class MachineService(
             machine.FleetNumber,
             machine.Model,
             machine.Status,
+            machine.MeterUnit,
             latestReading is null
                 ? null
                 : new LatestReadingResponse(
@@ -204,6 +207,6 @@ public sealed class MachineService(
 
     private static string Serialize(Machine machine) =>
         JsonSerializer.Serialize(
-            new { machine.Id, machine.FleetNumber, machine.Model, machine.Status },
+            new { machine.Id, machine.FleetNumber, machine.Model, machine.Status, machine.MeterUnit },
             ApplicationJson.Options);
 }

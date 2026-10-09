@@ -30,8 +30,8 @@ public sealed class AnomalyService(IAnomalyRepository anomalyRepository) : IAnom
         new(
             anomaly.Id,
             anomaly.ReadingId,
-            anomaly.Reading.MachineId,
-            anomaly.Reading.Machine!.FleetNumber,
+            anomaly.MachineId,
+            anomaly.Machine!.FleetNumber,
             anomaly.Type,
             anomaly.Severity,
             anomaly.Description,

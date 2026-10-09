@@ -5,6 +5,14 @@ import type {
   ReadingType,
 } from "@/types/domain";
 
+export interface ReadingFilters {
+  endDate?: string;
+  fleetNumber?: string;
+  startDate?: string;
+  status?: ReadingStatus | "";
+  workSiteId?: string;
+}
+
 interface ApiReading {
   id: string;
   machineId: string;
@@ -49,8 +57,59 @@ async function fetchReadings(path: string): Promise<readonly HourMeterReading[]>
   return response.items.map(mapReading);
 }
 
-export async function getReadings(): Promise<readonly HourMeterReading[]> {
-  return fetchReadings("/api/v1/readings?page=1&pageSize=100");
+function buildReadingsPath(
+  filters: ReadingFilters,
+  page = 1,
+): string {
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    pageSize: "100",
+  });
+
+  if (filters.fleetNumber) {
+    searchParams.set("fleetNumber", filters.fleetNumber);
+  }
+
+  if (filters.workSiteId) {
+    searchParams.set("workSiteId", filters.workSiteId);
+  }
+
+  if (filters.status) {
+    searchParams.set("status", filters.status);
+  }
+
+  if (filters.startDate) {
+    searchParams.set("from", `${filters.startDate}T00:00:00.000Z`);
+  }
+
+  if (filters.endDate) {
+    searchParams.set("to", `${filters.endDate}T23:59:59.999Z`);
+  }
+
+  return `/api/v1/readings?${searchParams.toString()}`;
+}
+
+export async function getReadings(
+  filters: ReadingFilters = {},
+): Promise<readonly HourMeterReading[]> {
+  return fetchReadings(buildReadingsPath(filters));
+}
+
+export async function getAllReadings(
+  filters: ReadingFilters = {},
+): Promise<readonly HourMeterReading[]> {
+  const firstPage = await apiFetch<PagedApiResponse<ApiReading>>(
+    buildReadingsPath(filters),
+  );
+  const pages = await Promise.all(
+    Array.from({ length: Math.max(0, firstPage.totalPages - 1) }, (_, index) =>
+      apiFetch<PagedApiResponse<ApiReading>>(
+        buildReadingsPath(filters, index + 2),
+      ),
+    ),
+  );
+
+  return [firstPage, ...pages].flatMap((page) => page.items.map(mapReading));
 }
 
 export async function getMachineReadings(

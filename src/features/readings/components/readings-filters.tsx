@@ -1,33 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Filter, RotateCcw } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  emptyReadingsFilters,
   readingsFilterSchema,
   type ReadingsFilterValues,
 } from "@/schemas/readings-filter.schema";
-import type { Machine } from "@/types/domain";
+import type { Machine, WorkSite } from "@/types/domain";
 
 const fieldClassName =
   "flex h-9 min-w-0 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 export function ReadingsFilters({
+  filters,
   machines,
+  workSites,
 }: {
+  filters: ReadingsFilterValues;
   machines: readonly Machine[];
+  workSites: readonly WorkSite[];
 }) {
-  const [feedback, setFeedback] = useState("");
-  const models = useMemo(
-    () => [...new Set(machines.map((machine) => machine.model))].sort(),
-    [machines],
-  );
-
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const {
     register,
     handleSubmit,
@@ -35,23 +37,30 @@ export function ReadingsFilters({
     formState: { errors },
   } = useForm<ReadingsFilterValues>({
     resolver: zodResolver(readingsFilterSchema),
-    defaultValues: {
-      startDate: "",
-      endDate: "",
-      fleetNumber: "",
-      model: "",
-      workSite: "",
-      status: "",
-    },
+    defaultValues: filters,
   });
 
-  function applyFilters() {
-    setFeedback("Filtros aplicados. Nenhum registro está disponível.");
+  function applyFilters(values: ReadingsFilterValues) {
+    const searchParams = new URLSearchParams();
+
+    Object.entries(values).forEach(([key, value]) => {
+      if (value) {
+        searchParams.set(key, value);
+      }
+    });
+
+    startTransition(() => {
+      router.push(
+        searchParams.size > 0
+          ? `/horimetros?${searchParams.toString()}`
+          : "/horimetros",
+      );
+    });
   }
 
   function clearFilters() {
-    reset();
-    setFeedback("");
+    reset(emptyReadingsFilters);
+    startTransition(() => router.push("/horimetros"));
   }
 
   return (
@@ -86,18 +95,22 @@ export function ReadingsFilters({
             <option value="">Todas as frotas</option>
             {machines.map((machine) => (
               <option key={machine.fleetNumber} value={machine.fleetNumber}>
-                {machine.fleetNumber}
+                {machine.fleetNumber} · {machine.model}
               </option>
             ))}
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="model">Modelo</Label>
-          <select id="model" className={fieldClassName} {...register("model")}>
-            <option value="">Todos os modelos</option>
-            {models.map((model) => (
-              <option key={model} value={model}>
-                {model}
+          <Label htmlFor="workSiteId">Obra</Label>
+          <select
+            id="workSiteId"
+            className={fieldClassName}
+            {...register("workSiteId")}
+          >
+            <option value="">Todas as obras</option>
+            {workSites.map((workSite) => (
+              <option key={workSite.id} value={workSite.id}>
+                {workSite.name}
               </option>
             ))}
           </select>
@@ -113,30 +126,24 @@ export function ReadingsFilters({
             <option value="REJECTED">Rejeitado</option>
           </select>
         </div>
-        <div className="space-y-2 sm:col-span-2 xl:col-span-2">
-          <Label htmlFor="workSite">Obra</Label>
-          <select
-            id="workSite"
-            className={fieldClassName}
-            disabled
-            {...register("workSite")}
-          >
-            <option value="">Nenhuma obra cadastrada</option>
-          </select>
-        </div>
-        <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-3 xl:justify-end">
-          <Button type="submit">
+        <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-5 xl:justify-end">
+          <Button type="submit" disabled={pending}>
             <Filter />
-            Aplicar filtros
+            {pending ? "Aplicando..." : "Aplicar filtros"}
           </Button>
-          <Button type="button" variant="outline" onClick={clearFilters}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={clearFilters}
+            disabled={pending}
+          >
             <RotateCcw />
             Limpar
           </Button>
         </div>
       </div>
       <p aria-live="polite" className="mt-3 min-h-5 text-sm text-slate-600">
-        {feedback}
+        {pending ? "Atualizando resultados..." : ""}
       </p>
     </form>
   );

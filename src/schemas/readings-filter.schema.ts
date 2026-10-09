@@ -2,12 +2,13 @@ import { z } from "zod";
 
 export const readingsFilterSchema = z
   .object({
-    startDate: z.string(),
-    endDate: z.string(),
-    fleetNumber: z.string(),
-    model: z.string(),
-    workSite: z.string(),
-    status: z.string(),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+    fleetNumber: z.string().regex(/^\d+$/).or(z.literal("")),
+    workSiteId: z.string().uuid().or(z.literal("")),
+    status: z
+      .enum(["VALIDATED", "PENDING", "SUSPECT", "CORRECTED", "REJECTED"])
+      .or(z.literal("")),
   })
   .refine(
     (values) =>
@@ -21,3 +22,11 @@ export const readingsFilterSchema = z
   );
 
 export type ReadingsFilterValues = z.infer<typeof readingsFilterSchema>;
+
+export const emptyReadingsFilters: ReadingsFilterValues = {
+  endDate: "",
+  fleetNumber: "",
+  startDate: "",
+  status: "",
+  workSiteId: "",
+};

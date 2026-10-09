@@ -20,7 +20,7 @@ export default function ErrorPage({
           Não foi possível conectar à API.
         </h2>
         <p className="mt-2 text-slate-600">
-          Verifique se a API e o PostgreSQL estão em execução e tente novamente.
+          Verifique a conexão com o serviço e tente novamente em instantes.
         </p>
         <Button onClick={reset} className="mt-5">
           <RotateCcw />

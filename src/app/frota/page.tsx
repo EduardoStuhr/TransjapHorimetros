@@ -22,7 +22,7 @@ export default async function FleetPage() {
         description="Consulte as máquinas cadastradas e acesse os detalhes operacionais de cada equipamento."
       />
       <DataSourceNotice>
-        Exibindo {machines.length} máquinas consultadas na API e no PostgreSQL.
+        Exibindo {machines.length} máquinas consultadas na API oficial.
         Campos sem dado operacional permanecem identificados como sem registro.
       </DataSourceNotice>
       <FleetTable data={machines} />

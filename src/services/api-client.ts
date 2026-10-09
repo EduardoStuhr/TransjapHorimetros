@@ -1,6 +1,12 @@
 interface ApiProblemDetails {
   detail?: string;
+  errors?: Record<string, string[]>;
   title?: string;
+}
+
+interface ApiFetchOptions {
+  body?: unknown;
+  method?: "GET" | "POST" | "PUT";
 }
 
 export interface PagedApiResponse<T> {
@@ -36,19 +42,42 @@ function getApiUrl(): string {
   return apiUrl;
 }
 
-export async function apiFetch<T>(path: string): Promise<T> {
+function getProblemMessage(
+  problem: ApiProblemDetails | undefined,
+  status: number,
+): string {
+  const validationMessages = problem?.errors
+    ? Object.values(problem.errors).flat().filter(Boolean)
+    : [];
+
+  return (
+    validationMessages.join(" ") ||
+    problem?.detail ||
+    problem?.title ||
+    `A solicitação não pôde ser concluída (código HTTP ${status}).`
+  );
+}
+
+export async function apiFetch<T>(
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<T> {
   const apiUrl = getApiUrl();
   const requestUrl = `${apiUrl}${path}`;
   const correlationId = crypto.randomUUID();
+  const hasBody = options.body !== undefined;
   let response: Response;
 
   try {
     response = await fetch(requestUrl, {
+      body: hasBody ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
       headers: {
         Accept: "application/json",
+        ...(hasBody ? { "Content-Type": "application/json" } : {}),
         "X-Correlation-ID": correlationId,
       },
+      method: options.method ?? "GET",
     });
   } catch (error) {
     console.error("[apiFetch] Falha de rede ao conectar à API:", {
@@ -79,12 +108,10 @@ export async function apiFetch<T>(path: string): Promise<T> {
       problem,
     });
 
-    const userMessage =
-      problem?.detail ??
-      problem?.title ??
-      `A solicitação não pôde ser concluída (código HTTP ${response.status}).`;
-
-    throw new ApiError(response.status, userMessage);
+    throw new ApiError(
+      response.status,
+      getProblemMessage(problem, response.status),
+    );
   }
 
   return (await response.json()) as T;

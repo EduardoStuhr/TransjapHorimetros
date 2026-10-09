@@ -62,7 +62,7 @@ export function Sidebar() {
         <div className="flex items-start gap-3 text-xs text-blue-100/70">
           <DatabaseZap className="mt-0.5 size-4 shrink-0 text-amber-400" />
           <p>
-            Interface preparada para integração com a API oficial.
+            Dados operacionais consultados na API oficial.
           </p>
         </div>
       </div>

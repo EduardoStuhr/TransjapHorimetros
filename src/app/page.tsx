@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/features/dashboard/components/metric-card";
 import { ReadingsTable } from "@/features/readings/components/readings-table";
+import { formatAnomalyType } from "@/lib/domain-formatters";
 import { getAnomalies } from "@/services/anomalies.service";
 import { getDashboardSummary } from "@/services/dashboard.service";
 import { getReadings } from "@/services/readings.service";
@@ -46,7 +47,7 @@ export default async function DashboardPage() {
           <MetricCard
             label="Total de máquinas"
             value={summary.totalMachines}
-            helper="Cadastro real no PostgreSQL"
+            helper="Cadastro real no banco operacional"
             icon={HardHat}
             emphasized
           />
@@ -151,7 +152,8 @@ export default async function DashboardPage() {
                 {anomalies.slice(0, 5).map((anomaly) => (
                   <div key={anomaly.id} className="px-5 py-4">
                     <p className="text-sm font-bold text-slate-900">
-                      Frota {anomaly.machineFleetNumber} · {anomaly.type}
+                      Frota {anomaly.machineFleetNumber} ·{" "}
+                      {formatAnomalyType(anomaly.type)}
                     </p>
                     <p className="mt-1 text-sm text-slate-600">
                       {anomaly.description}

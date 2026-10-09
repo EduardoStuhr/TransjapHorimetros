@@ -1,4 +1,9 @@
-import type { Machine, ReadingStatus } from "@/types/domain";
+import type {
+  Anomaly,
+  AnomalyType,
+  Machine,
+  ReadingStatus,
+} from "@/types/domain";
 
 export function formatMachineRegistrationStatus(
   status: Machine["registrationStatus"],
@@ -55,6 +60,40 @@ export function formatReadingStatus(status: ReadingStatus) {
     SUSPECT: "Suspeito",
     CORRECTED: "Corrigido",
     REJECTED: "Rejeitado",
+  };
+
+  return labels[status];
+}
+
+export function formatAnomalyType(type: AnomalyType) {
+  const labels: Record<AnomalyType, string> = {
+    READING_DECREASE: "Leitura menor que a anterior",
+    IMPOSSIBLE_HOUR_INCREASE: "Aumento impossível de horas",
+    DUPLICATE_READING: "Leitura duplicada",
+    MISSING_READING: "Leitura ausente",
+    LOW_OCR_CONFIDENCE: "Baixa confiança do OCR",
+    OCR_OPERATOR_DIVERGENCE: "Divergência entre OCR e operador",
+    LATE_SYNC: "Sincronização atrasada",
+  };
+
+  return labels[type];
+}
+
+export function formatAnomalySeverity(severity: Anomaly["severity"]) {
+  const labels: Record<Anomaly["severity"], string> = {
+    INFO: "Informativa",
+    WARNING: "Atenção",
+    CRITICAL: "Crítica",
+  };
+
+  return labels[severity];
+}
+
+export function formatAnomalyStatus(status: Anomaly["status"]) {
+  const labels: Record<Anomaly["status"], string> = {
+    OPEN: "Aberta",
+    ACKNOWLEDGED: "Reconhecida",
+    RESOLVED: "Resolvida",
   };
 
   return labels[status];

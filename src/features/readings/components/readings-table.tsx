@@ -33,8 +33,10 @@ const headers = [
 ];
 
 export function ReadingsTable({
+  emptyDescription = "Nenhuma leitura foi registrada pela API.",
   readings,
 }: {
+  emptyDescription?: string;
   readings: readonly HourMeterReading[];
 }) {
   const statusClassNames = {
@@ -68,7 +70,7 @@ export function ReadingsTable({
                   <EmptyState
                     icon={Gauge}
                     title="Nenhum horímetro registrado até o momento"
-                    description="Os registros aparecerão aqui quando forem enviados pelo aplicativo de campo ou cadastrados pela API."
+                    description={emptyDescription}
                   />
                 </TableCell>
               </TableRow>

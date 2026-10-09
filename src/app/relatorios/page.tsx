@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { connection } from "next/server";
 import {
   AlertTriangle,
@@ -13,34 +14,21 @@ import { PageHeading } from "@/components/shared/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getReportAvailability } from "@/services/reports.service";
+import {
+  getReportAvailability,
+  reportDefinitions,
+} from "@/services/reports.service";
 
 export const metadata: Metadata = {
   title: "Relatórios",
 };
 
-const reportTypes = [
-  {
-    title: "Relatório de horímetros",
-    description: "Leituras por período, status e evolução de horas.",
-    icon: Gauge,
-  },
-  {
-    title: "Relatório por máquina",
-    description: "Histórico consolidado de uma máquina da frota.",
-    icon: HardHat,
-  },
-  {
-    title: "Relatório por obra",
-    description: "Leituras agrupadas pelo local de operação.",
-    icon: Building2,
-  },
-  {
-    title: "Relatório de inconsistências",
-    description: "Alertas e leituras que exigem revisão humana.",
-    icon: AlertTriangle,
-  },
-] as const;
+const reportIcons = {
+  readings: Gauge,
+  machines: HardHat,
+  worksites: Building2,
+  anomalies: AlertTriangle,
+} as const;
 
 export default async function ReportsPage() {
   await connection();
@@ -51,18 +39,18 @@ export default async function ReportsPage() {
       <PageHeading
         eyebrow="Análise"
         title="Relatórios"
-        description="Estrutura preparada para consultas operacionais e exportações após o recebimento dos primeiros dados."
+        description="Exporte em Excel ou PDF os dados operacionais disponíveis na API."
       />
 
       <div className="grid gap-4 md:grid-cols-2">
-        {reportTypes.map((report) => {
-          const Icon = report.icon;
+        {reportDefinitions.map((report) => {
+          const Icon = reportIcons[report.type];
+          const itemCount =
+            availability.find((item) => item.type === report.type)?.count ?? 0;
+          const canExport = itemCount > 0;
 
           return (
-            <Card
-              key={report.title}
-              className="gap-4 border-slate-200 shadow-sm"
-            >
+            <Card key={report.type} className="gap-4 border-slate-200 shadow-sm">
               <CardHeader className="flex-row items-start justify-between gap-4">
                 <div className="flex gap-3">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-[#2c5b9e]">
@@ -75,28 +63,49 @@ export default async function ReportsPage() {
                     </p>
                   </div>
                 </div>
-                <Badge variant="secondary">Preparado</Badge>
+                <Badge variant={canExport ? "default" : "secondary"}>
+                  {canExport ? `${itemCount} registros` : "Sem dados"}
+                </Badge>
               </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                <Button variant="outline" disabled={!availability.canExport}>
-                  <FileSpreadsheet />
-                  Exportar Excel
-                </Button>
-                <Button variant="outline" disabled={!availability.canExport}>
-                  <FileDown />
-                  Exportar PDF
-                </Button>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {canExport ? (
+                    <>
+                      <Button asChild variant="outline">
+                        <Link href={`/api/reports/${report.type}/xlsx`}>
+                          <FileSpreadsheet />
+                          Exportar Excel
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline">
+                        <Link href={`/api/reports/${report.type}/pdf`}>
+                          <FileDown />
+                          Exportar PDF
+                        </Link>
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="outline" disabled>
+                        <FileSpreadsheet />
+                        Exportar Excel
+                      </Button>
+                      <Button variant="outline" disabled>
+                        <FileDown />
+                        Exportar PDF
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {!canExport ? (
+                  <p className="mt-3 text-sm text-slate-600">
+                    Não há dados reais disponíveis para exportar.
+                  </p>
+                ) : null}
               </CardContent>
             </Card>
           );
         })}
-      </div>
-
-      <div
-        role="status"
-        className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950"
-      >
-        {availability.reason}
       </div>
     </div>
   );

@@ -6,6 +6,12 @@ import { PageHeading } from "@/components/shared/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { anomalyDefinitions } from "@/features/anomalies/anomaly-definitions";
+import {
+  formatAnomalySeverity,
+  formatAnomalyStatus,
+  formatAnomalyType,
+  formatDateTime,
+} from "@/lib/domain-formatters";
 import { getAnomalies } from "@/services/anomalies.service";
 
 export const metadata: Metadata = {
@@ -20,7 +26,7 @@ export default async function AlertsPage() {
       <PageHeading
         eyebrow="Confiabilidade"
         title="Alertas"
-        description="Revise futuras inconsistências de leitura sem substituir a evidência nem a análise humana."
+        description="Revise as inconsistências identificadas pelo motor de regras, preservando a evidência e a análise humana."
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
@@ -33,9 +39,44 @@ export default async function AlertsPage() {
               <EmptyState
                 icon={ShieldCheck}
                 title="Nenhum alerta identificado"
-                description="Os alertas aparecerão quando o motor de regras processar leituras recebidas pela API."
+                description="Nenhuma anomalia foi identificada nas leituras processadas pela API."
               />
-            ) : null}
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {anomalies.map((anomaly) => (
+                  <article key={anomaly.id} className="space-y-2 px-5 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-bold text-slate-950">
+                        Frota {anomaly.machineFleetNumber}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge
+                          variant={
+                            anomaly.severity === "CRITICAL"
+                              ? "destructive"
+                              : "secondary"
+                          }
+                        >
+                          {formatAnomalySeverity(anomaly.severity)}
+                        </Badge>
+                        <Badge variant="outline">
+                          {formatAnomalyStatus(anomaly.status)}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {formatAnomalyType(anomaly.type)}
+                    </p>
+                    <p className="text-sm leading-6 text-slate-600">
+                      {anomaly.description}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Identificada em {formatDateTime(anomaly.createdAt)}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

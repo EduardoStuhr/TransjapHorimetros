@@ -8,7 +8,6 @@ using Microsoft.OpenApi;
 using TransjapHorimetros.Api.Health;
 using TransjapHorimetros.Api.Infrastructure;
 using TransjapHorimetros.Application.Anomalies;
-using TransjapHorimetros.Application.Configuration;
 using TransjapHorimetros.Application.Dashboard;
 using TransjapHorimetros.Application.Machines;
 using TransjapHorimetros.Application.Readings;

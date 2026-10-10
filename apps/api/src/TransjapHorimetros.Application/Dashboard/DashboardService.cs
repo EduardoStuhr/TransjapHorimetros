@@ -40,7 +40,7 @@ public sealed class DashboardService(
             totalMachines,
             updatedToday,
             withoutReading,
-            withoutReadingIsDefined: true,
+            WithoutReadingIsDefined: true,
             withoutReadingDefinition,
             pending,
             suspect,

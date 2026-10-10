@@ -252,7 +252,7 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
 
     public async Task<int> CountActiveMachinesWithoutReadingSinceAsync(
         IReadOnlyCollection<Guid> activeMachineIds,
-        DateTimeOffset receivedSince,
+        DateTimeOffset capturedSince,
         CancellationToken cancellationToken)
     {
         if (activeMachineIds.Count == 0)
@@ -263,7 +263,7 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         var machinesWithReadings = await dbContext.HourMeterReadings
             .AsNoTracking()
             .Where(reading => activeMachineIds.Contains(reading.MachineId)
-                && reading.ReceivedAtServer >= receivedSince)
+                && reading.CapturedAtDevice >= capturedSince)
             .Select(reading => reading.MachineId)
             .Distinct()
             .CountAsync(cancellationToken);

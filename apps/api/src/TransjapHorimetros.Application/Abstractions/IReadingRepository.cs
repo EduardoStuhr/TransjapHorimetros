@@ -48,12 +48,12 @@ public interface IReadingRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Conta máquinas ativas que não tiveram nenhuma leitura recebida desde a data informada.
+    /// Conta máquinas ativas que não tiveram nenhuma leitura capturada desde a data informada.
     /// Usado para calcular a métrica MissingReadingThresholdDays do dashboard (RN-006).
     /// </summary>
     Task<int> CountActiveMachinesWithoutReadingSinceAsync(
         IReadOnlyCollection<Guid> activeMachineIds,
-        DateTimeOffset receivedSince,
+        DateTimeOffset capturedSince,
         CancellationToken cancellationToken);
 
     void Add(HourMeterReading reading);

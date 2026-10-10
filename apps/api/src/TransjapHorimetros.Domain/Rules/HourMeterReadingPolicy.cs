@@ -75,7 +75,8 @@ public sealed class HourMeterReadingPolicy
             var elapsedLimit =
                 (elapsedHours * options.MaxPlausibleHoursPerElapsedHour)
                 + options.ElapsedTimeToleranceHours;
-            var elapsedDays = Math.Max(1m, Math.Ceiling(elapsedHours / 24m));
+            var hoursPerDay = (decimal)TimeSpan.FromDays(1).TotalHours;
+            var elapsedDays = Math.Max(1m, Math.Ceiling(elapsedHours / hoursPerDay));
             var dailyLimit =
                 (elapsedDays * options.MaxPlausibleDailyHours)
                 + options.ElapsedTimeToleranceHours;
@@ -91,6 +92,7 @@ public sealed class HourMeterReadingPolicy
 
         if (context.PreviousReadingType == ReadingType.Closing
             && context.CurrentReadingType == ReadingType.Opening
+            && context.CurrentCapturedAt.ToUniversalTime() > previousCapturedAt.ToUniversalTime()
             && Math.Abs(readingDelta) > options.DayTransitionToleranceHours)
         {
             anomalies.Add(Detect(

@@ -299,6 +299,34 @@ public sealed class HourMeterReadingPolicyTests
         Assert.DoesNotContain(result.Anomalies, a => a.Type == AnomalyType.DayTransitionMismatch);
     }
 
+    [Theory]
+    [InlineData(0.49, false)]
+    [InlineData(0.50, false)]
+    [InlineData(0.51, true)]
+    [InlineData(-0.49, false)]
+    [InlineData(-0.50, false)]
+    [InlineData(-0.51, true)]
+    public void Assess_DayTransitionToleranceBoundary(
+        double readingDelta,
+        bool expectMismatch)
+    {
+        var context = new ReadingAssessmentContext(
+            PreviousValue: 1000m,
+            PreviousCapturedAt: BaseTime,
+            PreviousReadingType: ReadingType.Closing,
+            CurrentValue: 1000m + (decimal)readingDelta,
+            CurrentCapturedAt: BaseTime.AddHours(8),
+            CurrentReadingType: ReadingType.Opening,
+            ReceivedAtServer: BaseTime.AddHours(8),
+            IsPotentialDuplicate: false);
+
+        var result = _policy.Assess(context, DefaultOptions);
+
+        Assert.Equal(
+            expectMismatch,
+            result.Anomalies.Any(anomaly => anomaly.Type == AnomalyType.DayTransitionMismatch));
+    }
+
     // ────────────────────────────────────────────────
     // Casos: múltiplas anomalias simultâneas
     // ────────────────────────────────────────────────

@@ -28,12 +28,12 @@ Os diretórios locais legados `.postgres/`, `.postgres-data/` e `.postgres-backu
 ## 2. Princípios e Regras Fundamentais Adotadas
 
 1. **Prioridade Máxima à Integridade e Rastreabilidade ("A foto é a prova, o texto é a leitura, o servidor é a verdade")**
-   - Registros de leitura originais são estritamente **imutáveis**. Nenhuma leitura é atualizada via `UPDATE`. Correções são efetuadas criando um novo registro vinculado com justificativa obrigatória, operador/usuário e timestamp.
+   - Registros de leitura originais são estritamente **imutáveis**. Nenhuma leitura é atualizada via `UPDATE`. Um fluxo formal de correção deverá criar novo registro vinculado, com justificativa, responsável e timestamp; esse fluxo ainda não existe nesta fase.
    - Todo ato relevante é registrado em `AuditLog` com bloqueio contra exclusão ou alteração.
 
 2. **Nomenclatura do Domínio Alinhada com as Skills**
    - As entidades centrais seguem o vocabulário oficial das skills: `PhotoEvidence` (em vez de `ReadingPhoto`) e `MachineQrCode` (para desacoplar o token de identificação física do cadastro da máquina).
-   - Unidade de medição identificada explicitamente: máquinas pesadas em horas (`MeterUnit.HOURS`) e veículos leves da frota em quilômetros (`MeterUnit.KM`).
+   - A unidade é explícita (`MeterUnit.HOURS` ou `MeterUnit.KM`), mas a classificação de cada frota ainda depende de confirmação da Transjap; até lá, `MeterUnit` pode permanecer nulo.
 
 3. **Política de Migrations e Proteção do Banco de Dados**
    - **Backup obrigatório antes de migrações:** Antes de aplicar qualquer migration futura em banco de dados existente, deve ser executado o script [scripts/backup-db.ps1](../scripts/backup-db.ps1), gerando e validando um backup SQL Server `.bak` com timestamp.
@@ -46,18 +46,49 @@ Os diretórios locais legados `.postgres/`, `.postgres-data/` e `.postgres-backu
 
 ---
 
-## 3. Parâmetros Configuráveis e Itens Pendentes de Decisão do Usuário
+## 3. Estado das Regras e Decisões Operacionais
 
-Enquanto as respostas aos itens de negócio não forem fornecidas, foram adotados padrões conservadores e configuráveis em `appsettings.json` (`HourMeterRules`):
+As regras implementadas estão detalhadas em [regras-de-negocio.md](regras-de-negocio.md). Seus valores padrão são configuráveis em `appsettings.json` (`HourMeterRules`), mas a configuração técnica não equivale à aprovação da Transjap.
 
-| Decisão de Negócio | Status | Padrão Conservador Adotado | Onde Configurar |
+### Confirmado no código
+
+- Leituras originais e logs de auditoria são append-only na aplicação; a API não oferece fluxo de correção formal nesta fase.
+- O servidor define `ReceivedAtServer`; `ClientEventId` é único e repetição do mesmo evento retorna o registro existente.
+- Anomalias deixam a leitura suspeita persistida e auditável; regressão, incremento implausível, relógio divergente, duplicidade provável e divergência de virada de dia têm regras implementadas.
+- Máquinas sem unidade confirmada podem permanecer com `MeterUnit = null`; `HOURS` e `KM` são persistidos como strings e não são intercambiáveis.
+- A métrica de ausência considera somente máquinas `ACTIVE` e o horário UTC de captura (`CapturedAtDevice`); o frontend apenas exibe o indicador retornado pela API.
+- Valor negativo enviado pela API é rejeitado com erro de validação e não é persistido como leitura operacional. `REJECTED` existe como resultado da política de domínio, não como leitura gravada por este endpoint.
+
+### Parâmetros provisórios configurados
+
+| Parâmetro | Padrão provisório | Configuração | Observação |
 | :--- | :--- | :--- | :--- |
-| **Tolerância entre final de um dia e início do dia seguinte (F03)** | Pendente | `0.5` horas (30 minutos) de divergência permitida. Se operador registrar apenas abertura, o sistema gera registro final inferido (`INFERRED`) sem substituir evidência fotográfica. | `HourMeterRules:DayTransitionToleranceHours` |
-| **Limite máximo diário de horas trabalhadas (F02)** | Pendente | Máximo de `24.0` horas por dia e `1.0` hora por hora transcorrida (com tolerância de `0.25h`). | `HourMeterRules:MaxPlausibleDailyHours` |
-| **Janela de alerta para máquina sem leitura (F04)** | Pendente | `2` dias consecutivos sem registro para frota ativa. | `HourMeterRules:MissingReadingThresholdDays` |
-| **Tolerância de divergência de relógio do dispositivo (F10)** | Pendente | `300` segundos (5 minutos) entre relógio do celular e relógio do servidor. | `HourMeterRules:ClockSkewToleranceSeconds` |
-| **Raio padrão de Geofence para Obras (F09)** | Pendente | `500` metros a partir do centro da obra, caso não haja polígono detalhado. | `HourMeterRules:GeofenceDefaultRadiusMeters` |
-| **Limiar de confiança mínima do OCR (F08)** | Pendente | `0.85` (85%). Abaixo disso gera anomalia de baixa confiança (`LOW_OCR_CONFIDENCE`). | `HourMeterRules:OcrConfidenceThreshold` |
-| **Método de Autenticação Primário (Fase 3)** | Pendente | Microsoft Entra ID (OIDC) como primário corporativo com fallback para credenciais locais com hash Argon2/BCrypt e papéis (`Admin`, `Diretoria`, `Escritório`). | `Authentication` |
-| **Plataforma Mobile Alvo** | Informativo | Arquitetura de API desenhada para ser agnóstica (JSON / HTTPS com autenticação de dispositivo por HMAC), compatível com Android e iOS (Expo/React Native). | Contratos `/api/v1/sync` |
-| **Conteúdo físico dos QR Codes colados** | Pendente | Confirmar se o QR code já existente nas máquinas traz a string `"FROTA 68"`, URL ou número simples. A API aceita resolução por `FleetNumber`. | Cadastro e leitura do QR |
+| Tolerância de virada `CLOSING` → `OPENING` | `0.5` hora | `HourMeterRules:DayTransitionToleranceHours` | Fora da tolerância cria anomalia; não infere leitura nem evidência. |
+| Limite plausível por dia | `24` horas | `HourMeterRules:MaxPlausibleDailyHours` | Ainda depende da operação real. |
+| Limite por hora transcorrida | `1` hora | `HourMeterRules:MaxPlausibleHoursPerElapsedHour` | Ainda depende da operação real. |
+| Tolerância adicional de incremento | `0.25` hora | `HourMeterRules:ElapsedTimeToleranceHours` | Ainda depende da operação real. |
+| Ausência de leitura | `2` dias | `HourMeterRules:MissingReadingThresholdDays` | Provisório; conta leitura capturada no período para máquinas ativas. |
+| Divergência de relógio | `300` segundos | `HourMeterRules:ClockSkewToleranceSeconds` | Provisório; divergência maior cria `CLOCK_SKEW`. |
+| Raio padrão de geofence | `500` metros | `HourMeterRules:GeofenceDefaultRadiusMeters` | Provisório para fase futura; geofence não é declarado como implementado. |
+| Confiança mínima de OCR | `0.85` | `HourMeterRules:OcrConfidenceThreshold` | Provisório para fase futura; OCR não é declarado como implementado. |
+
+Não há limite ativo de atraso de sincronização (`LATE_SYNC`): falta validação oficial do atraso máximo tolerado. Não se deve deduzir nem ativar um limiar arbitrário.
+
+### Pendente de validação com a Transjap
+
+1. Após quantos dias sem leitura deve surgir o alerta?
+2. Qual é o máximo realista de horas de operação por dia?
+3. Há troca física de horímetro? Como é registrada?
+4. O horímetro pode zerar?
+5. Em quais situações uma leitura menor é legítima?
+6. Quem pode solicitar/aprovar uma correção e qual justificativa deve ser registrada?
+7. Abertura e fechamento são obrigatórios?
+8. A obra é obrigatória em toda leitura?
+9. Quais frotas usam `HOURS`?
+10. Quais frotas usam `KM`?
+11. Uma máquina pode mudar de obra no mesmo dia?
+12. Qual atraso máximo de sincronização deve ser aceito antes de classificar `LATE_SYNC`?
+13. Qual conteúdo os QR codes físicos existentes carregam: número, texto ou URL?
+14. Qual provedor e fluxo de autenticação devem ser adotados na Fase 3?
+
+Nenhuma resposta acima é presumida por este documento. QR, OCR, geofence, mobile e autenticação permanecem fora da Fase 1 e não são descritos como funcionalidades concluídas.

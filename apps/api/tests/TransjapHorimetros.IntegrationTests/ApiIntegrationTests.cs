@@ -33,7 +33,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
         using var client = factory.CreateClient();
         var machineId = await GetMachineIdAsync(client, 68);
         var clientEventId = Guid.NewGuid();
-        var request = ReadingRequest(machineId, 100m, DateTimeOffset.UtcNow.AddHours(-2), clientEventId);
+        var request = ReadingRequest(machineId, 100m, DateTimeOffset.UtcNow.AddMinutes(-1), clientEventId);
 
         using var firstResponse = await client.PostAsJsonAsync("/api/v1/readings", request);
         Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
@@ -59,7 +59,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
         await factory.ResetDatabaseAsync();
         using var client = factory.CreateClient();
         var machineId = await GetMachineIdAsync(client, 68);
-        var capturedAt = DateTimeOffset.UtcNow.AddHours(-4);
+        var capturedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
 
         using var first = await client.PostAsJsonAsync(
             "/api/v1/readings",
@@ -68,7 +68,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
 
         using var second = await client.PostAsJsonAsync(
             "/api/v1/readings",
-            ReadingRequest(machineId, 90m, capturedAt.AddHours(1), Guid.NewGuid()));
+            ReadingRequest(machineId, 90m, capturedAt.AddMinutes(1), Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
         using var secondBody = await JsonDocument.ParseAsync(await second.Content.ReadAsStreamAsync());
         Assert.Equal("SUSPECT", secondBody.RootElement.GetProperty("status").GetString());
@@ -83,12 +83,139 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
     }
 
     [Fact]
+    public async Task SameValueAndCaptureTimeWithDifferentClientEvent_IsPersistedAsPossibleDuplicate()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        var machineId = await GetMachineIdAsync(client, 68);
+        var capturedAt = DateTimeOffset.UtcNow.AddSeconds(-1);
+        const decimal value = 100m;
+
+        using var firstResponse = await client.PostAsJsonAsync(
+            "/api/v1/readings",
+            ReadingRequest(machineId, value, capturedAt, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+
+        using var secondResponse = await client.PostAsJsonAsync(
+            "/api/v1/readings",
+            ReadingRequest(machineId, value, capturedAt, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
+        using var second = await JsonDocument.ParseAsync(await secondResponse.Content.ReadAsStreamAsync());
+        Assert.Equal("SUSPECT", second.RootElement.GetProperty("status").GetString());
+
+        using var readingsResponse = await client.GetAsync($"/api/v1/machines/{machineId}/readings");
+        using var readings = await JsonDocument.ParseAsync(await readingsResponse.Content.ReadAsStreamAsync());
+        Assert.Equal(2, readings.RootElement.GetProperty("totalItems").GetInt32());
+
+        using var anomaliesResponse = await client.GetAsync($"/api/v1/anomalies?machineId={machineId}");
+        using var anomalies = await JsonDocument.ParseAsync(await anomaliesResponse.Content.ReadAsStreamAsync());
+        Assert.Contains(
+            anomalies.RootElement.GetProperty("items").EnumerateArray(),
+            anomaly => anomaly.GetProperty("type").GetString() == "DUPLICATE_READING");
+    }
+
+    [Fact]
+    public async Task ImpossibleIncrease_IsPersistedAsSuspectWithAnomaly()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        var machineId = await GetMachineIdAsync(client, 68);
+        var capturedAt = DateTimeOffset.UtcNow.AddHours(-2);
+
+        using var firstResponse = await client.PostAsJsonAsync(
+            "/api/v1/readings",
+            ReadingRequest(machineId, 100m, capturedAt, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+
+        using var secondResponse = await client.PostAsJsonAsync(
+            "/api/v1/readings",
+            ReadingRequest(machineId, 103m, capturedAt.AddHours(1), Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
+        using var second = await JsonDocument.ParseAsync(await secondResponse.Content.ReadAsStreamAsync());
+        Assert.Equal("SUSPECT", second.RootElement.GetProperty("status").GetString());
+
+        using var anomaliesResponse = await client.GetAsync($"/api/v1/anomalies?machineId={machineId}");
+        using var anomalies = await JsonDocument.ParseAsync(await anomaliesResponse.Content.ReadAsStreamAsync());
+        Assert.Contains(
+            anomalies.RootElement.GetProperty("items").EnumerateArray(),
+            anomaly => anomaly.GetProperty("type").GetString() == "IMPOSSIBLE_HOUR_INCREASE");
+    }
+
+    [Fact]
+    public async Task NegativeReading_IsRejectedWithoutPersistingAnOperationalReading()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        var machineId = await GetMachineIdAsync(client, 68);
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/v1/readings",
+            ReadingRequest(machineId, -1m, DateTimeOffset.UtcNow, Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var readingsResponse = await client.GetAsync($"/api/v1/machines/{machineId}/readings");
+        using var readings = await JsonDocument.ParseAsync(await readingsResponse.Content.ReadAsStreamAsync());
+        Assert.Equal(0, readings.RootElement.GetProperty("totalItems").GetInt32());
+    }
+
+    [Fact]
+    public async Task DashboardMissingReading_CountsActiveMachinesOnlyAndUsesCaptureTime()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        const int activeFleetNumber = 9001;
+        const int inactiveFleetNumber = 9002;
+
+        using var activeResponse = await client.PostAsJsonAsync(
+            "/api/v1/machines",
+            new { fleetNumber = activeFleetNumber, model = "Teste ativa", status = "ACTIVE" });
+        Assert.Equal(HttpStatusCode.Created, activeResponse.StatusCode);
+        using var activeMachine = await JsonDocument.ParseAsync(await activeResponse.Content.ReadAsStreamAsync());
+        var activeMachineId = activeMachine.RootElement.GetProperty("id").GetGuid();
+
+        using var inactiveResponse = await client.PostAsJsonAsync(
+            "/api/v1/machines",
+            new { fleetNumber = inactiveFleetNumber, model = "Teste inativa", status = "INACTIVE" });
+        Assert.Equal(HttpStatusCode.Created, inactiveResponse.StatusCode);
+
+        using var beforeResponse = await client.GetAsync("/api/v1/dashboard/summary");
+        using var before = await JsonDocument.ParseAsync(await beforeResponse.Content.ReadAsStreamAsync());
+        Assert.Equal(53, before.RootElement.GetProperty("withoutReading").GetInt32());
+
+        using var oldReadingResponse = await client.PostAsJsonAsync(
+            "/api/v1/readings",
+            ReadingRequest(
+                activeMachineId,
+                1m,
+                DateTimeOffset.UtcNow.AddDays(-3),
+                Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, oldReadingResponse.StatusCode);
+
+        using var afterResponse = await client.GetAsync("/api/v1/dashboard/summary");
+        using var after = await JsonDocument.ParseAsync(await afterResponse.Content.ReadAsStreamAsync());
+        Assert.Equal(53, after.RootElement.GetProperty("withoutReading").GetInt32());
+
+        using var recentReadingResponse = await client.PostAsJsonAsync(
+            "/api/v1/readings",
+            ReadingRequest(
+                activeMachineId,
+                2m,
+                DateTimeOffset.UtcNow,
+                Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, recentReadingResponse.StatusCode);
+
+        using var withRecentResponse = await client.GetAsync("/api/v1/dashboard/summary");
+        using var withRecent = await JsonDocument.ParseAsync(await withRecentResponse.Content.ReadAsStreamAsync());
+        Assert.Equal(52, withRecent.RootElement.GetProperty("withoutReading").GetInt32());
+    }
+
+    [Fact]
     public async Task PlausibleSequence_IsValidatedWithoutAnomaly()
     {
         await factory.ResetDatabaseAsync();
         using var client = factory.CreateClient();
         var machineId = await GetMachineIdAsync(client, 68);
-        var capturedAt = DateTimeOffset.UtcNow.AddHours(-12);
+        var capturedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
 
         using var first = await client.PostAsJsonAsync(
             "/api/v1/readings",
@@ -97,7 +224,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
 
         using var second = await client.PostAsJsonAsync(
             "/api/v1/readings",
-            ReadingRequest(machineId, 108.5m, capturedAt.AddHours(9), Guid.NewGuid()));
+            ReadingRequest(machineId, 100.1m, capturedAt.AddMinutes(1), Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
         using var secondBody = await JsonDocument.ParseAsync(await second.Content.ReadAsStreamAsync());
         Assert.Equal("VALIDATED", secondBody.RootElement.GetProperty("status").GetString());

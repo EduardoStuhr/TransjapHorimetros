@@ -184,7 +184,7 @@ public sealed class ReadingServiceTests
 
         public Task<int> CountActiveMachinesWithoutReadingSinceAsync(
             IReadOnlyCollection<Guid> activeMachineIds,
-            DateTimeOffset receivedSince,
+            DateTimeOffset capturedSince,
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 

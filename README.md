@@ -114,3 +114,4 @@ Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Nenhu
 - `src/`: frontend Next.js 16.
 - `scripts/`: automações de desenvolvimento, testes e backup.
 - `docs/`: decisões arquiteturais e regras de engenharia.
+- [Regras de negócio da Fase 1](docs/regras-de-negocio.md) e [decisões pendentes](docs/decisoes.md).

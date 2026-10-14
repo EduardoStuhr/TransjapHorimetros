@@ -38,7 +38,11 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(1000)")
                         .HasColumnName("description");
 
-                    b.Property<Guid>("ReadingId")
+                    b.Property<Guid>("MachineId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("machine_id");
+
+                    b.Property<Guid?>("ReadingId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("reading_id");
 
@@ -62,6 +66,9 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_anomalies");
+
+                    b.HasIndex("MachineId")
+                        .HasDatabaseName("ix_anomalies_machine_id");
 
                     b.HasIndex("ReadingId")
                         .HasDatabaseName("ix_anomalies_reading_id");
@@ -216,6 +223,11 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasColumnType("int")
                         .HasColumnName("fleet_number");
 
+                    b.Property<string>("MeterUnit")
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)")
+                        .HasColumnName("meter_unit");
+
                     b.Property<string>("Model")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -286,12 +298,20 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.Anomaly", b =>
                 {
+                    b.HasOne("TransjapHorimetros.Domain.Entities.Machine", "Machine")
+                        .WithMany()
+                        .HasForeignKey("MachineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_anomalies_machines_machine_id");
+
                     b.HasOne("TransjapHorimetros.Domain.Entities.HourMeterReading", "Reading")
                         .WithMany("Anomalies")
                         .HasForeignKey("ReadingId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_anomalies_hour_meter_readings_reading_id");
+
+                    b.Navigation("Machine");
 
                     b.Navigation("Reading");
                 });

@@ -120,7 +120,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
         await factory.ResetDatabaseAsync();
         using var client = factory.CreateClient();
         var machineId = await GetMachineIdAsync(client, 68);
-        var capturedAt = DateTimeOffset.UtcNow.AddHours(-2);
+        var capturedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
 
         using var firstResponse = await client.PostAsJsonAsync(
             "/api/v1/readings",
@@ -129,7 +129,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
 
         using var secondResponse = await client.PostAsJsonAsync(
             "/api/v1/readings",
-            ReadingRequest(machineId, 103m, capturedAt.AddHours(1), Guid.NewGuid()));
+            ReadingRequest(machineId, 103m, capturedAt.AddMinutes(1), Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
         using var second = await JsonDocument.ParseAsync(await secondResponse.Content.ReadAsStreamAsync());
         Assert.Equal("SUSPECT", second.RootElement.GetProperty("status").GetString());

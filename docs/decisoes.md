@@ -90,14 +90,20 @@ Não há limite ativo de atraso de sincronização (`LATE_SYNC`): falta validaç
 10. Quais frotas usam `KM`?
 11. Uma máquina pode mudar de obra no mesmo dia?
 12. Qual atraso máximo de sincronização deve ser aceito antes de classificar `LATE_SYNC`?
-13. Qual conteúdo os QR codes físicos existentes carregam: número, texto ou URL?
-14. Qual provedor e fluxo de autenticação devem ser adotados na Fase 3?
+13. Qual provedor e fluxo de autenticação devem ser adotados na Fase 3?
 
-Nenhuma resposta acima é presumida por este documento. A identidade e a resolução de QR foram implementadas na Fase 2 e estão documentadas em [fase-2-qr-codes.md](fase-2-qr-codes.md); o formato físico existente continua pendente. OCR, geofence, mobile e autenticação não são descritos como funcionalidades concluídas.
+Nenhuma resposta acima é presumida por este documento. A identidade e a resolução de QR foram implementadas na Fase 2 e estão documentadas em [fase-2-qr-codes.md](fase-2-qr-codes.md). OCR, geofence, mobile e autenticação não são descritos como funcionalidades concluídas.
 
 ## 4. ADR — QR físico desacoplado da máquina
 
 **Data:** 2026-10-15
 **Status:** Aceita
 
-O QR físico é modelado por `MachineQrCode`, em relação N:1 com `Machine`. Tokens antigos permanecem reservados e auditáveis após desativação; não existe exclusão física. O banco garante token globalmente único e no máximo um QR ativo por máquina. A compatibilidade temporária aceita somente número de frota isolado ou o formato conservador `FROTA <número>`, sem interpretar URLs ou números em texto livre.
+O QR físico é modelado por `MachineQrCode`, em relação N:1 com `Machine`. Tokens antigos permanecem reservados e auditáveis após desativação; não existe exclusão física. O banco garante token globalmente único e no máximo um QR ativo por máquina. A resolução aceita número de frota isolado, o formato conservador `FROTA <número>` e o padrão físico oficial de quatro dígitos com zeros à esquerda, sem interpretar URLs ou números em texto livre.
+
+## 5. ADR — Associação inicial dos QR codes físicos oficiais
+
+**Data:** 2026-10-15
+**Status:** Aceita
+
+O PDF oficial confirmou que os adesivos já existem e usam quatro dígitos (`0068` → frota 68). Uma migration de dados separada associa os 51 códigos pertencentes às máquinas atuais por `fleet_number`. A frota 296 permanece sem QR porque não aparece no PDF. Códigos de frotas antigas não criam nem reativam máquinas. O patch é idempotente, valida conflitos antes de inserir e não é executado como importação oculta em cada startup. Tokens `TJ-*` permanecem disponíveis somente para futuras emissões ou substituições.

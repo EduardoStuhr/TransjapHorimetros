@@ -40,8 +40,10 @@ Os diretórios locais legados `.postgres/`, `.postgres-data/` e `.postgres-backu
    - **Migrations estritamente aditivas:** Novas colunas, tabelas e constraints nunca devem excluir dados ou colunas existentes sem procedimento explícito de transição.
    - **Trava de segurança nos testes de integração:** A classe `TestDatabaseGuard` impede a execução do `ResetDatabaseAsync` caso a connection string aponte para o banco da aplicação ou para qualquer banco diferente de `transjap_horimetros_tests`.
 
-4. **Bloqueio de Publicação e Exposição Externa**
-   - **Segurança primeiro:** O sistema não será publicado no Azure nem exposto publicamente à internet antes da conclusão e validação completa da **Fase 3 (Segurança e Autenticação)**.
+4. **Publicação atual e risco de exposição externa**
+   - A API e o frontend web já estão publicados no Azure, mas a autenticação ainda não foi implementada.
+   - A exposição pública atual é um risco conhecido e explícito. Endpoints administrativos e de escrita, inclusive emissão e desativação de QR, não devem ser considerados aptos para operação real antes da **Fase 3 (Segurança e Autenticação)**.
+   - A Fase 3 permanece prioridade de segurança; a publicação existente não equivale à aprovação operacional desses endpoints.
    - Arquivos `.env` e backups permanecem estritamente ignorados pelo Git (`.gitignore`).
 
 ---
@@ -91,4 +93,11 @@ Não há limite ativo de atraso de sincronização (`LATE_SYNC`): falta validaç
 13. Qual conteúdo os QR codes físicos existentes carregam: número, texto ou URL?
 14. Qual provedor e fluxo de autenticação devem ser adotados na Fase 3?
 
-Nenhuma resposta acima é presumida por este documento. QR, OCR, geofence, mobile e autenticação permanecem fora da Fase 1 e não são descritos como funcionalidades concluídas.
+Nenhuma resposta acima é presumida por este documento. A identidade e a resolução de QR foram implementadas na Fase 2 e estão documentadas em [fase-2-qr-codes.md](fase-2-qr-codes.md); o formato físico existente continua pendente. OCR, geofence, mobile e autenticação não são descritos como funcionalidades concluídas.
+
+## 4. ADR — QR físico desacoplado da máquina
+
+**Data:** 2026-10-15
+**Status:** Aceita
+
+O QR físico é modelado por `MachineQrCode`, em relação N:1 com `Machine`. Tokens antigos permanecem reservados e auditáveis após desativação; não existe exclusão física. O banco garante token globalmente único e no máximo um QR ativo por máquina. A compatibilidade temporária aceita somente número de frota isolado ou o formato conservador `FROTA <número>`, sem interpretar URLs ou números em texto livre.

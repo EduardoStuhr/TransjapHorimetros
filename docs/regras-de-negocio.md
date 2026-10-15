@@ -1,6 +1,6 @@
 # Regras de negócio operacionais — Fase 1
 
-Este documento descreve somente comportamentos presentes na Fase 1 ou decisões explicitamente reservadas. Os valores operacionais configurados são provisórios quando indicado em [decisoes.md](decisoes.md). OCR, QR avançado, armazenamento de evidências, mobile, autenticação e correção formal não são declarados como implementados.
+Este documento descreve os comportamentos da Fase 1 e decisões explicitamente reservadas. Os valores operacionais configurados são provisórios quando indicado em [decisoes.md](decisoes.md). A identidade e resolução de QR da Fase 2 estão em [fase-2-qr-codes.md](fase-2-qr-codes.md). OCR, armazenamento de evidências, mobile, autenticação e correção formal não são declarados como implementados.
 
 ## RN-001 — Imutabilidade da leitura original
 
@@ -114,4 +114,4 @@ Este documento descreve somente comportamentos presentes na Fase 1 ou decisões 
 
 - Criação/atualização de máquina (`CREATE_MACHINE`, `UPDATE_MACHINE`), criação/atualização de obra (`CREATE_WORKSITE`, `UPDATE_WORKSITE`) e criação de leitura (`CREATE_READING`) produzem `AuditLog`; logs são append-only na aplicação.
 - A auditoria não substitui autenticação ou identificação de operador: o sistema ainda não tem a autenticação da Fase 3.
-- Não foi ativada detecção `LATE_SYNC`: não há limiar aprovado. OCR, QR, geofence, fotos e sincronização mobile também não são afirmados como implementados.
+- Não foi ativada detecção `LATE_SYNC`: não há limiar aprovado. OCR, geração/leitura visual de QR, geofence, fotos e sincronização mobile também não são afirmados como implementados.

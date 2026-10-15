@@ -54,6 +54,7 @@ export async function getMachineByFleetNumber(
 
     return {
       ...mapMachine(machine),
+      qrCodeStatus: machine.qrCode ? "REGISTERED" : "MISSING",
       recentReadings,
       alertCount: machine.alertCount,
       qrCode: machine.qrCode,

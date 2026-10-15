@@ -65,9 +65,10 @@ export interface MachineQrCode {
   id: string;
   machineId: string;
   token: string;
-  active: boolean;
+  isActive: boolean;
   createdAt: string;
-  revokedAt: string | null;
+  updatedAt: string;
+  deactivatedAt: string | null;
 }
 
 export interface PhotoEvidence {

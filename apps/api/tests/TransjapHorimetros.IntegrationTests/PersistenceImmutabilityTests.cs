@@ -85,6 +85,20 @@ public sealed class PersistenceImmutabilityTests
         }
     }
 
+    [Fact]
+    public async Task MachineQrCode_RejectsPhysicalDelete()
+    {
+        using var dbContext = CreateDbContext();
+        var qrCode = new MachineQrCode(
+            Guid.NewGuid(),
+            "TJ-HISTORY",
+            DateTimeOffset.UtcNow);
+        dbContext.Entry(qrCode).State = EntityState.Deleted;
+
+        Assert.Throws<InvalidOperationException>(() => dbContext.SaveChanges());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => dbContext.SaveChangesAsync());
+    }
+
     private static TransjapDbContext CreateDbContext() =>
         new(new DbContextOptionsBuilder<TransjapDbContext>()
             .UseSqlServer("Server=127.0.0.1;Database=not_used;User Id=test;Password=test;Encrypt=False")

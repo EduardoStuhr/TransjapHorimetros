@@ -2,8 +2,8 @@
 
 Sistema de controle e integridade de registros de horímetros e odômetros de máquinas pesadas e veículos da **TRANSJAP Terraplenagem e Construções**.
 
-> [!IMPORTANT]
-> O sistema não deve ser publicado no Azure nem exposto à internet antes da conclusão e validação da Fase 3 (Segurança e Autenticação).
+> [!WARNING]
+> A API e o frontend web já estão publicados no Azure, mas ainda não possuem autenticação. Essa exposição é um risco conhecido; endpoints administrativos e de escrita não devem ser usados operacionalmente antes da Fase 3 (Segurança e Autenticação).
 
 ## Arquitetura de dados
 
@@ -106,7 +106,7 @@ No Azure App Service, configure `ConnectionStrings__DefaultConnection` sem alter
 Server=tcp:<servidor>.database.windows.net,1433;Initial Catalog=transjap_horimetros;Persist Security Info=False;User ID=<usuario>;Password=<segredo>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
 ```
 
-Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Nenhum deploy é realizado por este repositório nesta etapa.
+Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os workflows atuais publicam API e frontend quando há push na `main`; por isso, a Fase 2 deve permanecer em branch e PR até a revisão da migration.
 
 ## Estrutura
 
@@ -114,4 +114,4 @@ Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Nenhu
 - `src/`: frontend Next.js 16.
 - `scripts/`: automações de desenvolvimento, testes e backup.
 - `docs/`: decisões arquiteturais e regras de engenharia.
-- [Regras de negócio da Fase 1](docs/regras-de-negocio.md) e [decisões pendentes](docs/decisoes.md).
+- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md) e [decisões pendentes](docs/decisoes.md).

@@ -8,6 +8,8 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 {
     public DbSet<Machine> Machines => Set<Machine>();
 
+    public DbSet<MachineQrCode> MachineQrCodes => Set<MachineQrCode>();
+
     public DbSet<WorkSite> WorkSites => Set<WorkSite>();
 
     public DbSet<HourMeterReading> HourMeterReadings => Set<HourMeterReading>();
@@ -56,6 +58,12 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
     private void EnsureAppendOnlyEntitiesAreNotModifiedOrDeleted()
     {
+        if (ChangeTracker.Entries<MachineQrCode>().Any(entry => entry.State == EntityState.Deleted))
+        {
+            throw new InvalidOperationException(
+                "QR codes de máquinas não podem ser excluídos; desative o QR para preservar o histórico.");
+        }
+
         var invalidEntries = ChangeTracker.Entries()
             .Where(entry =>
                 (entry.Entity is HourMeterReading or AuditLog)

@@ -257,6 +257,54 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.MachineQrCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeactivatedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("deactivated_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_active");
+
+                    b.Property<Guid>("MachineId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("machine_id");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("token")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_machine_qr_codes");
+
+                    b.HasIndex("MachineId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_machine_qr_codes_machine_active")
+                        .HasFilter("[is_active] = 1");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ux_machine_qr_codes_token");
+
+                    b.ToTable("machine_qr_codes", (string)null);
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.WorkSite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -336,6 +384,18 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.Navigation("WorkSite");
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.MachineQrCode", b =>
+                {
+                    b.HasOne("TransjapHorimetros.Domain.Entities.Machine", "Machine")
+                        .WithMany("QrCodes")
+                        .HasForeignKey("MachineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_qr_codes_machines_machine_id");
+
+                    b.Navigation("Machine");
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.HourMeterReading", b =>
                 {
                     b.Navigation("Anomalies");
@@ -343,6 +403,8 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.Machine", b =>
                 {
+                    b.Navigation("QrCodes");
+
                     b.Navigation("Readings");
                 });
 

@@ -15,6 +15,14 @@ public sealed class GlobalExceptionHandler(
     {
         var (status, title, detail) = exception switch
         {
+            UnauthorizedException => (
+                StatusCodes.Status401Unauthorized,
+                "Unauthorized",
+                exception.Message),
+            ForbiddenException => (
+                StatusCodes.Status403Forbidden,
+                "Forbidden",
+                exception.Message),
             BadRequestException => (
                 StatusCodes.Status400BadRequest,
                 "Bad request",

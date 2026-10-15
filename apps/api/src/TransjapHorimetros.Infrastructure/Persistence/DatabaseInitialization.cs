@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TransjapHorimetros.Infrastructure.Persistence.Migrations;
 using TransjapHorimetros.Infrastructure.Persistence.Seed;
+using TransjapHorimetros.Infrastructure.Security;
 
 namespace TransjapHorimetros.Infrastructure.Persistence;
 
@@ -33,6 +34,10 @@ public static class DatabaseInitialization
         logger.LogInformation("Aplicando migrations do SQL Server.");
         await dbContext.Database.MigrateAsync(cancellationToken);
         await seeder.SeedAsync(cancellationToken);
-        logger.LogInformation("Banco migrado e seed concluído.");
+
+        var adminBootstrap = scope.ServiceProvider.GetRequiredService<AdminBootstrapService>();
+        await adminBootstrap.SeedRolesAndAdminAsync(cancellationToken);
+
+        logger.LogInformation("Banco migrado, seed e perfis de segurança concluídos.");
     }
 }

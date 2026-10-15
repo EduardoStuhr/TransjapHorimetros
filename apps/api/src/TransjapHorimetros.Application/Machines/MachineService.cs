@@ -14,7 +14,8 @@ public sealed class MachineService(
     IAnomalyRepository anomalyRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IMachineService
+    TimeProvider timeProvider,
+    ICurrentUser? currentUser = null) : IMachineService
 {
     public async Task<PagedResponse<MachineListItemResponse>> GetPageAsync(
         MachineQuery query,
@@ -84,7 +85,9 @@ public sealed class MachineService(
             null,
             Serialize(machine),
             now,
-            correlationId));
+            correlationId,
+            currentUser?.UserId,
+            currentUser?.Email));
 
         try
         {
@@ -124,7 +127,9 @@ public sealed class MachineService(
             oldValue,
             Serialize(machine),
             now,
-            correlationId));
+            correlationId,
+            currentUser?.UserId,
+            currentUser?.Email));
 
         try
         {

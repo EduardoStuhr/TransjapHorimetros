@@ -6,7 +6,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import {
+  canAccessNavigationItem,
   isNavigationItemActive,
   navigationItems,
 } from "@/components/layout/navigation";
@@ -23,6 +25,10 @@ import {
 export function MobileNavigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+  const visibleItems = navigationItems.filter((item) =>
+    canAccessNavigationItem(user.roles, item),
+  );
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -57,7 +63,7 @@ export function MobileNavigation() {
         </SheetHeader>
 
         <nav aria-label="Navegação principal" className="space-y-1 p-3">
-          {navigationItems.map((item) => {
+          {visibleItems.map((item) => {
             const isActive = isNavigationItemActive(pathname, item.href);
             const Icon = item.icon;
 

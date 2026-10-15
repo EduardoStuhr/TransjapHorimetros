@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TransjapHorimetros.Application.Anomalies;
 using TransjapHorimetros.Application.Common;
+using TransjapHorimetros.Application.Security;
 
 namespace TransjapHorimetros.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/anomalies")]
+[Authorize(Policy = Policies.CanReviewAnomalies)]
 public sealed class AnomaliesController(IAnomalyService anomalyService) : ControllerBase
 {
     /// <summary>Lista anomalias reais detectadas nas leituras.</summary>

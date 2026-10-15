@@ -24,6 +24,9 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
             .HasMaxLength(100)
             .IsRequired();
         builder.Property(auditLog => auditLog.UserId).HasColumnName("user_id");
+        builder.Property(auditLog => auditLog.UserEmail)
+            .HasColumnName("user_email")
+            .HasMaxLength(256);
         builder.HasIndex(auditLog => new { auditLog.Entity, auditLog.EntityId })
             .HasDatabaseName("ix_audit_logs_entity_entity_id");
     }

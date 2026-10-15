@@ -2,8 +2,11 @@
 
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
+import { Button } from "@/components/ui/button";
 
 const routeTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -16,6 +19,7 @@ const routeTitles: Record<string, string> = {
 
 export function Header() {
   const pathname = usePathname();
+  const { logout, user } = useAuth();
   const title = pathname.startsWith("/frota/")
     ? "Detalhes da máquina"
     : (routeTitles[pathname] ?? "Transjap Horímetros");
@@ -43,7 +47,15 @@ export function Header() {
             </h1>
           </div>
         </div>
-
+        <div className="flex items-center gap-3">
+          <div className="hidden text-right sm:block">
+            <p className="max-w-52 truncate text-sm font-semibold text-slate-900">{user.fullName}</p>
+            <p className="max-w-52 truncate text-xs text-slate-500">{user.email}</p>
+          </div>
+          <Button variant="outline" size="icon" onClick={() => void logout()} aria-label="Sair">
+            <LogOut />
+          </Button>
+        </div>
       </div>
     </header>
   );

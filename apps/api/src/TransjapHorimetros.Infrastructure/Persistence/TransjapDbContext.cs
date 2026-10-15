@@ -1,10 +1,14 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using TransjapHorimetros.Domain.Entities;
+using TransjapHorimetros.Infrastructure.Identity;
 using TransjapHorimetros.Infrastructure.Persistence.Converters;
 
 namespace TransjapHorimetros.Infrastructure.Persistence;
 
-public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> options) : DbContext(options)
+public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> options)
+    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
 {
     public DbSet<Machine> Machines => Set<Machine>();
 
@@ -17,6 +21,8 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
     public DbSet<Anomaly> Anomalies => Set<Anomaly>();
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     public override int SaveChanges()
     {
@@ -53,6 +59,28 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ApplicationUser>(b =>
+        {
+            b.ToTable("users");
+            b.Property(u => u.FullName).HasMaxLength(150).IsRequired();
+            b.Property(u => u.IsActive).IsRequired();
+            b.Property(u => u.CreatedAt).IsRequired();
+            b.Property(u => u.UpdatedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<ApplicationRole>(b =>
+        {
+            b.ToTable("roles");
+        });
+
+        modelBuilder.Entity<IdentityUserRole<Guid>>(b => b.ToTable("user_roles"));
+        modelBuilder.Entity<IdentityUserClaim<Guid>>(b => b.ToTable("user_claims"));
+        modelBuilder.Entity<IdentityUserLogin<Guid>>(b => b.ToTable("user_logins"));
+        modelBuilder.Entity<IdentityRoleClaim<Guid>>(b => b.ToTable("role_claims"));
+        modelBuilder.Entity<IdentityUserToken<Guid>>(b => b.ToTable("user_tokens"));
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TransjapDbContext).Assembly);
     }
 

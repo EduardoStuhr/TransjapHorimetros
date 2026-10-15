@@ -5,13 +5,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DatabaseZap } from "lucide-react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import {
+  canAccessNavigationItem,
   isNavigationItemActive,
   navigationItems,
 } from "@/components/layout/navigation";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const visibleItems = navigationItems.filter((item) =>
+    canAccessNavigationItem(user.roles, item),
+  );
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-68 flex-col border-r border-white/10 bg-[var(--sidebar)] text-[var(--sidebar-foreground)] lg:flex">
@@ -36,7 +42,7 @@ export function Sidebar() {
       </div>
 
       <nav aria-label="Navegação principal" className="flex-1 space-y-1 px-3 py-5">
-        {navigationItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = isNavigationItemActive(pathname, item.href);
           const Icon = item.icon;
 

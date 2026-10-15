@@ -21,6 +21,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\TransjapHorimetros.Domain\TransjapHorimetros.Domain.csproj" />
     <ProjectReference Include="..\..\src\TransjapHorimetros.Application\TransjapHorimetros.Application.csproj" />
+    <ProjectReference Include="..\..\src\TransjapHorimetros.Infrastructure\TransjapHorimetros.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\TransjapHorimetros.Api\TransjapHorimetros.Api.csproj" />
   </ItemGroup>
 
 </Project>

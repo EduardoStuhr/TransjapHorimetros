@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TransjapHorimetros.Application.Common;
 using TransjapHorimetros.Application.Machines;
 using TransjapHorimetros.Application.QrCodes;
 using TransjapHorimetros.Application.Readings;
+using TransjapHorimetros.Application.Security;
 
 namespace TransjapHorimetros.Api.Controllers;
 
@@ -40,6 +42,7 @@ public sealed class MachinesController(
 
     /// <summary>Cadastra uma máquina e registra auditoria.</summary>
     [HttpPost]
+    [Authorize(Policy = Policies.CanManageMachines)]
     [ProducesResponseType(typeof(MachineDetailsResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -56,6 +59,7 @@ public sealed class MachinesController(
 
     /// <summary>Atualiza cadastro e estado ativo/inativo sem apagar histórico.</summary>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Policies.CanManageMachines)]
     [ProducesResponseType(typeof(MachineDetailsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -79,6 +83,7 @@ public sealed class MachinesController(
 
     /// <summary>Lista o histórico completo de QR codes da máquina, mais recentes primeiro.</summary>
     [HttpGet("{machineId:guid}/qr-codes")]
+    [Authorize(Policy = Policies.CanViewQrHistory)]
     [ProducesResponseType(typeof(IReadOnlyList<MachineQrCodeResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public Task<IReadOnlyList<MachineQrCodeResponse>> GetQrCodes(
@@ -88,6 +93,7 @@ public sealed class MachinesController(
 
     /// <summary>Emite ou substitui o QR code ativo, preservando o histórico.</summary>
     [HttpPost("{machineId:guid}/qr-codes")]
+    [Authorize(Policy = Policies.CanManageQrCodes)]
     [ProducesResponseType(typeof(MachineQrCodeResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -107,6 +113,7 @@ public sealed class MachinesController(
 
     /// <summary>Desativa logicamente o QR code ativo da máquina.</summary>
     [HttpDelete("{machineId:guid}/qr-codes/active")]
+    [Authorize(Policy = Policies.CanManageQrCodes)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateActiveQrCode(

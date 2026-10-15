@@ -105,21 +105,21 @@ builder.Services.AddAuthorization(options =>
         .Build();
 
     options.AddPolicy(Policies.CanRecordReading, policy =>
-        policy.RequireRole(AppRoles.Operator, AppRoles.Supervisor, AppRoles.Manager, AppRoles.Admin));
+        policy.RequireRole(AppRoles.Operator, AppRoles.Supervisor, AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanResolveQr, policy =>
         policy.RequireRole(AppRoles.Operator, AppRoles.Supervisor, AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanManageMachines, policy =>
         policy.RequireRole(AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanManageQrCodes, policy =>
-        policy.RequireRole(AppRoles.Manager, AppRoles.Admin));
+        policy.RequireRole(AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanViewQrHistory, policy =>
         policy.RequireRole(AppRoles.Supervisor, AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanManageWorkSites, policy =>
         policy.RequireRole(AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanViewDashboard, policy =>
-        policy.RequireRole(AppRoles.Supervisor, AppRoles.Manager, AppRoles.Admin));
+        policy.RequireRole(AppRoles.Supervisor, AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanReviewAnomalies, policy =>
-        policy.RequireRole(AppRoles.Supervisor, AppRoles.Manager, AppRoles.Admin));
+        policy.RequireRole(AppRoles.Supervisor, AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanManageUsers, policy =>
         policy.RequireRole(AppRoles.Admin));
 });

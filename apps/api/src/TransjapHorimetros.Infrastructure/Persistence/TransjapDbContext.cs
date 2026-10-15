@@ -16,6 +16,8 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    public DbSet<MachineQrCode> MachineQrCodes => Set<MachineQrCode>();
+
     public override int SaveChanges()
     {
         EnsureAppendOnlyEntitiesAreNotModifiedOrDeleted();

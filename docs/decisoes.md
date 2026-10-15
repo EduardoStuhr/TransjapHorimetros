@@ -41,9 +41,8 @@ Os diretórios locais legados `.postgres/`, `.postgres-data/` e `.postgres-backu
    - **Trava de segurança nos testes de integração:** A classe `TestDatabaseGuard` impede a execução do `ResetDatabaseAsync` caso a connection string aponte para o banco da aplicação ou para qualquer banco diferente de `transjap_horimetros_tests`.
 
 4. **Publicação atual e risco de exposição externa**
-   - A API e o frontend web já estão publicados no Azure, mas a autenticação ainda não foi implementada.
-   - A exposição pública atual é um risco conhecido e explícito. Endpoints administrativos e de escrita, inclusive emissão e desativação de QR, não devem ser considerados aptos para operação real antes da **Fase 3 (Segurança e Autenticação)**.
-   - A Fase 3 permanece prioridade de segurança; a publicação existente não equivale à aprovação operacional desses endpoints.
+   - A autenticação foi implementada na branch da Fase 3, mas ainda depende de revisão, merge, configuração de secrets e nova implantação.
+   - A publicação existente não equivale à aprovação operacional dos endpoints protegidos.
    - Arquivos `.env` e backups permanecem estritamente ignorados pelo Git (`.gitignore`).
 
 ---
@@ -90,9 +89,9 @@ Não há limite ativo de atraso de sincronização (`LATE_SYNC`): falta validaç
 10. Quais frotas usam `KM`?
 11. Uma máquina pode mudar de obra no mesmo dia?
 12. Qual atraso máximo de sincronização deve ser aceito antes de classificar `LATE_SYNC`?
-13. Qual provedor e fluxo de autenticação devem ser adotados na Fase 3?
+13. Há exigência futura de MFA ou integração com um provedor corporativo de identidade?
 
-Nenhuma resposta acima é presumida por este documento. A identidade e a resolução de QR foram implementadas na Fase 2 e estão documentadas em [fase-2-qr-codes.md](fase-2-qr-codes.md). OCR, geofence, mobile e autenticação não são descritos como funcionalidades concluídas.
+Nenhuma resposta acima é presumida por este documento. A identidade e a resolução de QR foram implementadas na Fase 2 e estão documentadas em [fase-2-qr-codes.md](fase-2-qr-codes.md). OCR, geofence e mobile não são descritos como funcionalidades concluídas.
 
 ## 4. ADR — QR físico desacoplado da máquina
 
@@ -107,3 +106,14 @@ O QR físico é modelado por `MachineQrCode`, em relação N:1 com `Machine`. To
 **Status:** Aceita
 
 O PDF oficial confirmou que os adesivos já existem e usam quatro dígitos (`0068` → frota 68). Uma migration de dados separada associa os 51 códigos pertencentes às máquinas atuais por `fleet_number`. A frota 296 permanece sem QR porque não aparece no PDF. Códigos de frotas antigas não criam nem reativam máquinas. O patch é idempotente, valida conflitos antes de inserir e não é executado como importação oculta em cada startup. Tokens `TJ-*` permanecem disponíveis somente para futuras emissões ou substituições.
+
+## 6. ADR — Identity, JWT e sessão BFF
+
+**Data:** 2026-10-15
+**Status:** Aceita para revisão
+
+A API é a autoridade de autenticação e autorização. ASP.NET Core Identity mantém usuários, papéis, lockout e credenciais; JWT Bearer protege a API com validações de issuer, audience, chave, assinatura e lifetime. A fallback policy exige autenticação em todos os endpoints, exceto login, refresh e health checks explicitamente anônimos.
+
+O frontend Next.js usa o padrão BFF. Tokens não são entregues ao JavaScript da aplicação: access e refresh tokens são gravados no servidor em cookies `HttpOnly`, `SameSite=Strict` e `Secure` em produção. A rotação acontece no backend; o token anterior é revogado e não pode ser reutilizado. O Proxy faz somente a renovação antecipada e o redirecionamento otimista, enquanto a API continua executando a autorização real por policy.
+
+O bootstrap inicial depende exclusivamente de `BootstrapAdmin__Email`, `BootstrapAdmin__Password` e `BootstrapAdmin__FullName`. Ele não altera senhas existentes e deixa de criar usuário assim que existe um membro do papel `ADMIN`. Secrets reais devem permanecer no App Service Configuration ou Key Vault, nunca no repositório.

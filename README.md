@@ -3,7 +3,7 @@
 Sistema de controle e integridade de registros de horímetros e odômetros de máquinas pesadas e veículos da **TRANSJAP Terraplenagem e Construções**.
 
 > [!WARNING]
-> A API e o frontend web já estão publicados no Azure, mas ainda não possuem autenticação. Essa exposição é um risco conhecido; endpoints administrativos e de escrita não devem ser usados operacionalmente antes da Fase 3 (Segurança e Autenticação).
+> A Fase 3 implementa autenticação e autorização, mas esta branch ainda não foi mesclada nem publicada. A implantação atual não deve ser considerada protegida até a revisão, o merge e a configuração dos secrets no Azure.
 
 ## Arquitetura de dados
 
@@ -29,7 +29,9 @@ Sistema de controle e integridade de registros de horímetros e odômetros de m�
    ```
 
 2. Substitua `your_secure_password_here` por uma senha forte compatível com a política do SQL Server.
-3. Mantenha `SQLSERVER_USE_DOCKER=true` para usar o container ou altere para `false` quando houver um SQL Server local já configurado.
+3. Gere uma chave JWT aleatória de pelo menos 32 bytes e configure `Authentication__Jwt__SigningKey`.
+4. Informe `BootstrapAdmin__Email`, `BootstrapAdmin__Password` e `BootstrapAdmin__FullName` somente para provisionar o primeiro administrador.
+5. Mantenha `SQLSERVER_USE_DOCKER=true` para usar o container ou altere para `false` quando houver um SQL Server local já configurado.
 
 O `.env` não é versionado. Nunca inclua nele credenciais reais do Azure em commits.
 
@@ -49,6 +51,24 @@ docker compose up -d sqlserver
 ```
 
 A API aplica `InitialCreateSqlServer` e executa o seed idempotente das 52 máquinas na inicialização.
+
+### Autenticação
+
+O login corporativo está em `/login`. A API usa ASP.NET Core Identity, JWT Bearer e autorização por papéis. O frontend atua como BFF: access token e refresh token ficam em cookies `HttpOnly`, `SameSite=Strict` e `Secure` em produção, sem uso de `localStorage`.
+
+Variáveis obrigatórias ou recomendadas:
+
+```text
+Authentication__Jwt__SigningKey=<segredo-aleatorio-com-no-minimo-32-bytes>
+Authentication__Jwt__Issuer=TransjapHorimetros
+Authentication__Jwt__Audience=TransjapHorimetrosApp
+BootstrapAdmin__Email=<email-inicial>
+BootstrapAdmin__Password=<senha-temporaria-forte>
+BootstrapAdmin__FullName=<nome-completo>
+API_URL=<url-interna-da-api-para-o-next>
+```
+
+O bootstrap não redefine senha e só provisiona um administrador quando ainda não existe usuário no papel `ADMIN`. Remova os três secrets `BootstrapAdmin__*` depois do primeiro provisionamento.
 
 ### URLs locais
 
@@ -114,4 +134,4 @@ Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os wo
 - `src/`: frontend Next.js 16.
 - `scripts/`: automações de desenvolvimento, testes e backup.
 - `docs/`: decisões arquiteturais e regras de engenharia.
-- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md) e [decisões pendentes](docs/decisoes.md).
+- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md) e [decisões arquiteturais](docs/decisoes.md).

@@ -19,7 +19,12 @@ public sealed class AdminBootstrapService(
             if (!await roleManager.RoleExistsAsync(role))
             {
                 logger.LogInformation("Criando papel de segurança '{Role}'.", role);
-                await roleManager.CreateAsync(new ApplicationRole(role));
+                var roleResult = await roleManager.CreateAsync(new ApplicationRole(role));
+                if (!roleResult.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"Falha ao criar o papel '{role}': {string.Join(" ", roleResult.Errors.Select(error => error.Description))}");
+                }
             }
         }
 
@@ -29,15 +34,14 @@ public sealed class AdminBootstrapService(
             return;
         }
 
-        var email = configuration["BootstrapAdmin:Email"]
-            ?? configuration["BootstrapAdmin__Email"];
-        var password = configuration["BootstrapAdmin:Password"]
-            ?? configuration["BootstrapAdmin__Password"];
-        var fullName = configuration["BootstrapAdmin:FullName"]
-            ?? configuration["BootstrapAdmin__FullName"]
-            ?? "Administrador Transjap";
+        // O provider de variaveis de ambiente do .NET converte "__" para ":".
+        var email = configuration["BootstrapAdmin:Email"];
+        var password = configuration["BootstrapAdmin:Password"];
+        var fullName = configuration["BootstrapAdmin:FullName"];
 
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(email)
+            || string.IsNullOrWhiteSpace(password)
+            || string.IsNullOrWhiteSpace(fullName))
         {
             logger.LogInformation(
                 "Nenhum usuário administrador cadastrado e as variáveis BootstrapAdmin__* não foram fornecidas. O primeiro administrador deverá ser provisionado por configuração.");
@@ -65,7 +69,12 @@ public sealed class AdminBootstrapService(
 
         if (!await userManager.IsInRoleAsync(existingUser, AppRoles.Admin))
         {
-            await userManager.AddToRoleAsync(existingUser, AppRoles.Admin);
+            var addRoleResult = await userManager.AddToRoleAsync(existingUser, AppRoles.Admin);
+            if (!addRoleResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Falha ao atribuir o papel ADMIN ao usuário inicial: {string.Join(" ", addRoleResult.Errors.Select(error => error.Description))}");
+            }
         }
 
         logger.LogInformation(

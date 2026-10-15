@@ -1,3 +1,8 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+import { ACCESS_TOKEN_COOKIE } from "@/lib/auth/config";
+
 interface ApiProblemDetails {
   detail?: string;
   errors?: Record<string, string[]>;
@@ -28,7 +33,10 @@ export class ApiError extends Error {
 }
 
 function getApiUrl(): string {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  const apiUrl = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL)?.replace(
+    /\/$/,
+    "",
+  );
 
   if (!apiUrl) {
     console.error(
@@ -66,6 +74,7 @@ export async function apiFetch<T>(
   const requestUrl = `${apiUrl}${path}`;
   const correlationId = crypto.randomUUID();
   const hasBody = options.body !== undefined;
+  const accessToken = (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value;
   let response: Response;
 
   try {
@@ -75,6 +84,7 @@ export async function apiFetch<T>(
       headers: {
         Accept: "application/json",
         ...(hasBody ? { "Content-Type": "application/json" } : {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         "X-Correlation-ID": correlationId,
       },
       method: options.method ?? "GET",
@@ -93,6 +103,14 @@ export async function apiFetch<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      redirect("/login?reason=session-expired");
+    }
+
+    if (response.status === 403) {
+      redirect("/acesso-negado");
+    }
+
     let problem: ApiProblemDetails | undefined;
 
     try {

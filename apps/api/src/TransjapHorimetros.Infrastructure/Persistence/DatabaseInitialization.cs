@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TransjapHorimetros.Infrastructure.Persistence.Migrations;
 using TransjapHorimetros.Infrastructure.Persistence.Seed;
+using TransjapHorimetros.Infrastructure.Security;
 
 namespace TransjapHorimetros.Infrastructure.Persistence;
 

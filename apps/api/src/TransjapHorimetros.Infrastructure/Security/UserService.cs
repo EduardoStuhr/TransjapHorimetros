@@ -12,7 +12,6 @@ namespace TransjapHorimetros.Infrastructure.Security;
 
 public sealed class UserService(
     UserManager<ApplicationUser> userManager,
-    RoleManager<ApplicationRole> roleManager,
     IRefreshTokenRepository refreshTokenRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,

@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TransjapHorimetros.Application.Abstractions;
+using TransjapHorimetros.Infrastructure.Identity;
 using TransjapHorimetros.Infrastructure.Persistence;
 using TransjapHorimetros.Infrastructure.Persistence.Repositories;
 using TransjapHorimetros.Infrastructure.Persistence.Seed;
+using TransjapHorimetros.Infrastructure.Security;
 
 namespace TransjapHorimetros.Infrastructure;
 

@@ -10,6 +10,7 @@ namespace TransjapHorimetros.Application.Machines;
 public sealed class MachineService(
     IMachineRepository machineRepository,
     IReadingRepository readingRepository,
+    IMachineQrCodeRepository qrCodeRepository,
     IAnomalyRepository anomalyRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
@@ -145,6 +146,10 @@ public sealed class MachineService(
         var readings = await readingRepository.GetForMachineAsync(machine.Id, 1, 10, cancellationToken);
         var responses = readings.Items.Select(reading => ReadingMappings.ToResponse(reading)).ToArray();
         var alertCount = await anomalyRepository.CountOpenAsync(machine.Id, cancellationToken);
+        var activeQrCode = await qrCodeRepository.GetActiveByMachineIdAsync(
+            machine.Id,
+            false,
+            cancellationToken);
 
         return new MachineDetailsResponse(
             machine.Id,
@@ -157,7 +162,7 @@ public sealed class MachineService(
             responses.FirstOrDefault(),
             responses,
             alertCount,
-            null);
+            activeQrCode?.Token);
     }
 
     private static MachineDetailsResponse EmptyDetails(Machine machine) =>

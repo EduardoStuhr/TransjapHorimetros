@@ -11,6 +11,7 @@ using TransjapHorimetros.Application.Anomalies;
 using TransjapHorimetros.Application.Dashboard;
 using TransjapHorimetros.Application.Machines;
 using TransjapHorimetros.Application.Readings;
+using TransjapHorimetros.Application.QrCodes;
 using TransjapHorimetros.Application.WorkSites;
 using TransjapHorimetros.Domain.Rules;
 using TransjapHorimetros.Infrastructure;
@@ -34,6 +35,7 @@ builder.Services.AddScoped<IMachineService, MachineService>();
 builder.Services.AddScoped<IWorkSiteService, WorkSiteService>();
 builder.Services.AddScoped<IReadingService, ReadingService>();
 builder.Services.AddScoped<IAnomalyService, AnomalyService>();
+builder.Services.AddScoped<IMachineQrCodeService, MachineQrCodeService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 

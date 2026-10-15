@@ -15,6 +15,10 @@ public sealed class GlobalExceptionHandler(
     {
         var (status, title, detail) = exception switch
         {
+            BadRequestException => (
+                StatusCodes.Status400BadRequest,
+                "Bad request",
+                exception.Message),
             ApplicationValidationException => (
                 StatusCodes.Status422UnprocessableEntity,
                 "Validation error",

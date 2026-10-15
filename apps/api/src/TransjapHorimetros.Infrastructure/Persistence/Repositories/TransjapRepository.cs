@@ -14,6 +14,7 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Repositories;
 
 public sealed class TransjapRepository(TransjapDbContext dbContext) :
     IMachineRepository,
+    IMachineQrCodeRepository,
     IWorkSiteRepository,
     IReadingRepository,
     IAnomalyRepository,
@@ -91,6 +92,44 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
             .ToListAsync(cancellationToken);
 
     public void Add(Machine machine) => dbContext.Machines.Add(machine);
+
+    public Task<MachineQrCode?> GetActiveByMachineIdAsync(
+        Guid machineId,
+        bool trackChanges,
+        CancellationToken cancellationToken)
+    {
+        var query = trackChanges
+            ? dbContext.MachineQrCodes
+            : dbContext.MachineQrCodes.AsNoTracking();
+        return query.SingleOrDefaultAsync(
+            qrCode => qrCode.MachineId == machineId && qrCode.IsActive,
+            cancellationToken);
+    }
+
+    public Task<MachineQrCode?> GetActiveByTokenAsync(
+        string token,
+        CancellationToken cancellationToken) =>
+        dbContext.MachineQrCodes
+            .AsNoTracking()
+            .Include(qrCode => qrCode.Machine)
+            .SingleOrDefaultAsync(
+                qrCode => qrCode.Token == token && qrCode.IsActive,
+                cancellationToken);
+
+    public async Task<IReadOnlyList<MachineQrCode>> GetHistoryByMachineIdAsync(
+        Guid machineId,
+        CancellationToken cancellationToken) =>
+        await dbContext.MachineQrCodes
+            .AsNoTracking()
+            .Where(qrCode => qrCode.MachineId == machineId)
+            .OrderByDescending(qrCode => qrCode.CreatedAt)
+            .ThenByDescending(qrCode => qrCode.Id)
+            .ToListAsync(cancellationToken);
+
+    public Task<bool> TokenExistsAsync(string token, CancellationToken cancellationToken) =>
+        dbContext.MachineQrCodes.AnyAsync(qrCode => qrCode.Token == token, cancellationToken);
+
+    public void Add(MachineQrCode machineQrCode) => dbContext.MachineQrCodes.Add(machineQrCode);
 
     Task<WorkSite?> IWorkSiteRepository.GetByIdAsync(
         Guid id,

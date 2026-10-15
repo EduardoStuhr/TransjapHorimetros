@@ -35,6 +35,8 @@ public sealed class Machine : AuditableEntity
 
     public ICollection<HourMeterReading> Readings { get; } = new List<HourMeterReading>();
 
+    public ICollection<MachineQrCode> QrCodes { get; } = new List<MachineQrCode>();
+
     public void Update(
         int fleetNumber,
         string model,

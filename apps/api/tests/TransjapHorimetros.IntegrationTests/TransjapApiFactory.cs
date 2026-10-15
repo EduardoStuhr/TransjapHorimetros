@@ -46,6 +46,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         await dbContext.Database.ExecuteSqlRawAsync(
             """
+            DELETE FROM machine_qr_codes;
             DELETE FROM anomalies;
             DELETE FROM audit_logs;
             DELETE FROM hour_meter_readings;

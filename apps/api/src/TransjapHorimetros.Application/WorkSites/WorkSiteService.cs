@@ -10,7 +10,8 @@ public sealed class WorkSiteService(
     IWorkSiteRepository workSiteRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IWorkSiteService
+    TimeProvider timeProvider,
+    ICurrentUser? currentUser = null) : IWorkSiteService
 {
     public async Task<IReadOnlyList<WorkSiteResponse>> GetAllAsync(
         bool? active,
@@ -43,7 +44,9 @@ public sealed class WorkSiteService(
             null,
             Serialize(workSite),
             now,
-            correlationId));
+            correlationId,
+            currentUser?.UserId,
+            currentUser?.Email));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToResponse(workSite);
     }
@@ -67,7 +70,9 @@ public sealed class WorkSiteService(
             oldValue,
             Serialize(workSite),
             now,
-            correlationId));
+            correlationId,
+            currentUser?.UserId,
+            currentUser?.Email));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToResponse(workSite);
     }

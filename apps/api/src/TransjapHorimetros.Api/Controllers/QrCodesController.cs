@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TransjapHorimetros.Application.QrCodes;
+using TransjapHorimetros.Application.Security;
 
 namespace TransjapHorimetros.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/qr-codes")]
+[Authorize(Policy = Policies.CanResolveQr)]
 public sealed class QrCodesController(IMachineQrCodeService machineQrCodeService) : ControllerBase
 {
     /// <summary>Resolve um token formal ativo ou um identificador legado conservador de frota.</summary>

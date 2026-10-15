@@ -14,7 +14,8 @@ public sealed class AuditLog
         string? newValue,
         DateTimeOffset createdAt,
         string correlationId,
-        Guid? userId = null)
+        Guid? userId = null,
+        string? userEmail = null)
     {
         Id = Guid.NewGuid();
         Action = action;
@@ -25,6 +26,7 @@ public sealed class AuditLog
         CreatedAt = createdAt.ToUniversalTime();
         CorrelationId = correlationId;
         UserId = userId;
+        UserEmail = userEmail;
     }
 
     public Guid Id { get; private set; }
@@ -44,4 +46,6 @@ public sealed class AuditLog
     public string CorrelationId { get; private set; } = string.Empty;
 
     public Guid? UserId { get; private set; }
+
+    public string? UserEmail { get; private set; }
 }

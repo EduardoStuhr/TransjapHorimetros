@@ -12,7 +12,8 @@ public sealed class MachineQrCodeService(
     IMachineQrCodeRepository machineQrCodeRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IMachineQrCodeService
+    TimeProvider timeProvider,
+    ICurrentUser? currentUser = null) : IMachineQrCodeService
 {
     private const string TokenUniqueIndex = "ux_machine_qr_codes_token";
     private const string ActiveMachineUniqueIndex = "ux_machine_qr_codes_machine_active";
@@ -95,7 +96,9 @@ public sealed class MachineQrCodeService(
                 oldValue,
                 Serialize(currentQr),
                 now,
-                correlationId));
+                correlationId,
+                currentUser?.UserId,
+                currentUser?.Email));
         }
 
         var newQr = new MachineQrCode(machineId, token, now);
@@ -107,7 +110,9 @@ public sealed class MachineQrCodeService(
             null,
             Serialize(newQr),
             now,
-            correlationId));
+            correlationId,
+            currentUser?.UserId,
+            currentUser?.Email));
 
         try
         {
@@ -151,7 +156,9 @@ public sealed class MachineQrCodeService(
             oldValue,
             Serialize(currentQr),
             now,
-            correlationId));
+            correlationId,
+            currentUser?.UserId,
+            currentUser?.Email));
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

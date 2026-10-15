@@ -19,7 +19,8 @@ public sealed class ReadingService(
     HourMeterReadingPolicy policy,
     HourMeterRulesOptions rulesOptions,
     TimeProvider timeProvider,
-    ILogger<ReadingService> logger) : IReadingService
+    ILogger<ReadingService> logger,
+    ICurrentUser? currentUser = null) : IReadingService
 {
     public async Task<PagedResponse<ReadingResponse>> GetPageAsync(
         ReadingQuery query,
@@ -165,7 +166,9 @@ public sealed class ReadingService(
             null,
             Serialize(reading),
             syncedAt,
-            correlationId));
+            correlationId,
+            currentUser?.UserId,
+            currentUser?.Email));
 
         if (assessment.Status == ReadingStatus.Suspect)
         {
@@ -176,7 +179,9 @@ public sealed class ReadingService(
                 null,
                 Serialize(reading),
                 syncedAt,
-                correlationId));
+                correlationId,
+                currentUser?.UserId,
+                currentUser?.Email));
         }
 
         try

@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TransjapHorimetros.Application.Common;
 using TransjapHorimetros.Application.Readings;
+using TransjapHorimetros.Application.Security;
 
 namespace TransjapHorimetros.Api.Controllers;
 
@@ -26,6 +28,7 @@ public sealed class ReadingsController(IReadingService readingService) : Control
 
     /// <summary>Registra uma leitura de forma idempotente e detecta inconsistências.</summary>
     [HttpPost]
+    [Authorize(Policy = Policies.CanRecordReading)]
     [ProducesResponseType(typeof(ReadingResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ReadingResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]

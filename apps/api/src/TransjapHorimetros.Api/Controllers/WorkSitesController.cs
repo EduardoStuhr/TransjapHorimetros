@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TransjapHorimetros.Application.Security;
 using TransjapHorimetros.Application.WorkSites;
 
 namespace TransjapHorimetros.Api.Controllers;
@@ -24,6 +26,7 @@ public sealed class WorkSitesController(IWorkSiteService workSiteService) : Cont
 
     /// <summary>Cadastra uma obra e registra auditoria.</summary>
     [HttpPost]
+    [Authorize(Policy = Policies.CanManageWorkSites)]
     [ProducesResponseType(typeof(WorkSiteResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<WorkSiteResponse>> Create(
@@ -39,6 +42,7 @@ public sealed class WorkSitesController(IWorkSiteService workSiteService) : Cont
 
     /// <summary>Atualiza uma obra sem excluir seu histórico.</summary>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Policies.CanManageWorkSites)]
     [ProducesResponseType(typeof(WorkSiteResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]

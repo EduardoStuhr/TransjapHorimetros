@@ -1,7 +1,5 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.Common;
 using TransjapHorimetros.Application.Exceptions;
@@ -19,10 +17,6 @@ public sealed class MachineQrCodeService(
     private const string TokenUniqueIndex = "ux_machine_qr_codes_token";
     private const string ActiveMachineUniqueIndex = "ux_machine_qr_codes_machine_active";
 
-    private static readonly Regex LegacyFleetPattern = new(
-        @"^(?:(?<number>[1-9]\d*)|FROTA(?:\s+|\s*:\s*)(?<number>[1-9]\d*))$",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
     public async Task<QrResolutionResponse> ResolveAsync(
         string value,
         CancellationToken cancellationToken)
@@ -37,7 +31,7 @@ public sealed class MachineQrCodeService(
             return ToResolution(registeredQr.Machine, QrResolutionSource.RegisteredQr, registeredQr.Id);
         }
 
-        if (!TryParseLegacyFleetNumber(normalizedValue, out var fleetNumber))
+        if (!FleetQrParser.TryParse(normalizedValue, out var fleetNumber))
         {
             throw new EntityNotFoundException("QR code", normalizedValue);
         }
@@ -180,18 +174,6 @@ public sealed class MachineQrCodeService(
         }
 
         return value.Trim();
-    }
-
-    private static bool TryParseLegacyFleetNumber(string value, out int fleetNumber)
-    {
-        fleetNumber = default;
-        var match = LegacyFleetPattern.Match(value);
-        return match.Success
-            && int.TryParse(
-                match.Groups["number"].Value,
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out fleetNumber);
     }
 
     private static string GenerateToken() =>

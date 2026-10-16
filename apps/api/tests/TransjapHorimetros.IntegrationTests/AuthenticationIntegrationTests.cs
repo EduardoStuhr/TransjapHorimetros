@@ -103,7 +103,7 @@ public sealed class AuthenticationIntegrationTests(TransjapApiFactory factory)
     }
 
     [Fact]
-    public async Task Admin_CanManageQrAndUsers()
+    public async Task Admin_CanAccessDashboardAndUsers()
     {
         await factory.ResetDatabaseAsync();
         var user = await factory.CreateUserAsync(
@@ -114,13 +114,10 @@ public sealed class AuthenticationIntegrationTests(TransjapApiFactory factory)
         using var client = factory.CreateAnonymousClient();
         await AuthenticateAsync(client, user.Email!, Password);
 
-        var machineId = await GetMachineIdAsync(client, 68);
-        using var manageQr = await client.PostAsJsonAsync(
-            $"/api/v1/machines/{machineId}/qr-codes",
-            new { token = "phase3-admin-qr" });
+        using var dashboard = await client.GetAsync("/api/v1/dashboard/summary");
         using var users = await client.GetAsync("/api/v1/users");
 
-        Assert.Equal(HttpStatusCode.Created, manageQr.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
         Assert.Equal(HttpStatusCode.OK, users.StatusCode);
     }
 

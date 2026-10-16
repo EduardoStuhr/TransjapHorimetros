@@ -27,6 +27,10 @@ public sealed class GlobalExceptionHandler(
                 StatusCodes.Status400BadRequest,
                 "Bad request",
                 exception.Message),
+            PayloadTooLargeException => (
+                StatusCodes.Status413PayloadTooLarge,
+                "Payload too large",
+                exception.Message),
             ApplicationValidationException => (
                 StatusCodes.Status422UnprocessableEntity,
                 "Validation error",

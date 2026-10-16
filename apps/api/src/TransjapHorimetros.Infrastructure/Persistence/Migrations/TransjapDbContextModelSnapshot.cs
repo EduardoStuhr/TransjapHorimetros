@@ -17,7 +17,7 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -413,6 +413,129 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.ToTable("machine_qr_codes", (string)null);
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.PhotoEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CapturedAtDevice")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("captured_at_device");
+
+                    b.Property<Guid?>("ClientEventId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("client_event_id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedByEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("created_by_email");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("device_id");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_size_bytes");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("int")
+                        .HasColumnName("height");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("original_file_name");
+
+                    b.Property<Guid>("ReadingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("reading_id");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .HasColumnName("sha256")
+                        .IsFixedLength();
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StorageContainer")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("nvarchar(63)")
+                        .HasColumnName("storage_container");
+
+                    b.Property<string>("StorageObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)")
+                        .HasColumnName("storage_object_key");
+
+                    b.Property<string>("StorageProvider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)")
+                        .HasColumnName("storage_provider");
+
+                    b.Property<DateTime>("UploadedAtServer")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("uploaded_at_server");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("int")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id")
+                        .HasName("pk_photo_evidence");
+
+                    b.HasIndex("ClientEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_photo_evidence_client_event_id")
+                        .HasFilter("[client_event_id] IS NOT NULL");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_photo_evidence_created_by_user_id");
+
+                    b.HasIndex("ReadingId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_photo_evidence_reading_id");
+
+                    b.HasIndex("Sha256")
+                        .HasDatabaseName("ix_photo_evidence_sha256");
+
+                    b.HasIndex("StorageObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_photo_evidence_storage_object_key");
+
+                    b.ToTable("photo_evidence", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_photo_evidence_file_size_positive", "file_size_bytes > 0");
+                        });
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -721,6 +844,24 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.Navigation("Machine");
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.PhotoEvidence", b =>
+                {
+                    b.HasOne("TransjapHorimetros.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_photo_evidence_users_created_by_user_id");
+
+                    b.HasOne("TransjapHorimetros.Domain.Entities.HourMeterReading", "Reading")
+                        .WithOne("PhotoEvidence")
+                        .HasForeignKey("TransjapHorimetros.Domain.Entities.PhotoEvidence", "ReadingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_photo_evidence_hour_meter_readings_reading_id");
+
+                    b.Navigation("Reading");
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("TransjapHorimetros.Infrastructure.Identity.ApplicationUser", null)
@@ -734,6 +875,8 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.HourMeterReading", b =>
                 {
                     b.Navigation("Anomalies");
+
+                    b.Navigation("PhotoEvidence");
                 });
 
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.Machine", b =>

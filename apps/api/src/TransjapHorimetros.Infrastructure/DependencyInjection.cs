@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TransjapHorimetros.Application.Abstractions;
+using TransjapHorimetros.Application.PhotoEvidence;
 using TransjapHorimetros.Infrastructure.Identity;
 using TransjapHorimetros.Infrastructure.Persistence;
 using TransjapHorimetros.Infrastructure.Persistence.Repositories;
 using TransjapHorimetros.Infrastructure.Persistence.Seed;
 using TransjapHorimetros.Infrastructure.Security;
+using TransjapHorimetros.Infrastructure.Storage;
 
 namespace TransjapHorimetros.Infrastructure;
 
@@ -33,6 +35,16 @@ public static class DependencyInjection
 
         services.Configure<AuthenticationOptions>(
             configuration.GetSection(AuthenticationOptions.SectionName));
+        var photoEvidenceOptions = configuration
+            .GetSection(PhotoEvidenceOptions.SectionName)
+            .Get<PhotoEvidenceOptions>() ?? new PhotoEvidenceOptions();
+        if (photoEvidenceOptions.MaximumFileSizeBytes <= 0
+            || photoEvidenceOptions.MaximumFileSizeBytes > PhotoEvidenceOptions.AbsoluteMaximumFileSizeBytes)
+        {
+            throw new InvalidOperationException(
+                $"Storage:Photos:MaximumFileSizeBytes deve estar entre 1 e {PhotoEvidenceOptions.AbsoluteMaximumFileSizeBytes} bytes.");
+        }
+        services.AddSingleton(photoEvidenceOptions);
 
         services.AddIdentityCore<ApplicationUser>(options =>
         {
@@ -59,6 +71,7 @@ public static class DependencyInjection
         services.AddScoped<IMachineQrCodeRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IWorkSiteRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IReadingRepository>(provider => provider.GetRequiredService<TransjapRepository>());
+        services.AddScoped<IPhotoEvidenceRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IAnomalyRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IAuditLogRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<TransjapRepository>());
@@ -66,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddSingleton<IPhotoStorage, AzureBlobPhotoStorage>();
         services.AddScoped<AdminBootstrapService>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
         return services;

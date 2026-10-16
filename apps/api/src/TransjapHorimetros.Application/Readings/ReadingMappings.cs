@@ -28,6 +28,7 @@ internal static class ReadingMappings
             reading.SyncedAt,
             reading.ClientEventId,
             reading.CreatedAt,
-            reading.UpdatedAt);
+            reading.UpdatedAt,
+            reading.PhotoEvidence is not null);
     }
 }

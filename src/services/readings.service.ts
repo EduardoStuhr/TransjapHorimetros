@@ -1,6 +1,7 @@
 import { apiFetch, type PagedApiResponse } from "@/services/api-client";
 import type {
   HourMeterReading,
+  PhotoEvidence,
   ReadingStatus,
   ReadingType,
 } from "@/types/domain";
@@ -27,6 +28,9 @@ interface ApiReading {
   receivedAtServer: string;
   syncedAt: string;
   clientEventId: string;
+  createdAt: string;
+  updatedAt: string;
+  hasPhotoEvidence: boolean;
 }
 
 function mapReading(reading: ApiReading): HourMeterReading {
@@ -46,7 +50,7 @@ function mapReading(reading: ApiReading): HourMeterReading {
     workSiteId: reading.workSiteId,
     workSiteName: reading.workSiteName,
     status: reading.status,
-    photoEvidenceUrl: null,
+    hasPhotoEvidence: reading.hasPhotoEvidence,
     ocrDetectedValue: null,
     ocrConfidence: null,
   };
@@ -117,5 +121,18 @@ export async function getMachineReadings(
 ): Promise<readonly HourMeterReading[]> {
   return fetchReadings(
     `/api/v1/machines/${encodeURIComponent(machineId)}/readings?page=1&pageSize=100`,
+  );
+}
+
+export async function getReading(readingId: string): Promise<HourMeterReading> {
+  const reading = await apiFetch<ApiReading>(
+    `/api/v1/readings/${encodeURIComponent(readingId)}`,
+  );
+  return mapReading(reading);
+}
+
+export async function getPhotoEvidence(readingId: string) {
+  return apiFetch<PhotoEvidence>(
+    `/api/v1/readings/${encodeURIComponent(readingId)}/photo`,
   );
 }

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Domain.Security;
 using TransjapHorimetros.Infrastructure.Identity;
@@ -45,6 +46,13 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
                 ["RateLimiting:PermitLimit"] = "10000",
                 ["RateLimiting:AuthLogin:PermitLimit"] = "10000",
             });
+        });
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IPhotoStorage>();
+            services.AddSingleton<InMemoryPhotoStorage>();
+            services.AddSingleton<IPhotoStorage>(provider =>
+                provider.GetRequiredService<InMemoryPhotoStorage>());
         });
     }
 
@@ -103,6 +111,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         await dbContext.Database.ExecuteSqlRawAsync(
             """
+            DELETE FROM photo_evidence;
             DELETE FROM machine_qr_codes;
             DELETE FROM anomalies;
             DELETE FROM audit_logs;
@@ -116,6 +125,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
             DELETE FROM work_sites;
             DELETE FROM machines;
             """);
+        scope.ServiceProvider.GetRequiredService<InMemoryPhotoStorage>().Clear();
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
         await seeder.SeedAsync();
     }

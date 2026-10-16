@@ -104,16 +104,14 @@ export function ReadingsTable({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {reading.photoEvidenceUrl ? (
+                    {reading.hasPhotoEvidence ? (
                       <Button asChild variant="ghost" size="icon-sm">
-                        <a
-                          href={reading.photoEvidenceUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <Link
+                          href={`/horimetros/${reading.id}`}
                           aria-label="Abrir foto da leitura"
                         >
                           <ImageIcon />
-                        </a>
+                        </Link>
                       </Button>
                     ) : (
                       <span className="text-slate-500">Sem foto</span>
@@ -122,9 +120,9 @@ export function ReadingsTable({
                   <TableCell>
                     <Button asChild variant="ghost" size="icon-sm">
                       <Link
-                        href={"/frota/" + reading.machineFleetNumber}
+                        href={`/horimetros/${reading.id}`}
                         aria-label={
-                          "Abrir frota " + reading.machineFleetNumber
+                          "Abrir leitura da frota " + reading.machineFleetNumber
                         }
                       >
                         <ExternalLink />

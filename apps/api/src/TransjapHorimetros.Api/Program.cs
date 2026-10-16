@@ -94,7 +94,7 @@ builder.Services
             RequireSignedTokens = true,
             ClockSkew = TimeSpan.FromSeconds(30),
             NameClaimType = "name",
-            RoleClaimType = ClaimTypes.Role,
+            RoleClaimType = "role",
         };
     });
 

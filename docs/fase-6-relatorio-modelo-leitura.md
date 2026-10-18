@@ -33,8 +33,8 @@ Data: 18/10/2026. Branch `feat/phase-6-complete-reading-model`. Arquitetura e re
 | 27. Frontend lint | npm ci e npm run lint aprovados. Dependências transitivas emitiram avisos de depreciação. |
 | 28. Frontend build | npm run build aprovado; aviso de lockfile fora do repositório, sem bloquear. |
 | 29. Branch | feat/phase-6-complete-reading-model. |
-| 30. Commit | Principal previsto: feat: complete operational reading model. Hash será registrado no histórico publicado. |
-| 31. PR | A publicar contra main, sem merge, inicialmente em rascunho até a validação SQL completa. |
+| 30. Commit | Principal: d2aaafb — feat: complete operational reading model; ajustes de validação posteriores no histórico da branch. |
+| 31. PR | [#10](https://github.com/EduardoStuhr/TransjapHorimetros/pull/10), contra main, sem merge; em rascunho até a validação SQL completa. |
 | 32. Riscos restantes | Confirmar unidades oficiais e parâmetros de sequência/atraso, revisar migration/índices, validar SQL e snapshots legados; aprovação de correção, reconciliação e scheduler ficam para fases posteriores. |
 
 O comando completo de testes foi tentado localmente. Naquela rodada, 194 unitários e 43 testes de integração sem dependência do banco passaram; 91 testes de integração não inicializaram por ausência de TEST_SQLSERVER_CONNECTION_STRING/SQL Server/Docker. Não foi considerado sucesso da suíte completa. O workflow de PR existente será utilizado com SQL Server descartável; nenhum banco Azure foi acessado.

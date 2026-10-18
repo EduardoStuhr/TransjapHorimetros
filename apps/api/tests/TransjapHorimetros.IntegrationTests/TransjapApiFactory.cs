@@ -1,3 +1,4 @@
+using TransjapHorimetros.Application.Ocr;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
@@ -43,12 +44,19 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
                 ["Authentication:Jwt:SigningKey"] = TestSigningKey,
                 ["Authentication:Jwt:Issuer"] = "TransjapHorimetrosTests",
                 ["Authentication:Jwt:Audience"] = "TransjapHorimetrosTestsClient",
+                ["Ocr:Provider"] = "Fake",
+                ["Ocr:ReprocessCooldownSeconds"] = "1",
+                ["Ocr:TimeoutSeconds"] = "1",
+                ["Ocr:MaximumRetries"] = "0",
                 ["RateLimiting:PermitLimit"] = "10000",
                 ["RateLimiting:AuthLogin:PermitLimit"] = "10000",
             });
         });
         builder.ConfigureServices(services =>
         {
+            services.RemoveAll<IPhotoOcrProvider>();
+            services.AddSingleton<FakePhotoOcrProvider>();
+            services.AddSingleton<IPhotoOcrProvider>(p => p.GetRequiredService<FakePhotoOcrProvider>());
             services.RemoveAll<IPhotoStorage>();
             services.AddSingleton<InMemoryPhotoStorage>();
             services.AddSingleton<IPhotoStorage>(provider =>
@@ -111,6 +119,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         await dbContext.Database.ExecuteSqlRawAsync(
             """
+            DELETE FROM anomalies;
+            DELETE FROM photo_ocr_results;
             DELETE FROM photo_evidence;
             DELETE FROM machine_qr_codes;
             DELETE FROM anomalies;
@@ -126,6 +136,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
             DELETE FROM machines;
             """);
         scope.ServiceProvider.GetRequiredService<InMemoryPhotoStorage>().Clear();
+        scope.ServiceProvider.GetRequiredService<FakePhotoOcrProvider>().Reset();
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
         await seeder.SeedAsync();
     }

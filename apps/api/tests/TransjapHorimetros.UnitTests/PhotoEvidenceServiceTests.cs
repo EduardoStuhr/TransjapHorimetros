@@ -1,3 +1,4 @@
+using TransjapHorimetros.Application.Ocr;
 using Microsoft.Extensions.Logging.Abstractions;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.Common;
@@ -86,6 +87,25 @@ public sealed class PhotoEvidenceServiceTests
         Assert.Equal(1, context.Storage.DeleteCount);
     }
 
+    [Fact]
+    public async Task Upload_OcrPersistenceFailure_DoesNotCompensateCommittedPhoto()
+    {
+        var context = CreateContext(new FailingOcr());
+        var result = await UploadAsync(context, Guid.NewGuid());
+        Assert.False(result.IsExisting);
+        Assert.Equal(PhotoEvidenceStatus.Active, result.Evidence.Status);
+        Assert.Equal(0, context.Storage.DeleteCount);
+        Assert.Equal(1, context.Storage.UploadCount);
+    }
+
+    private sealed class FailingOcr : IPhotoOcrService
+    {
+        public Task<PhotoOcrResponse> GetLatestAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<PhotoOcrResponse>> GetHistoryAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<PhotoOcrResponse> ProcessAsync(Guid id, bool manual, string correlationId, CancellationToken ct) =>
+            throw new InvalidOperationException("Database unavailable after photo commit");
+    }
+
     private static async Task<UploadPhotoEvidenceResult> UploadAsync(
         TestContext context,
         Guid? clientEventId) =>
@@ -101,7 +121,7 @@ public sealed class PhotoEvidenceServiceTests
             "test-correlation",
             CancellationToken.None);
 
-    private static TestContext CreateContext()
+    private static TestContext CreateContext(IPhotoOcrService? ocr = null)
     {
         var reading = new HourMeterReading(
             Guid.NewGuid(),
@@ -127,7 +147,7 @@ public sealed class PhotoEvidenceServiceTests
             new CurrentUserFake(),
             new PhotoFileValidator(options),
             TimeProvider.System,
-            NullLogger<PhotoEvidenceService>.Instance);
+            NullLogger<PhotoEvidenceService>.Instance, ocr);
         return new TestContext(service, reading, storage, evidenceRepository, unitOfWork);
     }
 

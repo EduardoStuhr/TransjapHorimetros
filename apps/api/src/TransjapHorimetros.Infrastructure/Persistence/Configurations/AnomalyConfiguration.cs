@@ -10,6 +10,10 @@ public sealed class AnomalyConfiguration : IEntityTypeConfiguration<Anomaly>
     public void Configure(EntityTypeBuilder<Anomaly> builder)
     {
         builder.ToTable("anomalies");
+        builder.Property(a => a.OcrResultId).HasColumnName("ocr_result_id");
+        builder.HasOne<PhotoOcrResult>().WithMany().HasForeignKey(a => a.OcrResultId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(a => new { a.OcrResultId, a.Type }).IsUnique()
+            .HasFilter("[ocr_result_id] IS NOT NULL").HasDatabaseName("ux_anomalies_ocr_result_type");
         builder.HasKey(anomaly => anomaly.Id).HasName("pk_anomalies");
         builder.Property(anomaly => anomaly.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(anomaly => anomaly.MachineId).HasColumnName("machine_id").IsRequired();

@@ -14,9 +14,10 @@ public sealed class Anomaly
         AnomalyType type,
         AnomalySeverity severity,
         string description,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt, Guid? ocrResultId = null)
     {
         Id = Guid.NewGuid();
+        OcrResultId = ocrResultId;
         MachineId = machineId;
         ReadingId = readingId;
         Type = type;
@@ -27,6 +28,8 @@ public sealed class Anomaly
     }
 
     public Guid Id { get; private set; }
+
+    public Guid? OcrResultId { get; private set; }
 
     public Guid MachineId { get; private set; }
 

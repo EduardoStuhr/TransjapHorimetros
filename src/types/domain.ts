@@ -141,3 +141,20 @@ export interface AuditLog {
   createdAt: string;
   correlationId: string;
 }
+
+export interface PhotoOcrResult {
+  id: string;
+  photoEvidenceId: string;
+  status: "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "NO_VALUE_DETECTED" | "LOW_CONFIDENCE";
+  detectedValue: number | null;
+  confidence: number | null;
+  processedAtServer: string | null;
+  provider: string;
+  providerModel: string | null;
+  matchesOperatorValue: boolean | null;
+  absoluteDifference: number | null;
+  percentageDifference: number | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}

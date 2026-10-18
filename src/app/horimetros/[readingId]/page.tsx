@@ -1,6 +1,9 @@
+import { PhotoOcrPanel } from "@/features/readings/components/photo-ocr-panel";
+import type { PhotoOcrResult } from "@/types/domain";
+import { apiFetch } from "@/services/api-client";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, unstable_rethrow } from "next/navigation";
 import { connection } from "next/server";
 import { Camera, ChevronLeft, CircleGauge, Clock, HardHat, MapPinned } from "lucide-react";
 
@@ -58,6 +61,15 @@ export default async function ReadingDetailPage({ params }: ReadingDetailPagePro
   const evidence = reading.hasPhotoEvidence
     ? await getPhotoEvidence(reading.id)
     : null;
+  let ocr: PhotoOcrResult | null = null;
+  let ocrLoadError = false;
+  if (evidence) {
+    try { ocr = await apiFetch<PhotoOcrResult>(`/api/v1/readings/${encodeURIComponent(reading.id)}/photo/ocr`); }
+    catch (error) {
+      unstable_rethrow(error);
+      if (!(error instanceof ApiError && error.status === 404)) ocrLoadError = true;
+    }
+  }
   const statusClassNames = {
     VALIDATED: "border-emerald-200 bg-emerald-50 text-emerald-800",
     PENDING: "border-amber-200 bg-amber-50 text-amber-800",
@@ -108,6 +120,7 @@ export default async function ReadingDetailPage({ params }: ReadingDetailPagePro
           </CardHeader>
           <CardContent>
             <PhotoEvidencePanel readingId={reading.id} evidence={evidence} />
+            {evidence && <PhotoOcrPanel readingId={reading.id} operatorValue={reading.value} result={ocr} loadError={ocrLoadError} />}
           </CardContent>
         </Card>
       </div>

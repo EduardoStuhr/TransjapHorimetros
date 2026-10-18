@@ -71,7 +71,7 @@ As regras implementadas estão detalhadas em [regras-de-negocio.md](regras-de-ne
 | Ausência de leitura | `2` dias | `HourMeterRules:MissingReadingThresholdDays` | Provisório; conta leitura capturada no período para máquinas ativas. |
 | Divergência de relógio | `300` segundos | `HourMeterRules:ClockSkewToleranceSeconds` | Provisório; divergência maior cria `CLOCK_SKEW`. |
 | Raio padrão de geofence | `500` metros | `HourMeterRules:GeofenceDefaultRadiusMeters` | Provisório para fase futura; geofence não é declarado como implementado. |
-| Confiança mínima de OCR | `0.85` | `HourMeterRules:OcrConfidenceThreshold` | Provisório para fase futura; OCR não é declarado como implementado. |
+| Confiança mínima de OCR | `0.75` | `Ocr:MinimumConfidence` | Ativo na Fase 5; a opção antiga em HourMeterRules permanece sem uso. |
 
 Não há limite ativo de atraso de sincronização (`LATE_SYNC`): falta validação oficial do atraso máximo tolerado. Não se deve deduzir nem ativar um limiar arbitrário.
 
@@ -91,7 +91,7 @@ Não há limite ativo de atraso de sincronização (`LATE_SYNC`): falta validaç
 12. Qual atraso máximo de sincronização deve ser aceito antes de classificar `LATE_SYNC`?
 13. Há exigência futura de MFA ou integração com um provedor corporativo de identidade?
 
-Nenhuma resposta acima é presumida por este documento. A identidade e a resolução de QR foram implementadas na Fase 2 e estão documentadas em [fase-2-qr-codes.md](fase-2-qr-codes.md). OCR, geofence e mobile não são descritos como funcionalidades concluídas.
+Nenhuma resposta acima é presumida por este documento. A identidade e a resolução de QR foram implementadas na Fase 2 e estão documentadas em [fase-2-qr-codes.md](fase-2-qr-codes.md). A implementação OCR da Fase 5 é descrita abaixo, com validação no relatório próprio; geofence e mobile permanecem fora do escopo.
 
 ## 4. ADR — QR físico desacoplado da máquina
 
@@ -130,3 +130,18 @@ O upload é separado da criação da leitura para preservar o fluxo mobile/offli
 O acesso ao SDK Azure permanece na Infrastructure por meio de `IPhotoStorage`. Produção usa Managed Identity preferencialmente, com connection string somente como fallback por secret. Testes usam storage em memória e são proibidos de acessar recursos Azure reais. Em falha SQL após o upload, o serviço executa remoção compensatória do blob e registra falhas de cleanup.
 
 Detalhes operacionais e configuração estão em [fase-4-evidencia-fotografica.md](fase-4-evidencia-fotografica.md).
+
+## 8. ADR — OCR auxiliar, persistente e limitado
+
+**Data:** 2026-10-18
+**Status:** Implementada em branch, aguardando validação e revisão
+
+O valor operacional pertence ao operador; OCR nunca altera leitura ou evidência. A foto é persistida antes da análise síncrona com timeout. Cada análise tem um PhotoOcrResult, com histórico 1:N, estado e comparação persistidos. Resultados concluídos são imutáveis. Falha externa não invalida upload.
+
+A Application usa IPhotoOcrProvider e IMeterReadingExtractor. A Infrastructure implementa Azure AI Vision por REST autenticado com bytes privados, preferindo Managed Identity. Um fake local retorna ausência de detecção. Texto persistido é limitado a 4000 caracteres e não se inventa confiança. Unidade desconhecida não é inferida.
+
+Divergência usa limite absoluto OU percentual; operador zero torna o percentual indisponível. Baixa confiança e divergência geram anomalias auxiliares, únicas por resultado/tipo. A reserva SQL usa lock na evidência e unicidade da tentativa inicial. Reprocessamento manual preserva histórico, exige supervisão e aplica cooldown compartilhado entre instâncias. GET nunca chama OCR.
+
+Não há worker de recuperação nesta fase: queda do processo pode deixar PROCESSING no histórico; uma nova tentativa manual é permitida depois do prazo documentado. O Image Analysis 4.0 tem retirada anunciada para 25/09/2028; a interface permite substituição de provider. Configuração real Azure e calibração com fotos operacionais permanecem tarefas de implantação posteriores à revisão.
+
+A migration AddPhotoOcrResults foi gerada sem aplicação no Azure; as anteriores permanecem intactas. CI de PR usa SQL Server descartável e não executa deploy. Detalhes e resultados em [fase-5-ocr.md](fase-5-ocr.md) e [fase-5-relatorio-ocr.md](fase-5-relatorio-ocr.md).

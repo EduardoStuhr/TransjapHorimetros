@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TransjapHorimetros.Domain.Entities;
 using TransjapHorimetros.Domain.Enums;
+using TransjapHorimetros.Infrastructure.Identity;
 
 namespace TransjapHorimetros.Infrastructure.Persistence.Configurations;
 
@@ -45,6 +46,28 @@ public sealed class HourMeterReadingConfiguration : IEntityTypeConfiguration<Hou
         builder.Property(reading => reading.ClientEventId)
             .HasColumnName("client_event_id")
             .IsRequired();
+        builder.Property(r => r.MeterUnit).HasColumnName("meter_unit").HasMaxLength(16)
+            .HasConversion(v => v.HasValue ? v.Value.ToString().ToUpperInvariant() : null,
+                v => v == null ? null : Enum.Parse<MeterUnit>(v, true));
+        builder.Property(r => r.CreatedByUserId).HasColumnName("created_by_user_id");
+        builder.Property(r => r.CreatedByEmail).HasColumnName("created_by_email").HasMaxLength(320);
+        builder.Property(r => r.DeviceId).HasColumnName("device_id").HasMaxLength(100);
+        builder.Property(r => r.PreviousReadingId).HasColumnName("previous_reading_id");
+        builder.Property(r => r.DifferenceFromPrevious).HasColumnName("difference_from_previous").HasPrecision(12, 2);
+        builder.Property(r => r.CorrectionOfReadingId).HasColumnName("correction_of_reading_id");
+        builder.HasOne<HourMeterReading>().WithMany().HasForeignKey(r => r.PreviousReadingId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<HourMeterReading>().WithMany(r => r.Corrections).HasForeignKey(r => r.CorrectionOfReadingId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(r => r.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable("hour_meter_readings", table =>
+        {
+            table.HasCheckConstraint("ck_readings_previous_pair", "(previous_reading_id IS NULL AND difference_from_previous IS NULL) OR (previous_reading_id IS NOT NULL AND difference_from_previous IS NOT NULL AND previous_reading_id <> id)");
+            table.HasCheckConstraint("ck_readings_correction_link", "correction_of_reading_id IS NULL OR (reading_type = 'CORRECTION' AND correction_of_reading_id <> id)");
+            table.HasCheckConstraint("ck_readings_meter_unit", "meter_unit IS NULL OR meter_unit IN ('HOURS', 'KM')");
+        });
+        builder.HasIndex(r => new { r.MachineId, r.MeterUnit, r.CapturedAtDevice, r.ReceivedAtServer, r.Id })
+            .IsDescending(false, false, true, true, true).HasDatabaseName("ix_readings_operational_order");
+        builder.HasIndex(r => new { r.CapturedAtDevice, r.ReceivedAtServer, r.Id })
+            .IsDescending(true, true, true).HasDatabaseName("ix_readings_capture_order");
         builder.Property(reading => reading.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

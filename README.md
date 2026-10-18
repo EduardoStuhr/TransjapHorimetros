@@ -3,7 +3,7 @@
 Sistema de controle e integridade de registros de horímetros e odômetros de máquinas pesadas e veículos da **TRANSJAP Terraplenagem e Construções**.
 
 > [!WARNING]
-> A Fase 5 adiciona OCR auxiliar. Sua migration não foi aplicada ao Azure e a fase não está em produção. Mantenha a mudança em branch e PR, sem merge, até a revisão da migration e dos resultados de validação.
+> A Fase 6 completa o modelo operacional da leitura. Sua migration não foi aplicada ao Azure e a fase não está em produção. Mantenha a mudança em branch e PR, sem merge, até a revisão da migration e dos resultados de validação.
 
 ## Arquitetura de dados
 
@@ -94,6 +94,14 @@ Em desenvolvimento, `Ocr__Provider=Fake` retorna ausência de detecção. Para a
 
 A tela de detalhe mostra o resultado persistido. Reprocessamento e histórico exigem SUPERVISOR, ADMINISTRATIVE, MANAGER ou ADMIN; abrir a tela não chama o provider. Consulte [arquitetura e configuração da Fase 5](docs/fase-5-ocr.md) e [relatório OCR](docs/fase-5-relatorio-ocr.md).
 
+### Modelo completo de leitura — Fase 6
+
+Novas leituras guardam snapshot de unidade, autoria autenticada, dispositivo opcional, leitura anterior e delta calculados pelo servidor. A máquina precisa ter HOURS ou KM definido; o seed não presume unidades da frota. Campos históricos sem comprovação permanecem null, sem backfill automático.
+
+O servidor valida precisão decimal, obra ativa, idempotência e sequência operacional. As regras físicas de horímetro aplicam-se somente a HOURS. Propostas CORRECTION são PENDING e exigem supervisão, preservando o original. Filtros SQL, resumos de OCR/anomalias e histórico da máquina utilizam os mesmos dados operacionais.
+
+Consulte [modelo, regras e limitações](docs/fase-6-modelo-completo-leitura.md) e [relatório da Fase 6](docs/fase-6-relatorio-modelo-leitura.md). A migration `CompleteReadingModel` foi somente gerada; a CI de PR existente valida em SQL Server descartável e não faz deploy.
+
 ### URLs locais
 
 - Painel: [http://localhost:3000](http://localhost:3000)
@@ -150,7 +158,7 @@ No Azure App Service, configure `ConnectionStrings__DefaultConnection` sem alter
 Server=tcp:<servidor>.database.windows.net,1433;Initial Catalog=transjap_horimetros;Persist Security Info=False;User ID=<usuario>;Password=<segredo>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
 ```
 
-Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os workflows atuais publicam API e frontend quando há push na `main`; por isso, a Fase 5 deve permanecer em branch e PR até a revisão da migration e aprovação das validações.
+Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os workflows atuais publicam API e frontend quando há push na `main`; por isso, a Fase 6 deve permanecer em branch e PR até a revisão da migration e aprovação das validações.
 
 ## Estrutura
 
@@ -158,4 +166,4 @@ Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os wo
 - `src/`: frontend Next.js 16.
 - `scripts/`: automações de desenvolvimento, testes e backup.
 - `docs/`: decisões arquiteturais e regras de engenharia.
-- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md), [Evidência fotográfica da Fase 4](docs/fase-4-evidencia-fotografica.md), [OCR da Fase 5](docs/fase-5-ocr.md) e [decisões arquiteturais](docs/decisoes.md).
+- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md), [Evidência fotográfica da Fase 4](docs/fase-4-evidencia-fotografica.md), [OCR da Fase 5](docs/fase-5-ocr.md), [Modelo completo da Fase 6](docs/fase-6-modelo-completo-leitura.md) e [decisões arquiteturais](docs/decisoes.md).

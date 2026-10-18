@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import type { Metadata } from "next";
 
 import { DataSourceNotice } from "@/components/shared/data-source-notice";
@@ -9,7 +11,7 @@ import {
   readingsFilterSchema,
 } from "@/schemas/readings-filter.schema";
 import { getMachines } from "@/services/machines.service";
-import { getReadings } from "@/services/readings.service";
+import { getReadingsPage } from "@/services/readings.service";
 import { getWorkSites } from "@/services/worksites.service";
 
 export const metadata: Metadata = {
@@ -33,6 +35,11 @@ export default async function ReadingsPage({
 }: ReadingsPageProps) {
   const params = await searchParams;
   const parsedFilters = readingsFilterSchema.safeParse({
+    meterUnit: getSearchParam(params, "meterUnit"),
+    readingType: getSearchParam(params, "readingType"),
+    hasPhotoEvidence: getSearchParam(params, "hasPhotoEvidence"),
+    hasAnomaly: getSearchParam(params, "hasAnomaly"),
+    machineId: getSearchParam(params, "machineId"),
     endDate: getSearchParam(params, "endDate"),
     fleetNumber: getSearchParam(params, "fleetNumber"),
     startDate: getSearchParam(params, "startDate"),
@@ -43,12 +50,20 @@ export default async function ReadingsPage({
     ? parsedFilters.data
     : emptyReadingsFilters;
   const hasFilters = Object.values(filters).some(Boolean);
-  const [machines, readings, workSites] = await Promise.all([
+  const rawPage = Number(getSearchParam(params, "page") || "1");
+  const page = Number.isSafeInteger(rawPage) && rawPage >= 1 && rawPage <= 1000000 ? rawPage : 1;
+  const [machines, readingsPage, workSites] = await Promise.all([
     getMachines(),
-    getReadings(filters),
+    getReadingsPage(filters, page),
     getWorkSites(),
   ]);
 
+  const readings = readingsPage.items;
+  function pageUrl(nextPage: number) {
+    const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)));
+    query.set("page", String(nextPage));
+    return `/horimetros?${query.toString()}`;
+  }
   return (
     <div className="space-y-6">
       <PageHeading
@@ -75,6 +90,14 @@ export default async function ReadingsPage({
             : "Nenhuma leitura foi registrada pela API."
         }
       />
+      <nav aria-label="Páginas de leituras" className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+        <span>{readingsPage.totalItems} registros</span>
+        <div className="flex items-center gap-3">
+          {page > 1 && <Button asChild variant="outline"><Link href={pageUrl(page - 1)}>Anterior</Link></Button>}
+          <span>{page} / {Math.max(1, readingsPage.totalPages)}</span>
+          {page < readingsPage.totalPages && <Button asChild variant="outline"><Link href={pageUrl(page + 1)}>Próxima</Link></Button>}
+        </div>
+      </nav>
     </div>
   );
 }

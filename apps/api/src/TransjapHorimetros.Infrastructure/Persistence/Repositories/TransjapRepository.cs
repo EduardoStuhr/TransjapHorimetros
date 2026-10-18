@@ -22,6 +22,13 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
     IAuditLogRepository,
     IUnitOfWork
 {
+    public Task<HourMeterReading?> GetLatestBoundaryBeforeAsync(Guid machineId, MeterUnit meterUnit,
+        DateTimeOffset capturedAt, CancellationToken ct) => dbContext.HourMeterReadings.AsNoTracking()
+        .Where(r => r.MachineId == machineId && r.MeterUnit == meterUnit && r.Status == ReadingStatus.Validated
+            && r.CapturedAtDevice <= capturedAt && (r.ReadingType == ReadingType.Opening || r.ReadingType == ReadingType.Closing))
+        .OrderByDescending(r => r.CapturedAtDevice).ThenByDescending(r => r.ReceivedAtServer).ThenByDescending(r => r.Id)
+        .FirstOrDefaultAsync(ct);
+
     Task<Machine?> IMachineRepository.GetByIdAsync(
         Guid id,
         bool trackChanges,
@@ -174,16 +181,17 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
     public Task<HourMeterReading?> GetLatestValidBeforeAsync(
         Guid machineId,
         DateTimeOffset capturedAt,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        MeterUnit? meterUnit = null) =>
         dbContext.HourMeterReadings
             .AsNoTracking()
             .Where(reading => reading.MachineId == machineId)
             .Where(reading => reading.CapturedAtDevice <= capturedAt)
-            .Where(reading =>
-                reading.Status == ReadingStatus.Validated
-                || reading.Status == ReadingStatus.Corrected)
+            .Where(reading => reading.Status == ReadingStatus.Validated && reading.ReadingType != ReadingType.Correction)
+            .Where(reading => !meterUnit.HasValue || reading.MeterUnit == meterUnit)
             .OrderByDescending(reading => reading.CapturedAtDevice)
             .ThenByDescending(reading => reading.ReceivedAtServer)
+            .ThenByDescending(reading => reading.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<HourMeterReading>> GetLatestByMachineIdsAsync(
@@ -197,11 +205,12 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
 
         var latestReadingIds = await dbContext.HourMeterReadings
             .AsNoTracking()
-            .Where(reading => machineIds.Contains(reading.MachineId))
+            .Where(reading => machineIds.Contains(reading.MachineId) && reading.ReadingType != ReadingType.Correction)
             .GroupBy(reading => reading.MachineId)
             .Select(group => group
                 .OrderByDescending(reading => reading.CapturedAtDevice)
                 .ThenByDescending(reading => reading.ReceivedAtServer)
+                .ThenByDescending(reading => reading.Id)
                 .Select(reading => reading.Id)
                 .First())
             .ToListAsync(cancellationToken);
@@ -236,6 +245,11 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         {
             readings = readings.Where(reading => reading.Status == query.Status.Value);
         }
+
+        if (query.MeterUnit.HasValue) readings = readings.Where(r => r.MeterUnit == query.MeterUnit);
+        if (query.ReadingType.HasValue) readings = readings.Where(r => r.ReadingType == query.ReadingType);
+        if (query.HasPhotoEvidence.HasValue) readings = readings.Where(r => (r.PhotoEvidence != null) == query.HasPhotoEvidence.Value);
+        if (query.HasAnomaly.HasValue) readings = readings.Where(r => r.Anomalies.Any() == query.HasAnomaly.Value);
 
         if (query.From.HasValue)
         {
@@ -430,6 +444,7 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         var items = await readings
             .OrderByDescending(reading => reading.CapturedAtDevice)
             .ThenByDescending(reading => reading.ReceivedAtServer)
+            .ThenByDescending(reading => reading.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

@@ -7,6 +7,9 @@ namespace TransjapHorimetros.Application.Abstractions;
 
 public interface IReadingRepository
 {
+    Task<HourMeterReading?> GetLatestBoundaryBeforeAsync(Guid machineId, MeterUnit meterUnit,
+        DateTimeOffset capturedAt, CancellationToken ct) => Task.FromResult<HourMeterReading?>(null);
+
     Task<HourMeterReading?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
     Task<HourMeterReading?> GetByClientEventIdAsync(Guid clientEventId, CancellationToken cancellationToken);
@@ -14,7 +17,8 @@ public interface IReadingRepository
     Task<HourMeterReading?> GetLatestValidBeforeAsync(
         Guid machineId,
         DateTimeOffset capturedAt,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        MeterUnit? meterUnit = null);
 
     Task<IReadOnlyList<HourMeterReading>> GetLatestByMachineIdsAsync(
         IReadOnlyCollection<Guid> machineIds,

@@ -24,6 +24,14 @@ public sealed class HourMeterRulesOptions
     [Range(0, int.MaxValue)]
     public int ClockSkewToleranceSeconds { get; init; } = 300;
 
+    // Null preserves the prior behavior until the operation defines an acceptable sync delay.
+    [Range(1, int.MaxValue)]
+    public int? LateSyncThresholdSeconds { get; init; }
+
+    public bool RequireOpeningBeforeClosing { get; init; }
+
+    public bool DetectConsecutiveOpenings { get; init; } = true;
+
     [Range(1, int.MaxValue)]
     public int GeofenceDefaultRadiusMeters { get; init; } = 500;
 

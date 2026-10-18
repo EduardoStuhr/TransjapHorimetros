@@ -145,3 +145,20 @@ Divergência usa limite absoluto OU percentual; operador zero torna o percentual
 Não há worker de recuperação nesta fase: queda do processo pode deixar PROCESSING no histórico; uma nova tentativa manual é permitida depois do prazo documentado. O Image Analysis 4.0 tem retirada anunciada para 25/09/2028; a interface permite substituição de provider. Configuração real Azure e calibração com fotos operacionais permanecem tarefas de implantação posteriores à revisão.
 
 A migration AddPhotoOcrResults foi gerada sem aplicação no Azure; as anteriores permanecem intactas. CI de PR usa SQL Server descartável e não executa deploy. Detalhes e resultados em [fase-5-ocr.md](fase-5-ocr.md) e [fase-5-relatorio-ocr.md](fase-5-relatorio-ocr.md).
+
+## 9. ADR — Evento operacional completo, sem reinterpretação histórica
+
+**Data:** 2026-10-18
+**Status:** Implementada em branch, aguardando validação SQL e revisão
+
+A leitura mantém um snapshot da unidade da máquina, autoria do ICurrentUser e referências/delta escolhidos pelo servidor. Máquina sem unidade não permite novos eventos operacionais. Campos históricos não comprováveis permanecem nullable; a unidade atual da máquina não é evidência suficiente para preencher registros antigos. SyncedAt continua preenchido no aceite online, igual a ReceivedAtServer.
+
+O ClientEventId é consultado antes de configurações mutáveis; retries preservam o evento aceito. Leitura, anomalias e auditoria são atômicas. A referência anterior utiliza somente leituras VALIDATED da mesma máquina/unidade, exclui correções e possui desempate por captura, recebimento e Id. Leituras atrasadas não reescrevem deltas históricos.
+
+Limites de horas aplicam-se somente a HOURS. KM conserva redução, duplicação e regras gerais, sem velocidade presumida. Sequência usa fronteiras operacionais conhecidas; exigir abertura antes de fechamento é opt-in. LATE_SYNC possui threshold nullable e permanece inativo até validação operacional. WRONG_WORKSITE e scheduler de ausência não são inferidos.
+
+Correções são propostas imutáveis PENDING, restritas à supervisão e vinculadas diretamente ao original da mesma máquina/unidade. Não afetam valor/status do original nem o último valor operacional. ReadingStatusTransitionPolicy define transições futuras; nenhum endpoint novo altera status arbitrariamente. Aprovação administrativa e reconciliação offline ficam para fase própria.
+
+DTOs/projeções fornecem foto derivada da relação, latest OCR e contagens de anomalias, sem duplicar esses dados na tabela de leituras. Detalhes incluem anomalias e vínculos; listagens são paginadas e filtradas no SQL. Badges e mapeamentos são compartilhados entre lista, detalhe e histórico da máquina.
+
+CompleteReadingModel acrescenta apenas campos ausentes, checks, índices e FKs Restrict. Não há backfill fictício nem alteração de migrations anteriores. A migration não foi aplicada ao Azure e a branch não deve ser implantada ou mergeada antes de revisão. O workflow existente de PR foi reutilizado. Consulte [fase-6-modelo-completo-leitura.md](fase-6-modelo-completo-leitura.md).

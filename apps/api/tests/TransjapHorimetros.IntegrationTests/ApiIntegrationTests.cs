@@ -253,7 +253,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
             machineId,
             workSiteId = (Guid?)null,
             value,
-            readingType = "OPENING",
+            readingType = "INTERMEDIATE",
             capturedAtDevice = capturedAt,
             clientEventId,
         };

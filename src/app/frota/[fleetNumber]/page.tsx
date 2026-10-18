@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MeterUnitBadge } from "@/features/readings/components/reading-badges";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -138,7 +139,7 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
                 icon={QrCode}
               />
               <DetailItem
-                label="Horímetro atual"
+                label="Último valor informado"
                 value={
                   machine.currentHourMeter === null
                     ? "Sem registro"
@@ -161,6 +162,7 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
                 icon={MapPinned}
               />
             </dl>
+            <div className="mt-4 space-y-2"><p className="text-xs text-slate-500">Unidade da última leitura</p><MeterUnitBadge unit={machine.currentReadingMeterUnit} /></div>
           </CardContent>
         </Card>
 

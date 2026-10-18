@@ -6,6 +6,7 @@ using TransjapHorimetros.Application.Exceptions;
 using TransjapHorimetros.Domain.Entities;
 using TransjapHorimetros.Domain.Enums;
 using TransjapHorimetros.Domain.Rules;
+using TransjapHorimetros.Domain.Security;
 
 namespace TransjapHorimetros.Application.Readings;
 
@@ -20,13 +21,18 @@ public sealed class ReadingService(
     HourMeterRulesOptions rulesOptions,
     TimeProvider timeProvider,
     ILogger<ReadingService> logger,
-    ICurrentUser? currentUser = null) : IReadingService
+    ICurrentUser? currentUser = null,
+    IReadingSummaryRepository? summaryRepository = null) : IReadingService
 {
     public async Task<PagedResponse<ReadingResponse>> GetPageAsync(
         ReadingQuery query,
         CancellationToken cancellationToken)
     {
         var (page, pageSize) = Paging.Normalize(query.Page, query.PageSize);
+        if ((query.MeterUnit.HasValue && !Enum.IsDefined(query.MeterUnit.Value))
+            || (query.ReadingType.HasValue && !Enum.IsDefined(query.ReadingType.Value))
+            || (query.Status.HasValue && !Enum.IsDefined(query.Status.Value)))
+            throw new ApplicationValidationException("Filters", "Unidade, tipo ou status inválido.");
         if (query.From.HasValue && query.To.HasValue && query.From > query.To)
         {
             throw new ApplicationValidationException(nameof(query.From), "O início do período não pode ser posterior ao fim.");
@@ -40,7 +46,8 @@ public sealed class ReadingService(
             To = query.To?.ToUniversalTime(),
         };
         var result = await readingRepository.GetPageAsync(normalizedQuery, cancellationToken);
-        var items = result.Items.Select(reading => ReadingMappings.ToResponse(reading)).ToArray();
+        var summaries = await SummariesAsync(result.Items.Select(r => r.Id).ToArray(), false, cancellationToken);
+        var items = result.Items.Select(reading => ReadingMappings.ToResponse(reading, summary: summaries.GetValueOrDefault(reading.Id))).ToArray();
         return PagedResponse<ReadingResponse>.Create(items, page, pageSize, result.TotalItems);
     }
 
@@ -48,7 +55,8 @@ public sealed class ReadingService(
     {
         var reading = await readingRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new EntityNotFoundException("Leitura", id);
-        return ReadingMappings.ToResponse(reading);
+        var summaries = await SummariesAsync([id], true, cancellationToken);
+        return ReadingMappings.ToResponse(reading, summary: summaries.GetValueOrDefault(id));
     }
 
     public async Task<PagedResponse<ReadingResponse>> GetForMachineAsync(
@@ -65,7 +73,8 @@ public sealed class ReadingService(
             normalized.Page,
             normalized.PageSize,
             cancellationToken);
-        var items = result.Items.Select(reading => ReadingMappings.ToResponse(reading)).ToArray();
+        var summaries = await SummariesAsync(result.Items.Select(r => r.Id).ToArray(), false, cancellationToken);
+        var items = result.Items.Select(reading => ReadingMappings.ToResponse(reading, summary: summaries.GetValueOrDefault(reading.Id))).ToArray();
         return PagedResponse<ReadingResponse>.Create(
             items,
             normalized.Page,
@@ -78,31 +87,52 @@ public sealed class ReadingService(
         string correlationId,
         CancellationToken cancellationToken)
     {
+        if (currentUser?.IsAuthenticated != true || currentUser.UserId is null || string.IsNullOrWhiteSpace(currentUser.Email))
+            throw new UnauthorizedException("A leitura exige autoria do usuário autenticado.");
+        if (request.ClientEventId == Guid.Empty)
+            throw new ApplicationValidationException(nameof(request.ClientEventId), "O ClientEventId é obrigatório.");
+
+        // An accepted event is immutable: retries must precede validation of mutable machine/worksite configuration.
+        var existing = await readingRepository.GetByClientEventIdAsync(request.ClientEventId, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.MachineId != request.MachineId)
+                throw new ConflictException("O ClientEventId já pertence a outra máquina.");
+            return new CreateReadingResult(await GetByIdAsync(existing.Id, cancellationToken), true);
+        }
         Validate(request);
         var machine = await machineRepository.GetByIdAsync(request.MachineId, false, cancellationToken)
             ?? throw new EntityNotFoundException("Máquina", request.MachineId);
+        if (!machine.MeterUnit.HasValue)
+            throw new ApplicationValidationException(nameof(machine.MeterUnit), "Defina a unidade HOURS ou KM da máquina antes de registrar leituras.");
 
         WorkSite? workSite = null;
         if (request.WorkSiteId.HasValue)
         {
             workSite = await workSiteRepository.GetByIdAsync(request.WorkSiteId.Value, false, cancellationToken)
                 ?? throw new EntityNotFoundException("Obra", request.WorkSiteId.Value);
+            if (!workSite.Active)
+                throw new ApplicationValidationException(nameof(request.WorkSiteId), "A obra informada está inativa.");
         }
 
         // RN-003 — ClientEventId garante idempotência: mesmo evento retorna leitura existente sem criar nova
-        var existing = await readingRepository.GetByClientEventIdAsync(
-            request.ClientEventId,
-            cancellationToken);
-        if (existing is not null)
+        HourMeterReading? correctionOf = null;
+        if (request.ReadingType == ReadingType.Correction)
         {
-            return new CreateReadingResult(ReadingMappings.ToResponse(existing, machine, workSite), true);
+            if (!currentUser.Roles.Any(r => r is AppRoles.Supervisor or AppRoles.Administrative or AppRoles.Manager or AppRoles.Admin))
+                throw new ForbiddenException("Somente supervisão pode registrar uma proposta de correção.");
+            correctionOf = await readingRepository.GetByIdAsync(request.CorrectionOfReadingId!.Value, cancellationToken)
+                ?? throw new EntityNotFoundException("Leitura original", request.CorrectionOfReadingId.Value);
         }
 
         var capturedAt = request.CapturedAtDevice.ToUniversalTime();
         var previous = await readingRepository.GetLatestValidBeforeAsync(
             request.MachineId,
             capturedAt,
-            cancellationToken);
+            cancellationToken,
+            machine.MeterUnit.Value);
+        var previousBoundary = await readingRepository.GetLatestBoundaryBeforeAsync(machine.Id,
+            machine.MeterUnit.Value, capturedAt, cancellationToken);
 
         // Detectar possível duplicata: mesmo valor+horário com ClientEventId diferente (RN-005)
         var isPotentialDuplicate = await readingRepository.ExistsSimilarAsync(
@@ -123,21 +153,23 @@ public sealed class ReadingService(
             CurrentCapturedAt: capturedAt,
             CurrentReadingType: request.ReadingType!.Value,
             ReceivedAtServer: receivedAtServer,
-            IsPotentialDuplicate: isPotentialDuplicate);
+            IsPotentialDuplicate: isPotentialDuplicate,
+            MeterUnit: machine.MeterUnit,
+            PreviousBoundaryType: previousBoundary?.ReadingType,
+            PreviousBoundaryValue: previousBoundary?.Value,
+            PreviousBoundaryCapturedAt: previousBoundary?.CapturedAtDevice);
 
         var assessment = policy.Assess(context, rulesOptions);
 
-        var syncedAt = timeProvider.GetUtcNow();
-        var reading = new HourMeterReading(
-            request.MachineId,
-            request.WorkSiteId,
-            request.Value,
-            request.ReadingType!.Value,
-            assessment.Status,
-            capturedAt,
-            receivedAtServer,
-            syncedAt,
-            request.ClientEventId);
+        var syncedAt = receivedAtServer;
+        HourMeterReading reading;
+        try
+        {
+            reading = HourMeterReading.CreateOperational(machine, request.WorkSiteId, request.Value,
+                request.ReadingType!.Value, assessment.Status, capturedAt, receivedAtServer, request.ClientEventId,
+                currentUser.UserId.Value, currentUser.Email, request.DeviceId, previous, correctionOf);
+        }
+        catch (ArgumentException ex) { throw new ApplicationValidationException("Reading", ex.Message); }
         readingRepository.Add(reading);
 
         // RN-010 — leitura suspeita permanece auditável; uma Anomaly por detecção
@@ -197,7 +229,9 @@ public sealed class ReadingService(
                 cancellationToken);
             if (existing is not null)
             {
-                return new CreateReadingResult(ReadingMappings.ToResponse(existing, machine, workSite), true);
+                if (existing.MachineId != request.MachineId)
+                    throw new ConflictException("O ClientEventId já pertence a outra máquina.");
+                return new CreateReadingResult(await GetByIdAsync(existing.Id, cancellationToken), true);
             }
 
             throw;
@@ -205,7 +239,9 @@ public sealed class ReadingService(
 
         var persistedReading = await readingRepository.GetByIdAsync(reading.Id, cancellationToken)
             ?? throw new InvalidOperationException("A leitura persistida não pôde ser recarregada.");
-        return new CreateReadingResult(ReadingMappings.ToResponse(persistedReading), false);
+        var summaries = await SummariesAsync([persistedReading.Id], true, cancellationToken);
+        return new CreateReadingResult(ReadingMappings.ToResponse(persistedReading, machine, workSite,
+            summaries.GetValueOrDefault(persistedReading.Id)), false);
     }
 
     private static void Validate(CreateReadingRequest request)
@@ -220,9 +256,9 @@ public sealed class ReadingService(
             throw new ApplicationValidationException(nameof(request.WorkSiteId), "O identificador da obra é inválido.");
         }
 
-        if (request.Value < 0m || request.Value > 9_999_999_999.99m)
+        if (request.Value < 0m || request.Value > 9_999_999_999.99m || decimal.Round(request.Value, 2) != request.Value)
         {
-            throw new ApplicationValidationException(nameof(request.Value), "O horímetro deve estar entre 0 e 9999999999,99.");
+            throw new ApplicationValidationException(nameof(request.Value), "O valor deve estar entre 0 e 9999999999,99 e conter no máximo duas casas decimais.");
         }
 
         if (request.ClientEventId == Guid.Empty)
@@ -235,17 +271,22 @@ public sealed class ReadingService(
             throw new ApplicationValidationException(nameof(request.CapturedAtDevice), "A data de captura é obrigatória.");
         }
 
-        if (!request.ReadingType.HasValue)
+        if (!request.ReadingType.HasValue || !Enum.IsDefined(request.ReadingType.Value))
         {
-            throw new ApplicationValidationException(nameof(request.ReadingType), "O tipo da leitura é obrigatório.");
+            throw new ApplicationValidationException(nameof(request.ReadingType), "Informe um tipo de leitura válido.");
         }
+        if ((request.ReadingType == ReadingType.Correction) != request.CorrectionOfReadingId.HasValue
+            || request.CorrectionOfReadingId == Guid.Empty)
+            throw new ApplicationValidationException(nameof(request.CorrectionOfReadingId), "CORRECTION exige uma leitura original; os demais tipos não aceitam vínculo de correção.");
+        try { HourMeterReading.NormalizeDeviceId(request.DeviceId); }
+        catch (ArgumentException ex) { throw new ApplicationValidationException(nameof(request.DeviceId), ex.Message); }
     }
 
     private static string Serialize(HourMeterReading reading) =>
         JsonSerializer.Serialize(
             new
             {
-                reading.Id,
+                ReadingId = reading.Id,
                 reading.MachineId,
                 reading.WorkSiteId,
                 reading.Value,
@@ -255,6 +296,17 @@ public sealed class ReadingService(
                 reading.ReceivedAtServer,
                 reading.SyncedAt,
                 reading.ClientEventId,
+                reading.MeterUnit,
+                reading.CreatedByUserId,
+                reading.CreatedByEmail,
+                reading.DeviceId,
+                reading.PreviousReadingId,
+                reading.DifferenceFromPrevious,
+                reading.CorrectionOfReadingId,
             },
             ApplicationJson.Options);
+
+    private Task<IReadOnlyDictionary<Guid, ReadingSummary>> SummariesAsync(Guid[] ids, bool detail, CancellationToken ct) =>
+        summaryRepository?.GetAsync(ids, detail, ct)
+            ?? Task.FromResult<IReadOnlyDictionary<Guid, ReadingSummary>>(new Dictionary<Guid, ReadingSummary>());
 }

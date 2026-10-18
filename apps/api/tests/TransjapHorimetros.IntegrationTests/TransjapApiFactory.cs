@@ -1,3 +1,4 @@
+using TransjapHorimetros.Domain.Enums;
 using Microsoft.Extensions.Hosting;
 using TransjapHorimetros.Application.Ocr;
 using System.Net.Http.Headers;
@@ -80,9 +81,12 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         var client = base.CreateClient();
         using var scope = Services.CreateScope();
         var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
+        var actor = new ApplicationUser($"{role.ToLowerInvariant()}.{Guid.NewGuid():N}@tests.local", $"Teste {role}");
+        EnsureIdentitySucceeded(scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>()
+            .CreateAsync(actor).GetAwaiter().GetResult());
         var (token, _) = tokenService.GenerateAccessToken(
-            Guid.NewGuid(),
-            $"{role.ToLowerInvariant()}@tests.local",
+            actor.Id,
+            actor.Email!,
             $"Teste {role}",
             [role]);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -139,8 +143,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
             DELETE FROM user_logins;
             DELETE FROM user_roles;
             DELETE FROM user_tokens;
-            DELETE FROM users;
             DELETE FROM hour_meter_readings;
+            DELETE FROM users;
             DELETE FROM work_sites;
             DELETE FROM machines;
             """);
@@ -148,6 +152,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         scope.ServiceProvider.GetRequiredService<FakePhotoOcrProvider>().Reset();
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
         await seeder.SeedAsync();
+        // Synthetic test fixture only; never backfill unknown production fleet units.
+        await dbContext.Machines.ExecuteUpdateAsync(set => set.SetProperty(m => m.MeterUnit, MeterUnit.Hours));
     }
 
     private static void EnsureIdentitySucceeded(IdentityResult result)

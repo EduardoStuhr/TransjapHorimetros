@@ -262,13 +262,45 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("client_event_id");
 
+                    b.Property<Guid?>("CorrectionOfReadingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("correction_of_reading_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2(7)")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CreatedByEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)")
+                        .HasColumnName("created_by_email");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("device_id");
+
+                    b.Property<decimal?>("DifferenceFromPrevious")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)")
+                        .HasColumnName("difference_from_previous");
+
                     b.Property<Guid>("MachineId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("machine_id");
+
+                    b.Property<string>("MeterUnit")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasColumnName("meter_unit");
+
+                    b.Property<Guid?>("PreviousReadingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("previous_reading_id");
 
                     b.Property<string>("ReadingType")
                         .IsRequired()
@@ -310,6 +342,12 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_hour_meter_readings_client_event_id");
 
+                    b.HasIndex("CorrectionOfReadingId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("PreviousReadingId");
+
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_hour_meter_readings_status");
 
@@ -320,9 +358,23 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .IsDescending(false, true)
                         .HasDatabaseName("ix_hour_meter_readings_machine_captured_at");
 
+                    b.HasIndex("CapturedAtDevice", "ReceivedAtServer", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_readings_capture_order");
+
+                    b.HasIndex("MachineId", "MeterUnit", "CapturedAtDevice", "ReceivedAtServer", "Id")
+                        .IsDescending(false, false, true, true, true)
+                        .HasDatabaseName("ix_readings_operational_order");
+
                     b.ToTable("hour_meter_readings", null, t =>
                         {
                             t.HasCheckConstraint("ck_hour_meter_readings_value_non_negative", "value >= 0");
+
+                            t.HasCheckConstraint("ck_readings_correction_link", "correction_of_reading_id IS NULL OR (reading_type = 'CORRECTION' AND correction_of_reading_id <> id)");
+
+                            t.HasCheckConstraint("ck_readings_meter_unit", "meter_unit IS NULL OR meter_unit IN ('HOURS', 'KM')");
+
+                            t.HasCheckConstraint("ck_readings_previous_pair", "(previous_reading_id IS NULL AND difference_from_previous IS NULL) OR (previous_reading_id IS NOT NULL AND difference_from_previous IS NOT NULL AND previous_reading_id <> id)");
                         });
                 });
 
@@ -920,12 +972,27 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.HourMeterReading", b =>
                 {
+                    b.HasOne("TransjapHorimetros.Domain.Entities.HourMeterReading", null)
+                        .WithMany("Corrections")
+                        .HasForeignKey("CorrectionOfReadingId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TransjapHorimetros.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TransjapHorimetros.Domain.Entities.Machine", "Machine")
                         .WithMany("Readings")
                         .HasForeignKey("MachineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_hour_meter_readings_machines_machine_id");
+
+                    b.HasOne("TransjapHorimetros.Domain.Entities.HourMeterReading", null)
+                        .WithMany()
+                        .HasForeignKey("PreviousReadingId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("TransjapHorimetros.Domain.Entities.WorkSite", "WorkSite")
                         .WithMany("Readings")
@@ -990,6 +1057,8 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.HourMeterReading", b =>
                 {
                     b.Navigation("Anomalies");
+
+                    b.Navigation("Corrections");
 
                     b.Navigation("PhotoEvidence");
                 });

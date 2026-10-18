@@ -55,7 +55,8 @@ public sealed record LatestReadingResponse(
     decimal Value,
     DateTimeOffset CapturedAtDevice,
     Guid? WorkSiteId,
-    string? WorkSiteName);
+    string? WorkSiteName,
+    MeterUnit? MeterUnit = null);
 
 public sealed record MachineListItemResponse(
     Guid Id,

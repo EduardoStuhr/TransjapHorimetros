@@ -1,4 +1,4 @@
-name: Validate OCR phase
+name: Validate operational readings
 
 on:
   pull_request:

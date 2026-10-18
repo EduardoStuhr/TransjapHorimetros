@@ -7,7 +7,8 @@ internal static class ReadingMappings
     public static ReadingResponse ToResponse(
         HourMeterReading reading,
         Machine? machineOverride = null,
-        WorkSite? workSiteOverride = null)
+        WorkSite? workSiteOverride = null,
+        ReadingSummary? summary = null)
     {
         var machine = reading.Machine ?? machineOverride
             ?? throw new InvalidOperationException("A máquina relacionada não foi carregada.");
@@ -29,6 +30,21 @@ internal static class ReadingMappings
             reading.ClientEventId,
             reading.CreatedAt,
             reading.UpdatedAt,
-            reading.PhotoEvidence is not null);
+            reading.PhotoEvidence is not null,
+            reading.MeterUnit,
+            reading.CreatedByUserId,
+            reading.CreatedByEmail,
+            reading.DeviceId,
+            reading.PreviousReadingId,
+            reading.DifferenceFromPrevious,
+            reading.CorrectionOfReadingId)
+        {
+            AnomalyCount = summary?.AnomalyCount ?? 0,
+            OpenAnomalyCount = summary?.OpenAnomalyCount ?? 0,
+            CorrectionCount = summary?.CorrectionCount ?? 0,
+            Ocr = summary?.Ocr,
+            Anomalies = summary?.Anomalies,
+            Corrections = summary?.Corrections,
+        };
     }
 }

@@ -8,6 +8,10 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Repositories;
 
 public sealed class PhotoOcrRepository(TransjapDbContext db) : IPhotoOcrRepository
 {
+    public Task<PhotoOcrResult?> GetLatestAsync(Guid photoEvidenceId, CancellationToken ct) =>
+        db.PhotoOcrResults.AsNoTracking().Where(r => r.PhotoEvidenceId == photoEvidenceId)
+            .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).FirstOrDefaultAsync(ct);
+
     public async Task<IReadOnlyList<PhotoOcrResult>> GetHistoryAsync(Guid photoEvidenceId, CancellationToken ct) =>
         await db.PhotoOcrResults.AsNoTracking().Where(r => r.PhotoEvidenceId == photoEvidenceId)
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).ToListAsync(ct);

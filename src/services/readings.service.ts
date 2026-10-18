@@ -4,6 +4,10 @@ import type {
   PhotoEvidence,
   ReadingStatus,
   ReadingType,
+  MeterUnit,
+  PhotoOcrResult,
+  ReadingAnomalySummary,
+  ReadingCorrectionSummary,
 } from "@/types/domain";
 
 export interface ReadingFilters {
@@ -12,6 +16,11 @@ export interface ReadingFilters {
   startDate?: string;
   status?: ReadingStatus | "";
   workSiteId?: string;
+  machineId?: string;
+  meterUnit?: MeterUnit | "";
+  readingType?: ReadingType | "";
+  hasPhotoEvidence?: "true" | "false" | "";
+  hasAnomaly?: "true" | "false" | "";
 }
 
 interface ApiReading {
@@ -31,6 +40,19 @@ interface ApiReading {
   createdAt: string;
   updatedAt: string;
   hasPhotoEvidence: boolean;
+  meterUnit: MeterUnit | null;
+  differenceFromPrevious: number | null;
+  previousReadingId: string | null;
+  correctionOfReadingId: string | null;
+  createdByUserId: string | null;
+  createdByEmail: string | null;
+  deviceId: string | null;
+  anomalyCount: number;
+  openAnomalyCount: number;
+  correctionCount: number;
+  ocr: Pick<PhotoOcrResult, "status" | "detectedValue" | "confidence" | "matchesOperatorValue"> | null;
+  anomalies: ReadingAnomalySummary[] | null;
+  corrections: ReadingCorrectionSummary[] | null;
 }
 
 function mapReading(reading: ApiReading): HourMeterReading {
@@ -40,19 +62,34 @@ function mapReading(reading: ApiReading): HourMeterReading {
     machineFleetNumber: reading.machineFleetNumber,
     model: reading.machineModel,
     value: reading.value,
-    differenceFromPrevious: null,
+    differenceFromPrevious: reading.differenceFromPrevious,
+    meterUnit: reading.meterUnit,
     readingType: reading.readingType,
     capturedAtDevice: reading.capturedAtDevice,
     receivedAtServer: reading.receivedAtServer,
     syncedAt: reading.syncedAt,
     clientEventId: reading.clientEventId,
-    operatorName: null,
+    operatorName: reading.createdByEmail,
     workSiteId: reading.workSiteId,
     workSiteName: reading.workSiteName,
     status: reading.status,
     hasPhotoEvidence: reading.hasPhotoEvidence,
-    ocrDetectedValue: null,
-    ocrConfidence: null,
+    ocrDetectedValue: reading.ocr?.detectedValue ?? null,
+    ocrConfidence: reading.ocr?.confidence ?? null,
+    ocrStatus: reading.ocr?.status ?? null,
+    ocrMatchesOperatorValue: reading.ocr?.matchesOperatorValue ?? null,
+    createdByUserId: reading.createdByUserId,
+    createdByEmail: reading.createdByEmail,
+    deviceId: reading.deviceId,
+    previousReadingId: reading.previousReadingId,
+    correctionOfReadingId: reading.correctionOfReadingId,
+    anomalyCount: reading.anomalyCount,
+    openAnomalyCount: reading.openAnomalyCount,
+    correctionCount: reading.correctionCount,
+    anomalies: reading.anomalies,
+    corrections: reading.corrections,
+    createdAt: reading.createdAt,
+    updatedAt: reading.updatedAt,
   };
 }
 
@@ -64,10 +101,11 @@ async function fetchReadings(path: string): Promise<readonly HourMeterReading[]>
 function buildReadingsPath(
   filters: ReadingFilters,
   page = 1,
+  pageSize = 100,
 ): string {
   const searchParams = new URLSearchParams({
     page: String(page),
-    pageSize: "100",
+    pageSize: String(pageSize),
   });
 
   if (filters.fleetNumber) {
@@ -80,6 +118,10 @@ function buildReadingsPath(
 
   if (filters.status) {
     searchParams.set("status", filters.status);
+  }
+
+  for (const key of ["machineId", "meterUnit", "readingType", "hasPhotoEvidence", "hasAnomaly"] as const) {
+    if (filters[key]) searchParams.set(key, filters[key]);
   }
 
   if (filters.startDate) {
@@ -135,4 +177,9 @@ export async function getPhotoEvidence(readingId: string) {
   return apiFetch<PhotoEvidence>(
     `/api/v1/readings/${encodeURIComponent(readingId)}/photo`,
   );
+}
+
+export async function getReadingsPage(filters: ReadingFilters = {}, page = 1) {
+  const response = await apiFetch<PagedApiResponse<ApiReading>>(buildReadingsPath(filters, page, 20));
+  return { ...response, items: response.items.map(mapReading) };
 }

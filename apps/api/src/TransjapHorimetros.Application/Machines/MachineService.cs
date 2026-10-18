@@ -15,7 +15,8 @@ public sealed class MachineService(
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
-    ICurrentUser? currentUser = null) : IMachineService
+    ICurrentUser? currentUser = null,
+    IReadingSummaryRepository? summaryRepository = null) : IMachineService
 {
     public async Task<PagedResponse<MachineListItemResponse>> GetPageAsync(
         MachineQuery query,
@@ -149,7 +150,12 @@ public sealed class MachineService(
         CancellationToken cancellationToken)
     {
         var readings = await readingRepository.GetForMachineAsync(machine.Id, 1, 10, cancellationToken);
-        var responses = readings.Items.Select(reading => ReadingMappings.ToResponse(reading)).ToArray();
+        var latest = (await readingRepository.GetLatestByMachineIdsAsync([machine.Id], cancellationToken)).FirstOrDefault();
+        var ids = readings.Items.Select(r => r.Id).Concat(latest is null ? [] : new[] { latest.Id }).Distinct().ToArray();
+        var summaries = summaryRepository is null ? new Dictionary<Guid, ReadingSummary>()
+            : await summaryRepository.GetAsync(ids, false, cancellationToken);
+        var responses = readings.Items.Select(reading => ReadingMappings.ToResponse(reading,
+            summary: summaries.GetValueOrDefault(reading.Id))).ToArray();
         var alertCount = await anomalyRepository.CountOpenAsync(machine.Id, cancellationToken);
         var activeQrCode = await machineQrCodeRepository.GetActiveByMachineIdAsync(
             machine.Id,
@@ -164,7 +170,7 @@ public sealed class MachineService(
             machine.MeterUnit,
             machine.CreatedAt,
             machine.UpdatedAt,
-            responses.FirstOrDefault(),
+            latest is null ? null : ReadingMappings.ToResponse(latest, summary: summaries.GetValueOrDefault(latest.Id)),
             responses,
             alertCount,
             activeQrCode?.Token);
@@ -198,7 +204,8 @@ public sealed class MachineService(
                     latestReading.Value,
                     latestReading.CapturedAtDevice,
                     latestReading.WorkSiteId,
-                    latestReading.WorkSite?.Name),
+                    latestReading.WorkSite?.Name,
+                    latestReading.MeterUnit),
             machine.CreatedAt,
             machine.UpdatedAt);
 

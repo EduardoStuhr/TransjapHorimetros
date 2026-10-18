@@ -18,6 +18,47 @@ namespace TransjapHorimetros.IntegrationTests;
 public sealed class CompleteReadingModelIntegrationTests(TransjapApiFactory factory) : IClassFixture<TransjapApiFactory>
 {
     [Fact]
+    public async Task Create_WithoutTokenIsUnauthorized()
+    {
+        using var client = factory.CreateAnonymousClient();
+        using var response = await client.PostAsJsonAsync("/api/v1/readings", Request(Guid.NewGuid(), 100, DateTimeOffset.UtcNow));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MissingMachineOrWorksite_IsNotFound(bool missingMachine)
+    {
+        await factory.ResetDatabaseAsync(); using var client = factory.CreateClient();
+        var request = Request(missingMachine ? Guid.NewGuid() : await MachineId(client), 100, DateTimeOffset.UtcNow);
+        if (!missingMachine) request["workSiteId"] = Guid.NewGuid();
+        using var response = await client.PostAsJsonAsync("/api/v1/readings", request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConcurrentEventRetries_CreateOneReadingAndOneCreationAudit()
+    {
+        await factory.ResetDatabaseAsync(); using var client = factory.CreateClient();
+        var request = Request(await MachineId(client), 100, DateTimeOffset.UtcNow, Guid.NewGuid());
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => client.PostAsJsonAsync("/api/v1/readings", request)));
+        Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.Created));
+        Assert.Equal(3, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
+        var ids = new List<Guid>();
+        foreach (var response in responses)
+        {
+            ids.Add((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
+            response.Dispose();
+        }
+        Assert.Single(ids.Distinct());
+        using var scope = factory.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        Assert.Equal(1, await db.HourMeterReadings.CountAsync());
+        Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.Action == "CREATE_READING"));
+        Assert.Equal(0, await db.Anomalies.CountAsync());
+    }
+
+    [Fact]
     public async Task Create_RecordsServerAuthorSnapshotPreviousAndDelta_AndReplaysBeforeMutableValidation()
     {
         await factory.ResetDatabaseAsync();

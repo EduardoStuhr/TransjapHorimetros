@@ -149,7 +149,7 @@ A migration AddPhotoOcrResults foi gerada sem aplicação no Azure; as anteriore
 ## 9. ADR — Evento operacional completo, sem reinterpretação histórica
 
 **Data:** 2026-10-18
-**Status:** Implementada em branch, aguardando validação SQL e revisão
+**Status:** Implementada em branch, validação SQL e regressões concluídas, aguardando revisão
 
 A leitura mantém um snapshot da unidade da máquina, autoria do ICurrentUser e referências/delta escolhidos pelo servidor. Máquina sem unidade não permite novos eventos operacionais. Campos históricos não comprováveis permanecem nullable; a unidade atual da máquina não é evidência suficiente para preencher registros antigos. SyncedAt continua preenchido no aceite online, igual a ReceivedAtServer.
 

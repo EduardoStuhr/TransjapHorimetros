@@ -27,17 +27,19 @@ Data: 18/10/2026. Branch `feat/phase-6-complete-reading-model`. Arquitetura e re
 | 21. Migration | 20261018155742_CompleteReadingModel, somente gerada. Sete colunas nullable para compatibilidade histórica; sem recriar tabela/backfill fictício. |
 | 22. Índices | FKs de autor/anterior/correção, ordem global de captura/recebimento/Id e por máquina/unidade; unicidade ClientEventId preservada. |
 | 23. Testes unitários | 198 aprovados, sem falhas ou ignorados; inclui domínio, serviço, precisão, unidade, autoria, delta, idempotência, sequências, late sync, status e correção imutável. |
-| 24. Integração | Testes novos para snapshot, autoria, replay, precisão, segurança do request, correção, filtros, paginação, OCR histórico, migration legada e atomicidade. Validação SQL remota pendente. |
-| 25. Regressões | Suíte Fases 1–5 mantida, com fixtures sintéticas de unidade/autor e leituras intermediárias nos testes genéricos. Resultado SQL remoto pendente. |
+| 24. Integração | 141 aprovados, sem falhas/ignorados, no SQL Server 2022 descartável da [CI](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/39144490422). Cobertura de snapshot, autoria, replay concorrente, 401/404, precisão, segurança do request, correção, filtros, paginação, OCR histórico, migration legada e atomicidade. |
+| 25. Regressões | Fases 1–5 aprovadas na mesma suíte: QR, auth, foto/upload/conteúdo, OCR/histórico/reprocessamento, anomalias, dashboard, auditoria e imutabilidade. Fixtures sintéticas declaram unidade/autor e usam leituras intermediárias nos testes genéricos. |
 | 26. Backend build | Restore/build Release concluídos com zero erros/avisos na última compilação completa. |
 | 27. Frontend lint | npm ci e npm run lint aprovados. Dependências transitivas emitiram avisos de depreciação. |
 | 28. Frontend build | npm run build aprovado; aviso de lockfile fora do repositório, sem bloquear. |
 | 29. Branch | feat/phase-6-complete-reading-model. |
-| 30. Commit | Principal: d2aaafb — feat: complete operational reading model; ajustes de validação posteriores no histórico da branch. |
-| 31. PR | [#10](https://github.com/EduardoStuhr/TransjapHorimetros/pull/10), contra main, sem merge; em rascunho até a validação SQL completa. |
-| 32. Riscos restantes | Confirmar unidades oficiais e parâmetros de sequência/atraso, revisar migration/índices, validar SQL e snapshots legados; aprovação de correção, reconciliação e scheduler ficam para fases posteriores. |
+| 30. Commit | Principal: d2aaafb — feat: complete operational reading model; head funcional/testes 445b4f5 aprovado na CI, com atualização documental posterior no histórico. |
+| 31. PR | [#10](https://github.com/EduardoStuhr/TransjapHorimetros/pull/10), contra main, aberto para revisão e sem merge. Backend e frontend aprovados na CI. |
+| 32. Riscos restantes | Confirmar unidades oficiais e parâmetros de sequência/atraso, revisar migration/índices e eventual backfill comprovável. Aprovação de correção, reconciliação e scheduler ficam para fases posteriores. Novas leituras dependem de unidade configurada na máquina. |
 
 O comando completo de testes foi tentado localmente. Naquela rodada, 194 unitários e 43 testes de integração sem dependência do banco passaram; 91 testes de integração não inicializaram por ausência de TEST_SQLSERVER_CONNECTION_STRING/SQL Server/Docker. Não foi considerado sucesso da suíte completa. O workflow de PR existente será utilizado com SQL Server descartável; nenhum banco Azure foi acessado.
+
+A validação final foi concluída no workflow existente de PR: **198 unitários + 141 de integração = 339 testes aprovados**, sem falhas ou ignorados. Restore/build Release, npm ci, lint e build frontend também passaram. A primeira CI identificou uma fixture do dashboard sem unidade; os dados sintéticos do teste foram ajustados ao novo contrato. Nenhum secret real foi adicionado e não há secrets novos necessários para a Fase 6. A migration foi validada somente no banco descartável de testes, inclusive com dados legados.
 
 MODELO COMPLETO DE LEITURA? **SIM**
 
@@ -55,7 +57,7 @@ IMPOSSIBLE HOUR INCREASE? **SIM — somente HOURS.**
 
 CORREÇÃO IMUTÁVEL PREPARADA? **SIM**
 
-TESTES DE REGRESSÃO FASES 1-5? **NÃO — validação SQL completa pendente.**
+TESTES DE REGRESSÃO FASES 1-5? **SIM**
 
 MIGRATION APLICADA NO AZURE? **NÃO**
 
@@ -63,4 +65,4 @@ PR MERGEADO? **NÃO**
 
 FASE 6 EM PRODUÇÃO? **NÃO**
 
-FASE 6 PRONTA PARA REVISÃO? **NÃO — validação SQL completa pendente.**
+FASE 6 PRONTA PARA REVISÃO? **SIM**

@@ -168,7 +168,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
 
         using var activeResponse = await client.PostAsJsonAsync(
             "/api/v1/machines",
-            new { fleetNumber = activeFleetNumber, model = "Teste ativa", status = "ACTIVE" });
+            new { fleetNumber = activeFleetNumber, model = "Teste ativa", status = "ACTIVE", meterUnit = "HOURS" });
         Assert.Equal(HttpStatusCode.Created, activeResponse.StatusCode);
         using var activeMachine = await JsonDocument.ParseAsync(await activeResponse.Content.ReadAsStreamAsync());
         var activeMachineId = activeMachine.RootElement.GetProperty("id").GetGuid();
@@ -253,7 +253,7 @@ public sealed class ApiIntegrationTests(TransjapApiFactory factory) : IClassFixt
             machineId,
             workSiteId = (Guid?)null,
             value,
-            readingType = "OPENING",
+            readingType = "INTERMEDIATE",
             capturedAtDevice = capturedAt,
             clientEventId,
         };

@@ -1,8 +1,9 @@
 import { ApiError, apiFetch, type PagedApiResponse } from "@/services/api-client";
 import { getMachineReadings } from "@/services/readings.service";
-import type { Machine, MachineDetails } from "@/types/domain";
+import type { Machine, MachineDetails, MeterUnit } from "@/types/domain";
 
 interface ApiLatestReading {
+  meterUnit: MeterUnit | null;
   value: number;
   capturedAtDevice: string;
   workSiteName: string | null;
@@ -13,6 +14,7 @@ interface ApiMachineListItem {
   fleetNumber: number;
   model: string;
   status: "ACTIVE" | "INACTIVE";
+  meterUnit: MeterUnit | null;
   latestReading: ApiLatestReading | null;
 }
 
@@ -26,6 +28,8 @@ function mapMachine(machine: ApiMachineListItem): Machine {
     id: machine.id,
     fleetNumber: machine.fleetNumber,
     model: machine.model,
+    meterUnit: machine.meterUnit,
+    currentReadingMeterUnit: machine.latestReading?.meterUnit ?? null,
     manufacturer: null,
     registrationStatus: machine.status,
     operationalStatus: null,

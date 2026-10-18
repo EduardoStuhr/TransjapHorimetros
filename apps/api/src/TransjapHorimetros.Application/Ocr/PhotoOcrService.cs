@@ -16,9 +16,14 @@ public sealed class PhotoOcrService(IPhotoEvidenceRepository photos, IReadingRep
     IAuditLogRepository audits, IUnitOfWork uow, ICurrentUser user, TimeProvider clock,
     ILogger<PhotoOcrService> logger) : IPhotoOcrService
 {
-    public async Task<PhotoOcrResponse> GetLatestAsync(Guid readingId, CancellationToken ct) =>
-        (await GetHistoryAsync(readingId, ct)).FirstOrDefault()
+    public async Task<PhotoOcrResponse> GetLatestAsync(Guid readingId, CancellationToken ct)
+    {
+        var photo = await photos.GetByReadingIdAsync(readingId, ct)
+            ?? throw new EntityNotFoundException("Evidência fotográfica", readingId);
+        var result = await results.GetLatestAsync(photo.Id, ct)
             ?? throw new EntityNotFoundException("Resultado OCR", readingId);
+        return ToResponse(result);
+    }
 
     public async Task<IReadOnlyList<PhotoOcrResponse>> GetHistoryAsync(Guid readingId, CancellationToken ct)
     {
@@ -59,7 +64,7 @@ public sealed class PhotoOcrService(IPhotoEvidenceRepository photos, IReadingRep
                         .WaitAsync(attemptDeadline.Token);
                     text = OcrText.Limit(response.RawText);
                     model = response.Model;
-                    extraction = extractor.Extract(response with { RawText = text }, reading.Machine?.MeterUnit);
+                    extraction = extractor.Extract(response with { RawText = text }, reading.MeterUnit);
                     status = !extraction.Value.HasValue ? PhotoOcrStatus.NoValueDetected
                         : extraction.Confidence < options.MinimumConfidence ? PhotoOcrStatus.LowConfidence
                         : PhotoOcrStatus.Succeeded;

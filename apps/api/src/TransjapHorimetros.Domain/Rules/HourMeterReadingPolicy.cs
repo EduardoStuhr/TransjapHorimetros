@@ -24,11 +24,21 @@ public sealed class HourMeterReadingPolicy
         }
 
         DetectClockSkew(context, options, anomalies);
+        var syncDelaySeconds = (context.ReceivedAtServer - context.CurrentCapturedAt).TotalSeconds;
+        if (options.LateSyncThresholdSeconds.HasValue && syncDelaySeconds > options.LateSyncThresholdSeconds.Value)
+            anomalies.Add(Detect(AnomalyType.LateSync, "A captura foi recebida após o prazo configurado de sincronização."));
+
+        if (options.RequireOpeningBeforeClosing && context.CurrentReadingType == ReadingType.Closing
+            && (context.PreviousBoundaryType ?? context.PreviousReadingType) != ReadingType.Opening)
+            anomalies.Add(Detect(AnomalyType.DayTransitionMismatch, "Fechamento sem abertura operacional anterior conhecida."));
 
         if (context.PreviousValue.HasValue && context.PreviousCapturedAt.HasValue)
         {
             DetectSequenceAnomalies(context, options, anomalies);
         }
+
+        if (context.CurrentReadingType == ReadingType.Correction)
+            return new ReadingAssessment(ReadingStatus.Pending, anomalies);
 
         return anomalies.Count == 0
             ? ReadingAssessment.Validated
@@ -67,7 +77,7 @@ public sealed class HourMeterReadingPolicy
                 AnomalyType.ReadingDecrease,
                 $"A leitura {Format(context.CurrentValue)} é menor que a leitura válida anterior {Format(previousValue)}."));
         }
-        else
+        else if (context.MeterUnit == MeterUnit.Hours)
         {
             var elapsedHours = Math.Max(
                 0m,
@@ -90,14 +100,22 @@ public sealed class HourMeterReadingPolicy
             }
         }
 
-        if (context.PreviousReadingType == ReadingType.Closing
+        if (options.DetectConsecutiveOpenings && (context.PreviousBoundaryType ?? context.PreviousReadingType) == ReadingType.Opening
+            && context.CurrentReadingType == ReadingType.Opening)
+            anomalies.Add(Detect(AnomalyType.DayTransitionMismatch, "Duas aberturas consecutivas sem encerramento conhecido."));
+
+        var boundaryType = context.PreviousBoundaryType ?? context.PreviousReadingType;
+        var boundaryValue = context.PreviousBoundaryValue ?? previousValue;
+        var boundaryCapturedAt = context.PreviousBoundaryCapturedAt ?? previousCapturedAt;
+        var boundaryDelta = context.CurrentValue - boundaryValue;
+        if (context.MeterUnit == MeterUnit.Hours && boundaryType == ReadingType.Closing
             && context.CurrentReadingType == ReadingType.Opening
-            && context.CurrentCapturedAt.ToUniversalTime() > previousCapturedAt.ToUniversalTime()
-            && Math.Abs(readingDelta) > options.DayTransitionToleranceHours)
+            && context.CurrentCapturedAt.ToUniversalTime() > boundaryCapturedAt.ToUniversalTime()
+            && Math.Abs(boundaryDelta) > options.DayTransitionToleranceHours)
         {
             anomalies.Add(Detect(
                 AnomalyType.DayTransitionMismatch,
-                $"A diferença entre o fechamento e a abertura seguinte é de {Format(Math.Abs(readingDelta))}, acima da tolerância de {Format(options.DayTransitionToleranceHours)}."));
+                $"A diferença entre o fechamento e a abertura seguinte é de {Format(Math.Abs(boundaryDelta))}, acima da tolerância de {Format(options.DayTransitionToleranceHours)}."));
         }
     }
 

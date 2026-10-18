@@ -2,6 +2,8 @@ export interface Machine {
   id: string;
   fleetNumber: number;
   model: string;
+  meterUnit?: MeterUnit | null;
+  currentReadingMeterUnit?: MeterUnit | null;
   manufacturer?: string | null;
   registrationStatus?: "ACTIVE" | "INACTIVE" | null;
   operationalStatus?: string | null;
@@ -31,11 +33,14 @@ export type ReadingStatus =
   | "CORRECTED"
   | "REJECTED";
 
+export type MeterUnit = "HOURS" | "KM";
+
 export interface HourMeterReading {
   id: string;
   machineId: string;
   machineFleetNumber: number;
   model: string;
+  meterUnit: MeterUnit | null;
   value: number;
   differenceFromPrevious: number | null;
   readingType: ReadingType;
@@ -50,7 +55,30 @@ export interface HourMeterReading {
   hasPhotoEvidence: boolean;
   ocrDetectedValue: number | null;
   ocrConfidence: number | null;
+  ocrStatus: PhotoOcrResult["status"] | null;
+  ocrMatchesOperatorValue: boolean | null;
+  createdByUserId: string | null;
+  createdByEmail: string | null;
+  deviceId: string | null;
+  previousReadingId: string | null;
+  correctionOfReadingId: string | null;
+  anomalyCount: number;
+  openAnomalyCount: number;
+  correctionCount: number;
+  anomalies: readonly ReadingAnomalySummary[] | null;
+  corrections: readonly ReadingCorrectionSummary[] | null;
+  createdAt: string;
+  updatedAt: string;
 }
+
+export interface ReadingAnomalySummary {
+  id: string;
+  type: AnomalyType;
+  status: Anomaly["status"];
+  severity: Anomaly["severity"];
+  description: string;
+}
+export interface ReadingCorrectionSummary { id: string; value: number; status: ReadingStatus; createdAt: string }
 
 export interface WorkSite {
   id: string;
@@ -108,7 +136,10 @@ export type AnomalyType =
   | "MISSING_READING"
   | "LOW_OCR_CONFIDENCE"
   | "OCR_OPERATOR_DIVERGENCE"
-  | "LATE_SYNC";
+  | "LATE_SYNC"
+  | "CLOCK_SKEW"
+  | "DAY_TRANSITION_MISMATCH"
+  | "WRONG_WORK_SITE";
 
 export interface Anomaly {
   id: string;

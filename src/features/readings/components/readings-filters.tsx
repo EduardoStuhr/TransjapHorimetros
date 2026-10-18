@@ -68,6 +68,7 @@ export function ReadingsFilters({
       onSubmit={handleSubmit(applyFilters)}
       className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
     >
+      <input type="hidden" {...register("machineId")} />
       <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="space-y-2">
           <Label htmlFor="startDate">Período inicial</Label>
@@ -126,6 +127,23 @@ export function ReadingsFilters({
             <option value="REJECTED">Rejeitado</option>
           </select>
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="meterUnit">Unidade</Label>
+          <select id="meterUnit" className={fieldClassName} {...register("meterUnit")}>
+            <option value="">Todas as unidades</option><option value="HOURS">Horas (HOURS)</option><option value="KM">Quilômetros (KM)</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="readingType">Tipo de leitura</Label>
+          <select id="readingType" className={fieldClassName} {...register("readingType")}>
+            <option value="">Todos os tipos</option><option value="OPENING">Abertura</option><option value="CLOSING">Fechamento</option><option value="INTERMEDIATE">Intermediária</option><option value="MAINTENANCE">Manutenção</option><option value="CORRECTION">Proposta de correção</option>
+          </select>
+        </div>
+        {([ ["hasPhotoEvidence", "Evidência fotográfica"], ["hasAnomaly", "Anomalias"] ] as const).map(([name, label]) => (
+          <div key={name} className="space-y-2"><Label htmlFor={name}>{label}</Label>
+            <select id={name} className={fieldClassName} {...register(name)}><option value="">Todas</option><option value="true">Com registro</option><option value="false">Sem registro</option></select>
+          </div>
+        ))}
         <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-5 xl:justify-end">
           <Button type="submit" disabled={pending}>
             <Filter />

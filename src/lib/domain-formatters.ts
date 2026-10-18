@@ -38,7 +38,7 @@ export function formatHourMeter(value: number | null | undefined) {
 
   return new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -74,6 +74,9 @@ export function formatAnomalyType(type: AnomalyType) {
     LOW_OCR_CONFIDENCE: "Baixa confiança do OCR",
     OCR_OPERATOR_DIVERGENCE: "Divergência entre OCR e operador",
     LATE_SYNC: "Sincronização atrasada",
+    CLOCK_SKEW: "Divergência do relógio",
+    DAY_TRANSITION_MISMATCH: "Sequência operacional inconsistente",
+    WRONG_WORK_SITE: "Obra divergente",
   };
 
   return labels[type];

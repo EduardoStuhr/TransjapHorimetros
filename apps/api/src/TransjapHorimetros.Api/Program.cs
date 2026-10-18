@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -41,6 +42,7 @@ var rulesOptions = builder.Configuration
     .GetSection(HourMeterRulesOptions.SectionName)
     .Get<HourMeterRulesOptions>() ?? new HourMeterRulesOptions();
 builder.Services.AddSingleton(rulesOptions);
+Validator.ValidateObject(rulesOptions, new ValidationContext(rulesOptions), validateAllProperties: true);
 builder.Services.AddSingleton<HourMeterReadingPolicy>();
 builder.Services.AddScoped<IMachineService, MachineService>();
 builder.Services.AddScoped<IWorkSiteService, WorkSiteService>();

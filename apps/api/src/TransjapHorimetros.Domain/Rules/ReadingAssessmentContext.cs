@@ -10,4 +10,8 @@ public sealed record ReadingAssessmentContext(
     DateTimeOffset CurrentCapturedAt,
     ReadingType CurrentReadingType,
     DateTimeOffset ReceivedAtServer,
-    bool IsPotentialDuplicate);
+    bool IsPotentialDuplicate,
+    MeterUnit? MeterUnit = null,
+    ReadingType? PreviousBoundaryType = null,
+    decimal? PreviousBoundaryValue = null,
+    DateTimeOffset? PreviousBoundaryCapturedAt = null);

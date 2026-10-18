@@ -219,7 +219,7 @@ public sealed class PhotoEvidenceServiceTests
             Task.FromResult(id == reading.Id ? reading : null);
 
         public Task<HourMeterReading?> GetByClientEventIdAsync(Guid clientEventId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<HourMeterReading?> GetLatestValidBeforeAsync(Guid machineId, DateTimeOffset capturedAt, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<HourMeterReading?> GetLatestValidBeforeAsync(Guid machineId, DateTimeOffset capturedAt, CancellationToken cancellationToken, MeterUnit? meterUnit = null) => throw new NotSupportedException();
         public Task<IReadOnlyList<HourMeterReading>> GetLatestByMachineIdsAsync(IReadOnlyCollection<Guid> machineIds, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<RepositoryPage<HourMeterReading>> GetPageAsync(ReadingQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<RepositoryPage<HourMeterReading>> GetForMachineAsync(Guid machineId, int page, int pageSize, CancellationToken cancellationToken) => throw new NotSupportedException();

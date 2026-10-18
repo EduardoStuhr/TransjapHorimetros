@@ -18,7 +18,7 @@ public sealed class ReadingServiceTests
     [Fact]
     public async Task CreateAsync_WhenClientEventAlreadyExists_ReturnsExistingWithoutSaving()
     {
-        var machine = new Machine(68, "Pipa Ford", MachineStatus.Active, Now);
+        var machine = new Machine(68, "Pipa Ford", MachineStatus.Active, Now, MeterUnit.Hours);
         var clientEventId = Guid.NewGuid();
         var existingReading = new HourMeterReading(
             machine.Id,
@@ -30,6 +30,7 @@ public sealed class ReadingServiceTests
             Now.AddMinutes(-59),
             Now.AddMinutes(-59),
             clientEventId);
+        typeof(HourMeterReading).GetProperty(nameof(HourMeterReading.Machine))!.SetValue(existingReading, machine);
         var machineRepository = new FakeMachineRepository(machine);
         var readingRepository = new FakeReadingRepository(existingReading);
         var unitOfWork = new FakeUnitOfWork();
@@ -67,7 +68,7 @@ public sealed class ReadingServiceTests
     [Fact]
     public async Task CreateAsync_WhenWorkSiteDoesNotExist_ThrowsNotFound()
     {
-        var machine = new Machine(68, "Pipa Ford", MachineStatus.Active, Now);
+        var machine = new Machine(68, "Pipa Ford", MachineStatus.Active, Now, MeterUnit.Hours);
         var request = ValidRequest(machine.Id, Guid.NewGuid()) with { WorkSiteId = Guid.NewGuid() };
         var service = CreateService(
             new FakeMachineRepository(machine),
@@ -96,7 +97,38 @@ public sealed class ReadingServiceTests
             new HourMeterReadingPolicy(),
             new HourMeterRulesOptions { ElapsedTimeToleranceHours = 0.25m },
             new FixedTimeProvider(Now),
-            NullLogger<ReadingService>.Instance);
+            NullLogger<ReadingService>.Instance, new FakeCurrentUser());
+
+    [Fact]
+    public async Task CreateAsync_CapturesAuthorSnapshotDeviceAndServerCalculatedDelta()
+    {
+        var machine = new Machine(68, "Test", MachineStatus.Active, Now, MeterUnit.Hours);
+        var previous = new HourMeterReading(machine.Id, null, 100, ReadingType.Intermediate,
+            ReadingStatus.Validated, Now.AddHours(-2), Now.AddHours(-2), Now.AddHours(-2), Guid.NewGuid(), MeterUnit.Hours);
+        var repository = new FakeReadingRepository(previousReading: previous);
+        var uow = new FakeUnitOfWork();
+        var service = CreateService(new FakeMachineRepository(machine), new FakeWorkSiteRepository(), repository, uow);
+        var request = ValidRequest(machine.Id, Guid.NewGuid()) with { Value = 100.75m, DeviceId = "  device  " };
+        var result = await service.CreateAsync(request, "test", default);
+        Assert.False(result.IsExisting);
+        Assert.Equal(MeterUnit.Hours, result.Reading.MeterUnit);
+        Assert.Equal("operator@tests.local", result.Reading.CreatedByEmail);
+        Assert.NotNull(result.Reading.CreatedByUserId);
+        Assert.Equal("device", result.Reading.DeviceId);
+        Assert.Equal(previous.Id, result.Reading.PreviousReadingId);
+        Assert.Equal(0.75m, result.Reading.DifferenceFromPrevious);
+        Assert.Equal(1, uow.SaveCalls);
+    }
+
+    [Fact]
+    public async Task CreateAsync_MissingUnitDoesNotPersistNewReading()
+    {
+        var machine = new Machine(68, "Unknown", MachineStatus.Active, Now);
+        var repository = new FakeReadingRepository(); var uow = new FakeUnitOfWork();
+        var service = CreateService(new FakeMachineRepository(machine), new FakeWorkSiteRepository(), repository, uow);
+        await Assert.ThrowsAsync<ApplicationValidationException>(() => service.CreateAsync(ValidRequest(machine.Id, Guid.NewGuid()), "test", default));
+        Assert.Empty(repository.AddedReadings); Assert.Equal(0, uow.SaveCalls);
+    }
 
     private static CreateReadingRequest ValidRequest(Guid machineId, Guid clientEventId) =>
         new()
@@ -107,6 +139,16 @@ public sealed class ReadingServiceTests
             CapturedAtDevice = Now.AddHours(-1),
             ClientEventId = clientEventId,
         };
+
+    private sealed class FakeCurrentUser : ICurrentUser
+    {
+        public Guid? UserId { get; } = Guid.NewGuid();
+        public string? Email => "operator@tests.local";
+        public string? FullName => "Test Operator";
+        public IReadOnlyList<string> Roles => ["OPERATOR"];
+        public bool IsAuthenticated => true;
+        public bool IsInRole(string role) => Roles.Contains(role);
+    }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
@@ -146,7 +188,7 @@ public sealed class ReadingServiceTests
         public void Add(WorkSite workSiteToAdd) => throw new NotSupportedException();
     }
 
-    private sealed class FakeReadingRepository(HourMeterReading? existingReading = null) : IReadingRepository
+    private sealed class FakeReadingRepository(HourMeterReading? existingReading = null, HourMeterReading? previousReading = null) : IReadingRepository
     {
         public List<HourMeterReading> AddedReadings { get; } = [];
 
@@ -156,8 +198,8 @@ public sealed class ReadingServiceTests
         public Task<HourMeterReading?> GetByClientEventIdAsync(Guid clientEventId, CancellationToken cancellationToken) =>
             Task.FromResult(existingReading?.ClientEventId == clientEventId ? existingReading : null);
 
-        public Task<HourMeterReading?> GetLatestValidBeforeAsync(Guid machineId, DateTimeOffset capturedAt, CancellationToken cancellationToken) =>
-            Task.FromResult<HourMeterReading?>(null);
+        public Task<HourMeterReading?> GetLatestValidBeforeAsync(Guid machineId, DateTimeOffset capturedAt, CancellationToken cancellationToken, MeterUnit? meterUnit = null) =>
+            Task.FromResult(previousReading);
 
         public Task<IReadOnlyList<HourMeterReading>> GetLatestByMachineIdsAsync(IReadOnlyCollection<Guid> machineIds, CancellationToken cancellationToken) =>
             throw new NotSupportedException();

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ExternalLink, Gauge, ImageIcon } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { Badge } from "@/components/ui/badge";
+import { MeterUnitBadge, ReadingStatusBadge, formatReadingType } from "./reading-badges";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -15,7 +15,6 @@ import {
 import {
   formatDateTime,
   formatHourMeter,
-  formatReadingStatus,
 } from "@/lib/domain-formatters";
 import type { HourMeterReading } from "@/types/domain";
 
@@ -23,12 +22,14 @@ const headers = [
   "Data/Hora",
   "Frota",
   "Modelo",
-  "Horímetro",
+  "Valor informado",
+  "Unidade",
+  "Tipo",
   "Diferença",
-  "Operador",
   "Obra",
   "Status",
   "Foto",
+  "Alertas",
   "Ações",
 ];
 
@@ -39,14 +40,6 @@ export function ReadingsTable({
   emptyDescription?: string;
   readings: readonly HourMeterReading[];
 }) {
-  const statusClassNames = {
-    VALIDATED: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    PENDING: "border-amber-200 bg-amber-50 text-amber-800",
-    SUSPECT: "border-orange-200 bg-orange-50 text-orange-800",
-    CORRECTED: "border-blue-200 bg-blue-50 text-blue-800",
-    REJECTED: "border-red-200 bg-red-50 text-red-800",
-  } as const;
-
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -90,18 +83,14 @@ export function ReadingsTable({
                   </TableCell>
                   <TableCell className="min-w-52">{reading.model}</TableCell>
                   <TableCell>{formatHourMeter(reading.value)}</TableCell>
+                  <TableCell><MeterUnitBadge unit={reading.meterUnit} /></TableCell>
+                  <TableCell className="whitespace-nowrap">{formatReadingType(reading.readingType)}</TableCell>
                   <TableCell>
                     {formatHourMeter(reading.differenceFromPrevious)}
                   </TableCell>
-                  <TableCell>{reading.operatorName ?? "Sem registro"}</TableCell>
                   <TableCell>{reading.workSiteName ?? "Sem registro"}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={statusClassNames[reading.status]}
-                    >
-                      {formatReadingStatus(reading.status)}
-                    </Badge>
+                    <ReadingStatusBadge status={reading.status} />
                   </TableCell>
                   <TableCell>
                     {reading.hasPhotoEvidence ? (
@@ -116,6 +105,9 @@ export function ReadingsTable({
                     ) : (
                       <span className="text-slate-500">Sem foto</span>
                     )}
+                  </TableCell>
+                  <TableCell aria-label={`${reading.openAnomalyCount} anomalias abertas de ${reading.anomalyCount}`}>
+                    {reading.anomalyCount ? `${reading.openAnomalyCount} / ${reading.anomalyCount}` : "—"}
                   </TableCell>
                   <TableCell>
                     <Button asChild variant="ghost" size="icon-sm">

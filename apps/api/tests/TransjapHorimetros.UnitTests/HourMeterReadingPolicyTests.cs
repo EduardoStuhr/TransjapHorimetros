@@ -65,7 +65,7 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: BaseTime,
             CurrentReadingType: ReadingType.Opening,
             ReceivedAtServer: BaseTime,
-            IsPotentialDuplicate: false);
+            IsPotentialDuplicate: false, MeterUnit: MeterUnit.Hours);
 
         var result = _policy.Assess(ctx, DefaultOptions);
 
@@ -175,7 +175,7 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: capturedAt,
             CurrentReadingType: ReadingType.Opening,
             ReceivedAtServer: receivedAt,
-            IsPotentialDuplicate: false);
+            IsPotentialDuplicate: false, MeterUnit: MeterUnit.Hours);
 
         var result = _policy.Assess(ctx, DefaultOptions);
 
@@ -197,7 +197,7 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: capturedAt,
             CurrentReadingType: ReadingType.Opening,
             ReceivedAtServer: receivedAt,
-            IsPotentialDuplicate: false);
+            IsPotentialDuplicate: false, MeterUnit: MeterUnit.Hours);
 
         var result = _policy.Assess(ctx, DefaultOptions);
 
@@ -220,7 +220,7 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: capturedAt,
             CurrentReadingType: ReadingType.Opening,
             ReceivedAtServer: receivedAt,
-            IsPotentialDuplicate: false);
+            IsPotentialDuplicate: false, MeterUnit: MeterUnit.Hours);
 
         var result = _policy.Assess(ctx, DefaultOptions);
 
@@ -273,7 +273,7 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: BaseTime.AddHours(8),
             CurrentReadingType: ReadingType.Opening,
             ReceivedAtServer: BaseTime.AddHours(8),
-            IsPotentialDuplicate: false);
+            IsPotentialDuplicate: false, MeterUnit: MeterUnit.Hours);
 
         var result = _policy.Assess(ctx, DefaultOptions);
 
@@ -292,7 +292,7 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: BaseTime.AddHours(8),
             CurrentReadingType: ReadingType.Opening,
             ReceivedAtServer: BaseTime.AddHours(8),
-            IsPotentialDuplicate: false);
+            IsPotentialDuplicate: false, MeterUnit: MeterUnit.Hours);
 
         var result = _policy.Assess(ctx, DefaultOptions);
 
@@ -318,7 +318,7 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: BaseTime.AddHours(8),
             CurrentReadingType: ReadingType.Opening,
             ReceivedAtServer: BaseTime.AddHours(8),
-            IsPotentialDuplicate: false);
+            IsPotentialDuplicate: false, MeterUnit: MeterUnit.Hours);
 
         var result = _policy.Assess(context, DefaultOptions);
 
@@ -365,7 +365,7 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: brasilia, // 10h UTC
             CurrentReadingType: ReadingType.Intermediate,
             ReceivedAtServer: utc,       // 10h UTC
-            IsPotentialDuplicate: false);
+            IsPotentialDuplicate: false, MeterUnit: MeterUnit.Hours);
 
         var result = _policy.Assess(ctx, DefaultOptions);
 
@@ -399,6 +399,6 @@ public sealed class HourMeterReadingPolicyTests
             CurrentCapturedAt: BaseTime,
             CurrentReadingType: currentReadingType,
             ReceivedAtServer: BaseTime,
-            IsPotentialDuplicate: isPotentialDuplicate);
+            IsPotentialDuplicate: isPotentialDuplicate, MeterUnit: MeterUnit.Hours);
     }
 }

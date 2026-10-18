@@ -85,6 +85,7 @@ public static class DependencyInjection
         services.AddScoped<IMachineQrCodeRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IWorkSiteRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IReadingRepository>(provider => provider.GetRequiredService<TransjapRepository>());
+        services.AddScoped<IReadingSummaryRepository, ReadingSummaryRepository>();
         services.AddScoped<IPhotoEvidenceRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IAnomalyRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IAuditLogRepository>(provider => provider.GetRequiredService<TransjapRepository>());

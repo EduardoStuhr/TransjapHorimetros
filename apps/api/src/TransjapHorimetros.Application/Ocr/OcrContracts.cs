@@ -22,6 +22,8 @@ public interface IMeterReadingExtractor
 }
 public interface IPhotoOcrRepository
 {
+    async Task<PhotoOcrResult?> GetLatestAsync(Guid photoEvidenceId, CancellationToken ct) =>
+        (await GetHistoryAsync(photoEvidenceId, ct)).FirstOrDefault();
     Task<PhotoOcrResult?> StartAsync(PhotoOcrResult result, OcrOptions options, CancellationToken ct);
     Task<IReadOnlyList<PhotoOcrResult>> GetHistoryAsync(Guid photoEvidenceId, CancellationToken ct);
 }

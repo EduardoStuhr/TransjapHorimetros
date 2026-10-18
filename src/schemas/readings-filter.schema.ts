@@ -2,6 +2,11 @@ import { z } from "zod";
 
 export const readingsFilterSchema = z
   .object({
+    meterUnit: z.enum(["HOURS", "KM", ""]),
+    readingType: z.enum(["OPENING", "CLOSING", "INTERMEDIATE", "MAINTENANCE", "CORRECTION", ""]),
+    hasPhotoEvidence: z.enum(["true", "false", ""]),
+    hasAnomaly: z.enum(["true", "false", ""]),
+    machineId: z.string().uuid().or(z.literal("")),
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
     fleetNumber: z.string().regex(/^\d+$/).or(z.literal("")),
@@ -25,6 +30,11 @@ export type ReadingsFilterValues = z.infer<typeof readingsFilterSchema>;
 
 export const emptyReadingsFilters: ReadingsFilterValues = {
   endDate: "",
+  meterUnit: "",
+  readingType: "",
+  hasPhotoEvidence: "",
+  hasAnomaly: "",
+  machineId: "",
   fleetNumber: "",
   startDate: "",
   status: "",

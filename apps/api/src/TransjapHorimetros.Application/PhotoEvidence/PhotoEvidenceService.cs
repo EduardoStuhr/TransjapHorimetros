@@ -16,7 +16,8 @@ public sealed class PhotoEvidenceService(
     ICurrentUser currentUser,
     PhotoFileValidator fileValidator,
     TimeProvider timeProvider,
-    ILogger<PhotoEvidenceService> logger) : IPhotoEvidenceService
+    ILogger<PhotoEvidenceService> logger,
+    Ocr.IPhotoOcrService? ocrService = null) : IPhotoEvidenceService
 {
     public async Task<UploadPhotoEvidenceResult> UploadAsync(
         Guid readingId,
@@ -164,6 +165,18 @@ public sealed class PhotoEvidenceService(
             throw;
         }
 
+        if (ocrService is not null)
+        {
+            try
+            {
+                await ocrService.ProcessAsync(readingId, false, correlationId, CancellationToken.None);
+            }
+            catch (Exception)
+            {
+                // Storage and metadata are already committed. OCR persistence outages must not roll them back.
+                logger.LogError("OCR could not finalize after photo commit. ReadingId={ReadingId} PhotoEvidenceId={PhotoEvidenceId}", readingId, photoEvidence.Id);
+            }
+        }
         return new UploadPhotoEvidenceResult(ToResponse(photoEvidence), false);
     }
 

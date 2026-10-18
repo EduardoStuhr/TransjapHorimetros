@@ -1,0 +1,48 @@
+name: Validate OCR phase
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_PID: Developer
+          # Disposable CI container credential, never a production secret.
+          MSSQL_SA_PASSWORD: IntegrationOnly!2026
+        ports:
+          - 1433:1433
+    env:
+      TEST_SQLSERVER_CONNECTION_STRING: Server=127.0.0.1,1433;Database=transjap_horimetros_tests;User Id=sa;Password=IntegrationOnly!2026;Encrypt=False;TrustServerCertificate=True;Connection Timeout=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore apps/api/TransjapHorimetros.sln
+      - run: dotnet build apps/api/TransjapHorimetros.sln --configuration Release --no-restore
+      - run: dotnet test apps/api/TransjapHorimetros.sln --configuration Release --no-build --logger trx
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: apps/api/tests/**/TestResults/*.trx
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build

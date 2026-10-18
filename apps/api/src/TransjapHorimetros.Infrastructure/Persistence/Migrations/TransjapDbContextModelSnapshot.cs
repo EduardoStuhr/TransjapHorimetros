@@ -145,6 +145,10 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("machine_id");
 
+                    b.Property<Guid?>("OcrResultId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("ocr_result_id");
+
                     b.Property<Guid?>("ReadingId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("reading_id");
@@ -175,6 +179,11 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ReadingId")
                         .HasDatabaseName("ix_anomalies_reading_id");
+
+                    b.HasIndex("OcrResultId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("ux_anomalies_ocr_result_type")
+                        .HasFilter("[ocr_result_id] IS NOT NULL");
 
                     b.ToTable("anomalies", (string)null);
                 });
@@ -536,6 +545,98 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.PhotoOcrResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("AbsoluteDifference")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Confidence")
+                        .HasPrecision(9, 8)
+                        .HasColumnType("decimal(9,8)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<decimal?>("DetectedValue")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<bool>("IsInitial")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("MatchesOperatorValue")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("PercentageDifference")
+                        .HasPrecision(24, 8)
+                        .HasColumnType("decimal(24,8)");
+
+                    b.Property<Guid>("PhotoEvidenceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ProcessedAtServer")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<long?>("ProcessingDurationMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("ProviderModel")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RawText")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PhotoEvidenceId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_photo_ocr_initial")
+                        .HasFilter("[IsInitial] = 1");
+
+                    b.HasIndex("ProcessedAtServer");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("PhotoEvidenceId", "CreatedAt");
+
+                    b.ToTable("photo_ocr_results", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_photo_ocr_confidence", "[Confidence] IS NULL OR ([Confidence] >= 0 AND [Confidence] <= 1)");
+                        });
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -801,6 +902,11 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_anomalies_machines_machine_id");
 
+                    b.HasOne("TransjapHorimetros.Domain.Entities.PhotoOcrResult", null)
+                        .WithMany()
+                        .HasForeignKey("OcrResultId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TransjapHorimetros.Domain.Entities.HourMeterReading", "Reading")
                         .WithMany("Anomalies")
                         .HasForeignKey("ReadingId")
@@ -860,6 +966,15 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_photo_evidence_hour_meter_readings_reading_id");
 
                     b.Navigation("Reading");
+                });
+
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.PhotoOcrResult", b =>
+                {
+                    b.HasOne("TransjapHorimetros.Domain.Entities.PhotoEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("PhotoEvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.RefreshToken", b =>

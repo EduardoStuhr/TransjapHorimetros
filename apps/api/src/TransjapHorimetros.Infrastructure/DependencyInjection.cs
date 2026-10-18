@@ -1,3 +1,5 @@
+using TransjapHorimetros.Application.Ocr;
+using TransjapHorimetros.Infrastructure.Ocr;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -45,6 +47,18 @@ public static class DependencyInjection
                 $"Storage:Photos:MaximumFileSizeBytes deve estar entre 1 e {PhotoEvidenceOptions.AbsoluteMaximumFileSizeBytes} bytes.");
         }
         services.AddSingleton(photoEvidenceOptions);
+        var ocrOptions = configuration.GetSection("Ocr").Get<OcrOptions>() ?? new OcrOptions();
+        ocrOptions.Validate();
+        services.AddSingleton(ocrOptions);
+        services.AddScoped<IPhotoOcrRepository, PhotoOcrRepository>();
+        services.AddScoped<IPhotoOcrService, PhotoOcrService>();
+        services.AddSingleton<IMeterReadingExtractor, MeterReadingExtractor>();
+        if (ocrOptions.Provider == "AzureAiVision")
+        {
+            services.AddHttpClient<IPhotoOcrProvider, AzureAiVisionOcrProvider>(c => c.Timeout = Timeout.InfiniteTimeSpan)
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        }
+        else services.AddSingleton<IPhotoOcrProvider, FakePhotoOcrProvider>();
 
         services.AddIdentityCore<ApplicationUser>(options =>
         {

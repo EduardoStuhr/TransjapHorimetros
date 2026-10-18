@@ -3,7 +3,7 @@
 Sistema de controle e integridade de registros de horímetros e odômetros de máquinas pesadas e veículos da **TRANSJAP Terraplenagem e Construções**.
 
 > [!WARNING]
-> A Fase 4 adiciona evidência fotográfica, mas a migration e o storage desta branch ainda não foram aplicados no Azure. Revise o PR e configure o Blob privado antes de qualquer implantação.
+> A Fase 5 adiciona OCR auxiliar. Sua migration não foi aplicada ao Azure e a fase não está em produção. Mantenha a mudança em branch e PR, sem merge, até a revisão da migration e dos resultados de validação.
 
 ## Arquitetura de dados
 
@@ -86,6 +86,14 @@ Storage__Photos__AccountUri=https://<storage-account>.blob.core.windows.net
 
 Como fallback, `Storage__Photos__ConnectionString` pode ser definida por secret. Nunca versione a connection string, AccountKey ou SAS. Consulte [docs/fase-4-evidencia-fotografica.md](docs/fase-4-evidencia-fotografica.md).
 
+### OCR de evidência fotográfica — Fase 5
+
+Após o commit da foto, a API executa OCR com timeout e registra histórico, confiança e comparação com o valor informado. O OCR nunca altera a leitura ou invalida a foto. Divergência e baixa confiança geram anomalias para revisão humana.
+
+Em desenvolvimento, `Ocr__Provider=Fake` retorna ausência de detecção. Para analisar imagens reais, configure `Ocr__Provider=AzureAiVision` e `Ocr__Azure__Endpoint`; prefira Managed Identity com `Cognitive Services User`. `Ocr__Azure__Key` é somente fallback por secret. O limiar padrão é `Ocr__MinimumConfidence=0.75`, com tolerâncias absoluta `0.5` e percentual `5`, timeout de `15` segundos e cooldown de reprocessamento de `60` segundos.
+
+A tela de detalhe mostra o resultado persistido. Reprocessamento e histórico exigem SUPERVISOR, ADMINISTRATIVE, MANAGER ou ADMIN; abrir a tela não chama o provider. Consulte [arquitetura e configuração da Fase 5](docs/fase-5-ocr.md) e [relatório OCR](docs/fase-5-relatorio-ocr.md).
+
 ### URLs locais
 
 - Painel: [http://localhost:3000](http://localhost:3000)
@@ -142,7 +150,7 @@ No Azure App Service, configure `ConnectionStrings__DefaultConnection` sem alter
 Server=tcp:<servidor>.database.windows.net,1433;Initial Catalog=transjap_horimetros;Persist Security Info=False;User ID=<usuario>;Password=<segredo>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
 ```
 
-Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os workflows atuais publicam API e frontend quando há push na `main`; por isso, a Fase 2 deve permanecer em branch e PR até a revisão da migration.
+Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os workflows atuais publicam API e frontend quando há push na `main`; por isso, a Fase 5 deve permanecer em branch e PR até a revisão da migration e aprovação das validações.
 
 ## Estrutura
 
@@ -150,4 +158,4 @@ Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os wo
 - `src/`: frontend Next.js 16.
 - `scripts/`: automações de desenvolvimento, testes e backup.
 - `docs/`: decisões arquiteturais e regras de engenharia.
-- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md), [Evidência fotográfica da Fase 4](docs/fase-4-evidencia-fotografica.md) e [decisões arquiteturais](docs/decisoes.md).
+- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md), [Evidência fotográfica da Fase 4](docs/fase-4-evidencia-fotografica.md), [OCR da Fase 5](docs/fase-5-ocr.md) e [decisões arquiteturais](docs/decisoes.md).

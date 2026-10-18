@@ -26,6 +26,8 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
     public DbSet<PhotoEvidence> PhotoEvidences => Set<PhotoEvidence>();
 
+    public DbSet<PhotoOcrResult> PhotoOcrResults => Set<PhotoOcrResult>();
+
     public override int SaveChanges()
     {
         EnsureAppendOnlyEntitiesAreNotModifiedOrDeleted();
@@ -88,6 +90,16 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
     private void EnsureAppendOnlyEntitiesAreNotModifiedOrDeleted()
     {
+        foreach (var entry in ChangeTracker.Entries<PhotoOcrResult>())
+        {
+            var immutableNames = new[] { nameof(PhotoOcrResult.Id), nameof(PhotoOcrResult.PhotoEvidenceId),
+                nameof(PhotoOcrResult.Provider), nameof(PhotoOcrResult.CreatedAt), nameof(PhotoOcrResult.IsInitial),
+                nameof(PhotoOcrResult.ActorUserId), nameof(PhotoOcrResult.CorrelationId) };
+            if (entry.State == EntityState.Deleted || (entry.State == EntityState.Modified
+                && (entry.Property(r => r.Status).OriginalValue != Domain.Enums.PhotoOcrStatus.Processing
+                    || immutableNames.Any(name => entry.Property(name).IsModified))))
+                throw new InvalidOperationException("Resultados OCR finalizados são imutáveis.");
+        }
         if (ChangeTracker.Entries<MachineQrCode>().Any(entry => entry.State == EntityState.Deleted))
         {
             throw new InvalidOperationException(

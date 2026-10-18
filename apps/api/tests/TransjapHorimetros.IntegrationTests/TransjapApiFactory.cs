@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Hosting;
+using TransjapHorimetros.Application.Ocr;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
@@ -31,24 +33,39 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         TestDatabaseGuard.EnsureSafeTestDatabase(_connectionString, _originalAppConnectionString);
     }
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    protected override IHost CreateHost(IHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
-        builder.ConfigureAppConfiguration((_, configuration) =>
+        // Minimal hosting reads these settings before ConfigureWebHost callbacks are replayed.
+        // DeferredHostBuilder passes host configuration into Program as command-line arguments.
+        builder.ConfigureHostConfiguration(configuration =>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["environment"] = "Testing",
                 ["ConnectionStrings:DefaultConnection"] = _connectionString,
                 ["Database:ApplyMigrationsOnStartup"] = "true",
                 ["Authentication:Jwt:SigningKey"] = TestSigningKey,
                 ["Authentication:Jwt:Issuer"] = "TransjapHorimetrosTests",
                 ["Authentication:Jwt:Audience"] = "TransjapHorimetrosTestsClient",
+                ["Ocr:Provider"] = "Fake",
+                ["Ocr:ReprocessCooldownSeconds"] = "1",
+                ["Ocr:TimeoutSeconds"] = "1",
+                ["Ocr:MaximumRetries"] = "0",
                 ["RateLimiting:PermitLimit"] = "10000",
                 ["RateLimiting:AuthLogin:PermitLimit"] = "10000",
             });
         });
+        return base.CreateHost(builder);
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
         builder.ConfigureServices(services =>
         {
+            services.RemoveAll<IPhotoOcrProvider>();
+            services.AddSingleton<FakePhotoOcrProvider>();
+            services.AddSingleton<IPhotoOcrProvider>(p => p.GetRequiredService<FakePhotoOcrProvider>());
             services.RemoveAll<IPhotoStorage>();
             services.AddSingleton<InMemoryPhotoStorage>();
             services.AddSingleton<IPhotoStorage>(provider =>
@@ -111,6 +128,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         await dbContext.Database.ExecuteSqlRawAsync(
             """
+            DELETE FROM anomalies;
+            DELETE FROM photo_ocr_results;
             DELETE FROM photo_evidence;
             DELETE FROM machine_qr_codes;
             DELETE FROM anomalies;
@@ -126,6 +145,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
             DELETE FROM machines;
             """);
         scope.ServiceProvider.GetRequiredService<InMemoryPhotoStorage>().Clear();
+        scope.ServiceProvider.GetRequiredService<FakePhotoOcrProvider>().Reset();
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
         await seeder.SeedAsync();
     }

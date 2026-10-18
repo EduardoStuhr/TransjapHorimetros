@@ -2,6 +2,9 @@ namespace TransjapHorimetros.Application.Common;
 
 public static class AuditActions
 {
+    public const string PhotoOcrProcessed = "PHOTO_OCR_PROCESSED";
+    public const string PhotoOcrFailed = "PHOTO_OCR_FAILED";
+    public const string PhotoOcrReprocessed = "PHOTO_OCR_REPROCESSED";
     public const string MachineCreated = "CREATE_MACHINE";
     public const string MachineUpdated = "UPDATE_MACHINE";
     public const string ReadingCreated = "CREATE_READING";

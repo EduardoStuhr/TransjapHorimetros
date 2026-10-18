@@ -134,7 +134,7 @@ Detalhes operacionais e configuração estão em [fase-4-evidencia-fotografica.m
 ## 8. ADR — OCR auxiliar, persistente e limitado
 
 **Data:** 2026-10-18
-**Status:** Implementada em branch, aguardando validação e revisão
+**Status:** Implementada em branch, validação concluída, aguardando revisão
 
 O valor operacional pertence ao operador; OCR nunca altera leitura ou evidência. A foto é persistida antes da análise síncrona com timeout. Cada análise tem um PhotoOcrResult, com histórico 1:N, estado e comparação persistidos. Resultados concluídos são imutáveis. Falha externa não invalida upload.
 

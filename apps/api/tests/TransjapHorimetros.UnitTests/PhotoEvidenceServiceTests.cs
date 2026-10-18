@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.Common;
+using TransjapHorimetros.Application.Exceptions;
 using TransjapHorimetros.Application.PhotoEvidence;
 using TransjapHorimetros.Application.Readings;
 using TransjapHorimetros.Domain.Entities;
@@ -47,9 +48,47 @@ public sealed class PhotoEvidenceServiceTests
         Assert.Equal(1, context.Storage.UploadCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UploadAsync_ConcurrentUploadsWithoutClientEventId_CompareHashes(bool sameHash)
+    {
+        var context = CreateContext();
+        var first = await UploadAsync(context, null);
+        context.Repository.HideExisting = true;
+        context.UnitOfWork.OnSave = () => throw new UniqueConstraintException(
+            "ux_photo_evidence_reading_id", new InvalidOperationException("Concurrent upload"));
+        context.UnitOfWork.OnClear = () => context.Repository.HideExisting = false;
+        var bytes = PhotoFileValidatorTests.CreateJpeg();
+        if (!sameHash)
+        {
+            bytes[10] = 3; // A different width keeps the JPEG header valid but changes its hash.
+        }
+
+        var upload = context.Service.UploadAsync(
+            context.Reading.Id,
+            new UploadPhotoEvidenceRequest(
+                new MemoryStream(bytes), "proof.jpg", "image/jpeg", null, null, null),
+            "test-correlation",
+            CancellationToken.None);
+
+        if (sameHash)
+        {
+            var result = await upload;
+            Assert.True(result.IsExisting);
+            Assert.Equal(first.Evidence.Id, result.Evidence.Id);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<ConflictException>(() => upload);
+        }
+
+        Assert.Equal(1, context.Storage.DeleteCount);
+    }
+
     private static async Task<UploadPhotoEvidenceResult> UploadAsync(
         TestContext context,
-        Guid clientEventId) =>
+        Guid? clientEventId) =>
         await context.Service.UploadAsync(
             context.Reading.Id,
             new UploadPhotoEvidenceRequest(
@@ -89,34 +128,44 @@ public sealed class PhotoEvidenceServiceTests
             new PhotoFileValidator(options),
             TimeProvider.System,
             NullLogger<PhotoEvidenceService>.Instance);
-        return new TestContext(service, reading, storage);
+        return new TestContext(service, reading, storage, evidenceRepository, unitOfWork);
     }
 
     private sealed record TestContext(
         PhotoEvidenceService Service,
         HourMeterReading Reading,
-        PhotoStorageFake Storage);
+        PhotoStorageFake Storage,
+        PhotoEvidenceRepositoryFake Repository,
+        UnitOfWorkFake UnitOfWork);
 
     private sealed class PhotoEvidenceRepositoryFake : IPhotoEvidenceRepository
     {
         private Domain.Entities.PhotoEvidence? _evidence;
+        public bool HideExisting { get; set; }
 
         public Task<Domain.Entities.PhotoEvidence?> GetByReadingIdAsync(
             Guid readingId,
             CancellationToken cancellationToken) =>
-            Task.FromResult(_evidence?.ReadingId == readingId ? _evidence : null);
+            Task.FromResult(!HideExisting && _evidence?.ReadingId == readingId ? _evidence : null);
 
         public Task<Domain.Entities.PhotoEvidence?> GetByClientEventIdAsync(
             Guid clientEventId,
             CancellationToken cancellationToken) =>
             Task.FromResult(_evidence?.ClientEventId == clientEventId ? _evidence : null);
 
-        public void Add(Domain.Entities.PhotoEvidence photoEvidence) => _evidence = photoEvidence;
+        public void Add(Domain.Entities.PhotoEvidence photoEvidence)
+        {
+            if (!HideExisting)
+            {
+                _evidence = photoEvidence;
+            }
+        }
     }
 
     private sealed class PhotoStorageFake : IPhotoStorage
     {
         public int UploadCount { get; private set; }
+        public int DeleteCount { get; private set; }
 
         public string ProviderName => "InMemory";
 
@@ -137,8 +186,11 @@ public sealed class PhotoEvidenceServiceTests
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+        public Task DeleteIfExistsAsync(string objectKey, CancellationToken cancellationToken)
+        {
+            DeleteCount++;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class ReadingRepositoryFake(HourMeterReading reading) : IReadingRepository
@@ -167,10 +219,18 @@ public sealed class PhotoEvidenceServiceTests
 
     private sealed class UnitOfWorkFake : IUnitOfWork
     {
-        public Task<int> SaveChangesAsync(CancellationToken cancellationToken) => Task.FromResult(1);
+        public Action? OnSave { get; set; }
+        public Action? OnClear { get; set; }
+
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            OnSave?.Invoke();
+            return Task.FromResult(1);
+        }
 
         public void ClearChanges()
         {
+            OnClear?.Invoke();
         }
     }
 

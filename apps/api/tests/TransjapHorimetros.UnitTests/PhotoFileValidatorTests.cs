@@ -63,6 +63,17 @@ public sealed class PhotoFileValidatorTests
             CancellationToken.None));
     }
 
+    [Fact]
+    public async Task ValidateAndSpoolAsync_RejectsJpegWithTruncatedFrameHeader()
+    {
+        byte[] content = [0xff, 0xd8, 0xff, 0xc0, 0x00, 0x02, 0xff, 0xd9];
+
+        await Assert.ThrowsAsync<BadRequestException>(() => CreateValidator().ValidateAndSpoolAsync(
+            new MemoryStream(content),
+            "image/jpeg",
+            CancellationToken.None));
+    }
+
     [Theory]
     [InlineData("application/pdf")]
     [InlineData("application/zip")]

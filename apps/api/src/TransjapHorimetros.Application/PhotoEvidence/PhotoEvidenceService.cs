@@ -149,7 +149,8 @@ public sealed class PhotoEvidenceService(
                         racedEvidence.Sha256,
                         file.Sha256,
                         StringComparison.OrdinalIgnoreCase)
-                    || racedEvidence.ClientEventId == request.ClientEventId))
+                    || (request.ClientEventId.HasValue
+                        && racedEvidence.ClientEventId == request.ClientEventId)))
             {
                 return new UploadPhotoEvidenceResult(ToResponse(racedEvidence), true);
             }

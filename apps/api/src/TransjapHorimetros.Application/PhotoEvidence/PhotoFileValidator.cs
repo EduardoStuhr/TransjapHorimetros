@@ -261,6 +261,11 @@ internal static class ImageFileInspector
 
             if (IsStartOfFrame(marker))
             {
+                if (segmentLength < 7)
+                {
+                    break;
+                }
+
                 Span<byte> dimensions = stackalloc byte[5];
                 stream.ReadExactly(dimensions);
                 var height = BinaryPrimitives.ReadUInt16BigEndian(dimensions.Slice(1, 2));

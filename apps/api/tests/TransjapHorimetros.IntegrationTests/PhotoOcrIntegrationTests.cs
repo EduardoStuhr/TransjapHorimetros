@@ -2,12 +2,18 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TransjapHorimetros.Application.Ocr;
 using TransjapHorimetros.Domain.Enums;
 using TransjapHorimetros.Domain.Security;
 using TransjapHorimetros.Infrastructure.Persistence;
+using TransjapHorimetros.Infrastructure.Persistence.Repositories;
+using TransjapHorimetros.Domain.Entities;
 
 namespace TransjapHorimetros.IntegrationTests;
 
@@ -124,6 +130,56 @@ public sealed class PhotoOcrIntegrationTests(TransjapApiFactory factory) : IClas
         var token = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("accessToken").GetString();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClaimRetry_HandlesRollbackAndLostCommitAcknowledgement(bool afterCommit)
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = await CreateClientAsync(AppRoles.Admin);
+        var readingId = await UploadAsync(client);
+        using var scope = factory.Services.CreateScope();
+        var connection = scope.ServiceProvider.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection")!;
+        TestDatabaseGuard.EnsureSafeTestDatabase(connection);
+        var options = new DbContextOptionsBuilder<TransjapDbContext>().UseSqlServer(connection)
+            .ReplaceService<IExecutionStrategyFactory, CommitRetryStrategyFactory>()
+            .AddInterceptors(new FailFirstCommitInterceptor(afterCommit)).Options;
+        await using var db = new TransjapDbContext(options);
+        var photo = await db.PhotoEvidences.AsNoTracking().SingleAsync(p => p.ReadingId == readingId);
+        var result = new PhotoOcrResult(photo.Id, "RetryTest", false, DateTimeOffset.UtcNow.AddMinutes(2), "commit-retry", null);
+        var reserved = await new PhotoOcrRepository(db).StartAsync(result, new OcrOptions(), default);
+        Assert.NotNull(reserved);
+        Assert.Equal(result.Id, reserved.Id);
+        Assert.Equal(1, await db.PhotoOcrResults.CountAsync(r => r.Id == result.Id));
+    }
+
+    public sealed class CommitRetryStrategyFactory(ExecutionStrategyDependencies dependencies) : IExecutionStrategyFactory
+    {
+        public IExecutionStrategy Create() => new CommitRetryStrategy(dependencies);
+    }
+    private sealed class CommitRetryStrategy(ExecutionStrategyDependencies dependencies)
+        : ExecutionStrategy(dependencies, 1, TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => exception is SimulatedCommitFailure;
+    }
+    private sealed class SimulatedCommitFailure : Exception;
+    private sealed class FailFirstCommitInterceptor(bool afterCommit) : DbTransactionInterceptor
+    {
+        private bool failed;
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
+            TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+        {
+            if (!afterCommit && !failed) { failed = true; throw new SimulatedCommitFailure(); }
+            return ValueTask.FromResult(result);
+        }
+        public override Task TransactionCommittedAsync(DbTransaction transaction,
+            TransactionEndEventData eventData, CancellationToken cancellationToken = default)
+        {
+            if (afterCommit && !failed) { failed = true; throw new SimulatedCommitFailure(); }
+            return Task.CompletedTask;
+        }
     }
 
     private static string Route(Guid id) => $"/api/v1/readings/{id}/photo/ocr";

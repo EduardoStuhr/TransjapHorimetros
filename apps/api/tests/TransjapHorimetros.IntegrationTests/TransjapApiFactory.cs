@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Hosting;
 using TransjapHorimetros.Application.Ocr;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Identity;
@@ -32,13 +33,15 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         TestDatabaseGuard.EnsureSafeTestDatabase(_connectionString, _originalAppConnectionString);
     }
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    protected override IHost CreateHost(IHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
-        builder.ConfigureAppConfiguration((_, configuration) =>
+        // Minimal hosting reads these settings before ConfigureWebHost callbacks are replayed.
+        // DeferredHostBuilder passes host configuration into Program as command-line arguments.
+        builder.ConfigureHostConfiguration(configuration =>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["environment"] = "Testing",
                 ["ConnectionStrings:DefaultConnection"] = _connectionString,
                 ["Database:ApplyMigrationsOnStartup"] = "true",
                 ["Authentication:Jwt:SigningKey"] = TestSigningKey,
@@ -52,6 +55,12 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
                 ["RateLimiting:AuthLogin:PermitLimit"] = "10000",
             });
         });
+        return base.CreateHost(builder);
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IPhotoOcrProvider>();

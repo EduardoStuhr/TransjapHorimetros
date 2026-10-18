@@ -39,7 +39,9 @@ public sealed class PhotoOcrRepository(TransjapDbContext db) : IPhotoOcrReposito
                 || (r.Status == PhotoOcrStatus.Processing
                     && r.CreatedAt.AddSeconds(options.TimeoutSeconds + 30) > result.CreatedAt)))
                 throw new ConflictException("OCR recente ou em processamento. Aguarde o intervalo configurado antes de reprocessar.");
-            if (db.Entry(result).State == EntityState.Detached) db.PhotoOcrResults.Add(result);
+            // SaveChanges may have accepted the tracked insert before a transaction commit failed.
+            // If the retry found no committed row, explicitly restore Added for the new transaction.
+            db.Entry(result).State = EntityState.Added;
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return result;

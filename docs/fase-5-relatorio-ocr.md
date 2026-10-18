@@ -24,15 +24,15 @@ Data: 18/10/2026. Implementação em `feat/phase-5-ocr`, sem implantação ou me
 | 18. Auditoria | PHOTO_OCR_PROCESSED, PHOTO_OCR_FAILED, PHOTO_OCR_REPROCESSED; identificadores, comparação, confiança, correlação e ator manual. |
 | 19. Frontend | Seção de OCR, estados, diferenças, aviso de divergência, confirmação de reprocessamento e proteção de clique. |
 | 20. Testes unitários | 163 aprovados, zero falhas: extração, comparação, provider HTTP simulado, serviço, retry, timeout, falhas, imutabilidade, modelo EF e isolamento do upload quando a persistência OCR falha. |
-| 21. Integração | Primeira execução local: 43 aprovados, 73 falharam na inicialização por TEST_SQLSERVER_CONNECTION_STRING ausente. SQL Server/Docker e .env não disponíveis. Workflow de PR com SQL descartável incluído; resultado remoto pendente. |
+| 21. Integração | Primeira execução local: 43 aprovados, 73 falharam na inicialização por TEST_SQLSERVER_CONNECTION_STRING ausente. SQL Server/Docker e .env não disponíveis. A primeira CI identificou configuração tardia na factory do host mínimo; corrigida via ConfigureHostConfiguration. Nova rodada remota pendente, incluindo rollback de commit e perda da confirmação de commit da reserva. |
 | 22. Build backend | `dotnet restore` e `dotnet build ... --configuration Release` concluídos, zero erros/avisos na última compilação completa. |
 | 23. Lint frontend | `npm ci` e `npm run lint` concluídos com sucesso. Dependências transitivas emitiram avisos de depreciação. |
 | 24. Build frontend | `npm run build` concluído; TypeScript e rotas geradas. Aviso de lockfile no diretório pai, fora do Git, sem impedir build. |
 | 25. Secrets | Ocr__Azure__Key apenas se não usar identidade; nenhum secret real adicionado. |
 | 26. Configuração Azure | Endpoint do recurso, Managed Identity + Cognitive Services User, provider AzureAiVision, revisão dos limiares e migration. Não executada nesta fase. |
 | 27. Branch | feat/phase-5-ocr. |
-| 28. Commit | Commit principal previsto: `feat: implement OCR analysis for photo evidence`. Hash verificável no histórico da branch/PR após publicação. |
-| 29. PR | A publicar para main, sem merge; validação remota pendente. |
+| 28. Commit | Principal: `1ce724f` — `feat: implement OCR analysis for photo evidence`; correções de validação posteriores no histórico da branch. |
+| 29. PR | [#9](https://github.com/EduardoStuhr/TransjapHorimetros/pull/9), para main, em rascunho e sem merge; validação remota pendente. |
 | 30. Riscos restantes | Executar integração SQL, validar fotos reais e identidade Azure, calibrar limiares, revisar migration; queda do processo exige reprocessamento manual. Image Analysis 4.0 tem retirada anunciada em 25/09/2028. |
 
 O comando completo `dotnet test apps/api/TransjapHorimetros.sln --configuration Release` foi executado e seu resultado local não foi considerado aprovado. Nenhum banco alternativo ou Azure foi usado para contornar a proteção dos testes.

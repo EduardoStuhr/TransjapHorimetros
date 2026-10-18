@@ -47,7 +47,7 @@ export interface HourMeterReading {
   workSiteId: string | null;
   workSiteName: string | null;
   status: ReadingStatus;
-  photoEvidenceUrl: string | null;
+  hasPhotoEvidence: boolean;
   ocrDetectedValue: number | null;
   ocrConfidence: number | null;
 }
@@ -74,11 +74,20 @@ export interface MachineQrCode {
 export interface PhotoEvidence {
   id: string;
   readingId: string;
-  storagePath: string;
-  hash: string;
-  mimeType: string;
-  size: number;
+  originalFileName: string;
+  contentType: "image/jpeg" | "image/png" | "image/webp";
+  fileSizeBytes: number;
+  sha256: string;
+  capturedAtDevice: string | null;
+  uploadedAtServer: string;
+  width: number | null;
+  height: number | null;
+  status: "ACTIVE" | "REVOKED" | "INVALID";
+  createdByUserId: string | null;
+  createdByEmail: string | null;
   createdAt: string;
+  deviceId: string | null;
+  clientEventId: string | null;
 }
 
 export interface OcrResult {

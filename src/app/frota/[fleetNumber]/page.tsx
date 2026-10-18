@@ -76,6 +76,10 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
     notFound();
   }
 
+  const readingsWithEvidence = machine.recentReadings.filter(
+    (reading) => reading.hasPhotoEvidence,
+  );
+
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" size="sm" className="-ml-3">
@@ -185,11 +189,36 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
             value="evidence"
             className="mt-4 rounded-lg border bg-white shadow-sm"
           >
-            <EmptyState
-              icon={Camera}
-              title="Nenhuma evidência disponível"
-              description="As fotografias associadas às leituras aparecerão aqui quando forem enviadas."
-            />
+            {readingsWithEvidence.length === 0 ? (
+              <EmptyState
+                icon={Camera}
+                title="Nenhuma evidência disponível"
+                description="As fotografias associadas às leituras aparecerão aqui quando forem enviadas."
+              />
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {readingsWithEvidence.map((reading) => (
+                  <Link
+                    key={reading.id}
+                    href={`/horimetros/${reading.id}`}
+                    className="flex items-center justify-between gap-4 p-5 transition-colors hover:bg-slate-50"
+                  >
+                    <span>
+                      <span className="block font-semibold text-slate-900">
+                        Leitura {formatHourMeter(reading.value)}
+                      </span>
+                      <span className="text-sm text-slate-500">
+                        {formatDateTime(reading.capturedAtDevice)}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2 text-sm font-semibold text-[#234f8c]">
+                      <Camera className="size-4" />
+                      Visualizar
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </TabsContent>
           <TabsContent
             value="alerts"

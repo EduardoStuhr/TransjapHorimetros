@@ -3,7 +3,7 @@
 Sistema de controle e integridade de registros de horímetros e odômetros de máquinas pesadas e veículos da **TRANSJAP Terraplenagem e Construções**.
 
 > [!WARNING]
-> A Fase 3 implementa autenticação e autorização, mas esta branch ainda não foi mesclada nem publicada. A implantação atual não deve ser considerada protegida até a revisão, o merge e a configuração dos secrets no Azure.
+> A Fase 4 adiciona evidência fotográfica, mas a migration e o storage desta branch ainda não foram aplicados no Azure. Revise o PR e configure o Blob privado antes de qualquer implantação.
 
 ## Arquitetura de dados
 
@@ -32,6 +32,7 @@ Sistema de controle e integridade de registros de horímetros e odômetros de m�
 3. Gere uma chave JWT aleatória de pelo menos 32 bytes e configure `Authentication__Jwt__SigningKey`.
 4. Informe `BootstrapAdmin__Email`, `BootstrapAdmin__Password` e `BootstrapAdmin__FullName` somente para provisionar o primeiro administrador.
 5. Mantenha `SQLSERVER_USE_DOCKER=true` para usar o container ou altere para `false` quando houver um SQL Server local já configurado.
+6. Para testar fotos, configure `Storage__Photos__AccountUri` com identidade Azure ou `Storage__Photos__ConnectionString` somente no `.env` local.
 
 O `.env` não é versionado. Nunca inclua nele credenciais reais do Azure em commits.
 
@@ -69,6 +70,21 @@ API_URL=<url-interna-da-api-para-o-next>
 ```
 
 O bootstrap não redefine senha e só provisiona um administrador quando ainda não existe usuário no papel `ADMIN`. Remova os três secrets `BootstrapAdmin__*` depois do primeiro provisionamento.
+
+### Evidência fotográfica
+
+Leituras podem receber uma foto JPEG, PNG ou WEBP de até 10 MB pelo endpoint autenticado `POST /api/v1/readings/{readingId}/photo`. A API valida magic bytes e dimensões, calcula SHA-256 e guarda somente metadados no Azure SQL. O original permanece em container Azure Blob privado e é visualizado exclusivamente pelo endpoint protegido/BFF.
+
+Configuração recomendada com Managed Identity:
+
+```text
+Storage__Photos__Provider=AzureBlob
+Storage__Photos__ContainerName=photo-evidence
+Storage__Photos__MaximumFileSizeBytes=10485760
+Storage__Photos__AccountUri=https://<storage-account>.blob.core.windows.net
+```
+
+Como fallback, `Storage__Photos__ConnectionString` pode ser definida por secret. Nunca versione a connection string, AccountKey ou SAS. Consulte [docs/fase-4-evidencia-fotografica.md](docs/fase-4-evidencia-fotografica.md).
 
 ### URLs locais
 
@@ -134,4 +150,4 @@ Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os wo
 - `src/`: frontend Next.js 16.
 - `scripts/`: automações de desenvolvimento, testes e backup.
 - `docs/`: decisões arquiteturais e regras de engenharia.
-- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md) e [decisões arquiteturais](docs/decisoes.md).
+- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md), [Evidência fotográfica da Fase 4](docs/fase-4-evidencia-fotografica.md) e [decisões arquiteturais](docs/decisoes.md).

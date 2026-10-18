@@ -117,3 +117,16 @@ A API é a autoridade de autenticação e autorização. ASP.NET Core Identity m
 O frontend Next.js usa o padrão BFF. Tokens não são entregues ao JavaScript da aplicação: access e refresh tokens são gravados no servidor em cookies `HttpOnly`, `SameSite=Strict` e `Secure` em produção. A rotação acontece no backend; o token anterior é revogado e não pode ser reutilizado. O Proxy faz somente a renovação antecipada e o redirecionamento otimista, enquanto a API continua executando a autorização real por policy.
 
 O bootstrap inicial depende exclusivamente de `BootstrapAdmin__Email`, `BootstrapAdmin__Password` e `BootstrapAdmin__FullName`. Ele não altera senhas existentes e deixa de criar usuário assim que existe um membro do papel `ADMIN`. Secrets reais devem permanecer no App Service Configuration ou Key Vault, nunca no repositório.
+
+## 7. ADR — Evidência fotográfica em Blob privado
+
+**Data:** 2026-10-16
+**Status:** Aceita para revisão
+
+Cada leitura pode possuir uma única evidência principal imutável. O Azure SQL armazena metadados, SHA-256, autoria e referência interna; os bytes originais ficam no Azure Blob Storage em container privado. A API transmite o conteúdo após autenticação, sem expor URL pública permanente ou SAS.
+
+O upload é separado da criação da leitura para preservar o fluxo mobile/offline futuro. Reenvios com o mesmo `ClientEventId` ou com o mesmo hash na mesma leitura são idempotentes. Uma imagem diferente nunca substitui silenciosamente a evidência existente. Não existe delete físico nem update de arquivo.
+
+O acesso ao SDK Azure permanece na Infrastructure por meio de `IPhotoStorage`. Produção usa Managed Identity preferencialmente, com connection string somente como fallback por secret. Testes usam storage em memória e são proibidos de acessar recursos Azure reais. Em falha SQL após o upload, o serviço executa remoção compensatória do blob e registra falhas de cleanup.
+
+Detalhes operacionais e configuração estão em [fase-4-evidencia-fotografica.md](fase-4-evidencia-fotografica.md).

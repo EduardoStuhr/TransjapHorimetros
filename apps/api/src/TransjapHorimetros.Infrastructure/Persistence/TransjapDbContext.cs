@@ -24,6 +24,8 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<PhotoEvidence> PhotoEvidences => Set<PhotoEvidence>();
+
     public override int SaveChanges()
     {
         EnsureAppendOnlyEntitiesAreNotModifiedOrDeleted();
@@ -94,14 +96,14 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
         var invalidEntries = ChangeTracker.Entries()
             .Where(entry =>
-                (entry.Entity is HourMeterReading or AuditLog)
+                (entry.Entity is HourMeterReading or AuditLog or PhotoEvidence)
                 && entry.State is EntityState.Modified or EntityState.Deleted)
             .ToArray();
 
         if (invalidEntries.Length > 0)
         {
             throw new InvalidOperationException(
-                "Leituras originais e registros de auditoria são imutáveis; correções devem ser registradas sem sobrescrever o histórico.");
+                "Leituras, evidências fotográficas e registros de auditoria são imutáveis; correções devem preservar o histórico.");
         }
     }
 }

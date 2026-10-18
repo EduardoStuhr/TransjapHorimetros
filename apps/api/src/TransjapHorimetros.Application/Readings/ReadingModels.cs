@@ -56,6 +56,7 @@ public sealed record ReadingResponse(
     DateTimeOffset SyncedAt,
     Guid ClientEventId,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool HasPhotoEvidence);
 
 public sealed record CreateReadingResult(ReadingResponse Reading, bool IsExisting);

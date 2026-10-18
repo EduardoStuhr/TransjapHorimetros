@@ -57,4 +57,6 @@ public sealed class HourMeterReading : AuditableEntity
     public Guid ClientEventId { get; private set; }
 
     public ICollection<Anomaly> Anomalies { get; } = new List<Anomaly>();
+
+    public PhotoEvidence? PhotoEvidence { get; private set; }
 }

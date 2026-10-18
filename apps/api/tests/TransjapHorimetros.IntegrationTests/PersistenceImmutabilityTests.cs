@@ -99,6 +99,36 @@ public sealed class PersistenceImmutabilityTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => dbContext.SaveChangesAsync());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PhotoEvidence_RejectsUpdateAndDelete(bool delete)
+    {
+        using var dbContext = CreateDbContext();
+        var evidence = new PhotoEvidence(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "InMemory",
+            "photo-evidence-tests",
+            $"readings/{Guid.NewGuid():D}/{Guid.NewGuid():D}.jpg",
+            "proof.jpg",
+            "image/jpeg",
+            100,
+            new string('a', 64),
+            null,
+            DateTimeOffset.UtcNow,
+            1,
+            1,
+            null,
+            null,
+            null,
+            null);
+        dbContext.Entry(evidence).State = delete ? EntityState.Deleted : EntityState.Modified;
+
+        Assert.Throws<InvalidOperationException>(() => dbContext.SaveChanges());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => dbContext.SaveChangesAsync());
+    }
+
     private static TransjapDbContext CreateDbContext() =>
         new(new DbContextOptionsBuilder<TransjapDbContext>()
             .UseSqlServer("Server=127.0.0.1;Database=not_used;User Id=test;Password=test;Encrypt=False")

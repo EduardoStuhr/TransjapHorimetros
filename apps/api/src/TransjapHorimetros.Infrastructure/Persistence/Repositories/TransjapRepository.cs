@@ -17,6 +17,7 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
     IMachineQrCodeRepository,
     IWorkSiteRepository,
     IReadingRepository,
+    IPhotoEvidenceRepository,
     IAnomalyRepository,
     IAuditLogRepository,
     IUnitOfWork
@@ -312,6 +313,24 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
 
     public void Add(HourMeterReading reading) => dbContext.HourMeterReadings.Add(reading);
 
+    public Task<PhotoEvidence?> GetByReadingIdAsync(
+        Guid readingId,
+        CancellationToken cancellationToken) =>
+        dbContext.PhotoEvidences
+            .AsNoTracking()
+            .SingleOrDefaultAsync(evidence => evidence.ReadingId == readingId, cancellationToken);
+
+    Task<PhotoEvidence?> IPhotoEvidenceRepository.GetByClientEventIdAsync(
+        Guid clientEventId,
+        CancellationToken cancellationToken) =>
+        dbContext.PhotoEvidences
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                evidence => evidence.ClientEventId == clientEventId,
+                cancellationToken);
+
+    public void Add(PhotoEvidence photoEvidence) => dbContext.PhotoEvidences.Add(photoEvidence);
+
     Task<Anomaly?> IAnomalyRepository.GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         AnomaliesWithReferences()
             .SingleOrDefaultAsync(anomaly => anomaly.Id == id, cancellationToken);
@@ -391,7 +410,8 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         dbContext.HourMeterReadings
             .AsNoTracking()
             .Include(reading => reading.Machine)
-            .Include(reading => reading.WorkSite);
+            .Include(reading => reading.WorkSite)
+            .Include(reading => reading.PhotoEvidence);
 
     private IQueryable<Anomaly> AnomaliesWithReferences() =>
         dbContext.Anomalies

@@ -19,4 +19,7 @@ public static class AuditActions
     public const string UserActivated = "USER_ACTIVATED";
     public const string UserDeactivated = "USER_DEACTIVATED";
     public const string UserRolesChanged = "USER_ROLES_CHANGED";
+    public const string PhotoEvidenceCreated = "PHOTO_EVIDENCE_CREATED";
+    public const string PhotoEvidenceViewed = "PHOTO_EVIDENCE_VIEWED";
+    public const string PhotoEvidenceRevoked = "PHOTO_EVIDENCE_REVOKED";
 }

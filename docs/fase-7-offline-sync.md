@@ -114,3 +114,10 @@ Após sucesso confirmado, o blob pode ser removido depois de 5 minutos. Metadado
 - Leituras antigas que chegam fora de ordem não reescrevem histórico anterior. O backend aplica as regras da Fase 6 no momento do recebimento.
 - Eventos `FAILED_PERMANENT` ainda não possuem editor administrativo; a Fase 7 apenas os preserva e sinaliza para revisão.
 - Background Sync API não é requisito. A sincronização principal funciona com a aplicação aberta.
+
+## Validação e Pull Request
+
+- **Pull Request:** [PR #11 — feat: implement offline first synchronization](https://github.com/EduardoStuhr/TransjapHorimetros/pull/11) (sem merge, pronto para revisão).
+- **Testes automatizados frontend:** 34 testes Vitest (`sync-transport.test.ts`, `indexed-db-store.test.ts`, `sync-engine.test.ts`).
+- **Testes unitários backend:** 198 testes unitários aprovados em `TransjapHorimetros.UnitTests`.
+- **Workflow de CI:** `Validate Transjap Horimetros` (`.github/workflows/ocr-validation.yml`).

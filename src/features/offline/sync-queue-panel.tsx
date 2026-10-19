@@ -62,11 +62,12 @@ export function SyncQueuePanel() {
         </div>
       )}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Summary label="Pendentes" value={snapshot.pending} icon={Clock3} />
         <Summary label="Sincronizando" value={snapshot.syncing} icon={LoaderCircle} spinning={isSyncing} />
+        <Summary label="Falhas temporárias" value={snapshot.retryableFailures} icon={RefreshCw} />
+        <Summary label="Precisa de revisão" value={snapshot.permanentFailures} icon={AlertTriangle} />
         <Summary label="Sincronizados recentes" value={snapshot.synced} icon={CheckCircle2} />
-        <Summary label="Falhas" value={snapshot.retryableFailures + snapshot.permanentFailures} icon={AlertTriangle} />
       </section>
 
       <section className="rounded-lg border bg-white shadow-sm">

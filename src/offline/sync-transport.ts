@@ -60,7 +60,7 @@ async function parseResponse(response: Response): Promise<SyncResponse> {
 
 async function requestWithTimeout(input: RequestInfo | URL, init: RequestInit) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 30_000);
+  const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (error) {
@@ -69,7 +69,7 @@ async function requestWithTimeout(input: RequestInfo | URL, init: RequestInit) {
       : "Sem comunicação com o servidor. A tentativa será repetida.";
     throw new SyncTransportError(message, null);
   } finally {
-    window.clearTimeout(timeout);
+    clearTimeout(timeout);
   }
 }
 

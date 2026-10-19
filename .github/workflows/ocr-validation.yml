@@ -1,4 +1,4 @@
-name: Validate operational readings
+name: Validate Transjap Horimetros
 
 on:
   pull_request:

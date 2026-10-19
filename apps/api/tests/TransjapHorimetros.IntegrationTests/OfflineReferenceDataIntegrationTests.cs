@@ -29,9 +29,20 @@ public sealed class OfflineReferenceDataIntegrationTests(TransjapApiFactory fact
         {
             Assert.Equal("ACTIVE", machine.GetProperty("status").GetString());
             Assert.True(machine.TryGetProperty("activeQrToken", out _));
+            Assert.True(machine.TryGetProperty("meterUnit", out var meterUnit) && meterUnit.ValueKind != JsonValueKind.Undefined);
+            Assert.True(machine.GetProperty("fleetNumber").GetInt32() > 0);
+            Assert.False(string.IsNullOrWhiteSpace(machine.GetProperty("model").GetString()));
             Assert.False(machine.TryGetProperty("latestReading", out _));
+            Assert.False(machine.TryGetProperty("createdBy", out _));
+            Assert.False(machine.TryGetProperty("notes", out _));
         });
-        Assert.All(body.GetProperty("workSites").EnumerateArray(), workSite =>
-            Assert.True(workSite.GetProperty("active").GetBoolean()));
+        var workSites = body.GetProperty("workSites").EnumerateArray().ToArray();
+        Assert.NotEmpty(workSites);
+        Assert.All(workSites, workSite =>
+        {
+            Assert.True(workSite.GetProperty("active").GetBoolean());
+            Assert.False(string.IsNullOrWhiteSpace(workSite.GetProperty("name").GetString()));
+            Assert.NotEqual(Guid.Empty, workSite.GetProperty("id").GetGuid());
+        });
     }
 }

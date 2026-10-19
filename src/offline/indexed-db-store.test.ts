@@ -124,4 +124,93 @@ describe("IndexedDbOfflineStore", () => {
     expect(await store.getEventsForUser("user-1")).toHaveLength(2);
     store.close();
   });
+
+  it("persiste e reutiliza o mesmo deviceId entre chamadas e reinicializações", async () => {
+    const { name, store } = createStore();
+    const deviceId1 = await store.getOrCreateDeviceId();
+    const deviceId2 = await store.getOrCreateDeviceId();
+    expect(deviceId1).toBe(deviceId2);
+    expect(deviceId1).toMatch(/^web-[0-9a-f-]+$/);
+    store.close();
+
+    const reopened = new IndexedDbOfflineStore(name);
+    const deviceId3 = await reopened.getOrCreateDeviceId();
+    expect(deviceId3).toBe(deviceId1);
+    reopened.close();
+  });
+
+  it("cleanup preserva rigorosamente eventos e blobs em PENDING, SYNCING, FAILED_RETRYABLE e FAILED_PERMANENT", async () => {
+    const { store } = createStore();
+    const queued1 = await store.enqueueReadingWithPhoto(await readingInput());
+    const queued2 = await store.enqueueReadingWithPhoto(await readingInput());
+    const queued3 = await store.enqueueReadingWithPhoto(await readingInput());
+
+    await store.markSyncing(queued1.readingEvent.localEventId, "2026-10-19T11:00:00Z");
+    await store.markRetryableFailure(queued2.readingEvent.localEventId, "erro rede", "2026-10-19T11:05:00Z");
+    await store.markPermanentFailure(queued3.readingEvent.localEventId, "erro 422");
+
+    // Executa cleanup com retenção zero
+    await store.removeSyncedDataWhenSafe({
+      blobRetentionMs: 0,
+      eventRetentionMs: 0,
+      now: new Date("2026-10-19T12:00:00Z"),
+    });
+
+    const userEvents = await store.getEventsForUser("user-1");
+    // Todos os 6 eventos (3 leituras + 3 fotos) devem continuar intactos
+    expect(userEvents).toHaveLength(6);
+    expect(await store.getPhotoBlob(queued1.photoEvent.payload.blobKey)).toBeDefined();
+    expect(await store.getPhotoBlob(queued2.photoEvent.payload.blobKey)).toBeDefined();
+    expect(await store.getPhotoBlob(queued3.photoEvent.payload.blobKey)).toBeDefined();
+    store.close();
+  });
+
+  it("upgrade de schema do IndexedDB preserva dados existentes sem perda ou wipe", async () => {
+    const { name, store } = createStore();
+    const queued = await store.enqueueReadingWithPhoto(await readingInput());
+    store.close();
+
+    // Simula abertura em versão 2 adicionando novo store sem apagar existentes
+    const upgradeSuccess = await new Promise<boolean>((resolve, reject) => {
+      const upgradeRequest = indexedDB.open(name, OFFLINE_DB_VERSION + 1);
+      upgradeRequest.onupgradeneeded = () => {
+        const db = upgradeRequest.result;
+        expect(db.objectStoreNames.contains("events")).toBe(true);
+        expect(db.objectStoreNames.contains("photos")).toBe(true);
+        if (!db.objectStoreNames.contains("audit_v2")) {
+          db.createObjectStore("audit_v2", { keyPath: "id" });
+        }
+      };
+      upgradeRequest.onsuccess = () => {
+        const db = upgradeRequest.result;
+        expect(db.version).toBe(OFFLINE_DB_VERSION + 1);
+        db.close();
+        resolve(true);
+      };
+      upgradeRequest.onerror = () => reject(upgradeRequest.error);
+    });
+
+    expect(upgradeSuccess).toBe(true);
+
+    // Reabre e verifica que os dados gravados na v1 continuam íntegros
+    const reopenedDb = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open(name, OFFLINE_DB_VERSION + 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+
+    const tx = reopenedDb.transaction(["events", "photos"], "readonly");
+    const event = await new Promise((resolve) => {
+      const getReq = tx.objectStore("events").get(queued.readingEvent.localEventId);
+      getReq.onsuccess = () => resolve(getReq.result);
+    });
+    const photo = await new Promise((resolve) => {
+      const getReq = tx.objectStore("photos").get(queued.photoEvent.payload.blobKey);
+      getReq.onsuccess = () => resolve(getReq.result);
+    });
+
+    expect(event).toBeDefined();
+    expect(photo).toBeDefined();
+    reopenedDb.close();
+  });
 });

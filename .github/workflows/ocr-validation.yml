@@ -1,4 +1,4 @@
-name: Validate operational readings
+name: Validate Transjap Horimetros
 
 on:
   pull_request:
@@ -45,4 +45,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { AuthUser } from "@/lib/auth/types";
+import { getOfflineStore } from "@/offline/indexed-db-store";
 
 interface AuthContextValue {
   logout: () => Promise<void>;
@@ -18,6 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState(false);
+  const offlineStore = useMemo(() => getOfflineStore(), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -29,21 +31,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           signal: controller.signal,
         });
         if (response.status === 401) {
+          await offlineStore.clearCachedAuthenticatedUser();
           router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
           return;
         }
         if (response.status === 403) {
+          await offlineStore.clearCachedAuthenticatedUser();
           router.replace("/acesso-negado");
           return;
         }
         if (!response.ok) {
           throw new Error("Nao foi possivel validar a sessao.");
         }
-        setUser((await response.json()) as AuthUser);
+        const authenticatedUser = (await response.json()) as AuthUser;
+        setUser(authenticatedUser);
+        await offlineStore.cacheAuthenticatedUser(authenticatedUser);
       } catch (error) {
         if (!controller.signal.aborted) {
-          console.error("[auth] Falha ao validar a sessao:", error);
-          setSessionError(true);
+          const cachedUser = await offlineStore.getCachedAuthenticatedUser();
+          if (cachedUser) {
+            setUser(cachedUser);
+          } else {
+            if (process.env.NODE_ENV === "development") {
+              console.error("[auth] Falha ao validar a sessao:", error);
+            }
+            setSessionError(true);
+          }
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -54,7 +67,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     void loadUser();
     return () => controller.abort();
-  }, [pathname, router]);
+  }, [offlineStore, pathname, router]);
+
+  useEffect(() => {
+    const requireAuthentication = () => {
+      void offlineStore.clearCachedAuthenticatedUser();
+      router.push(`/login?reason=session-expired&returnTo=${encodeURIComponent(pathname)}`);
+    };
+    window.addEventListener("transjap:auth-required", requireAuthentication);
+    return () => window.removeEventListener("transjap:auth-required", requireAuthentication);
+  }, [offlineStore, pathname, router]);
 
   const value = useMemo<AuthContextValue | null>(() => {
     if (!user) return null;
@@ -62,12 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       logout: async () => {
         await fetch("/api/auth/logout", { method: "POST" });
+        await offlineStore.clearCachedAuthenticatedUser();
         setUser(null);
         router.replace("/login");
         router.refresh();
       },
     };
-  }, [router, user]);
+  }, [offlineStore, router, user]);
 
   if (sessionError) {
     return (

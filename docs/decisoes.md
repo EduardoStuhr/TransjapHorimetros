@@ -162,3 +162,9 @@ Correções são propostas imutáveis PENDING, restritas à supervisão e vincul
 DTOs/projeções fornecem foto derivada da relação, latest OCR e contagens de anomalias, sem duplicar esses dados na tabela de leituras. Detalhes incluem anomalias e vínculos; listagens são paginadas e filtradas no SQL. Badges e mapeamentos são compartilhados entre lista, detalhe e histórico da máquina.
 
 CompleteReadingModel acrescenta apenas campos ausentes, checks, índices e FKs Restrict. Não há backfill fictício nem alteração de migrations anteriores. A migration não foi aplicada ao Azure e a branch não deve ser implantada ou mergeada antes de revisão. O workflow existente de PR foi reutilizado. Consulte [fase-6-modelo-completo-leitura.md](fase-6-modelo-completo-leitura.md).
+
+## 2026-10-19 — Fila offline pertence ao cliente e usa eventos explícitos
+
+A Fase 7 usa IndexedDB versionado, com blob separado e eventos `READING_CREATED`/`PHOTO_UPLOADED`. `LocalEventId` é chave do dispositivo e `ClientEventId` é a chave global de idempotência, criada uma vez. A dependência da foto é explícita por `parentReadingClientEventId`; timing de chamadas não é usado como coordenação.
+
+O backend ganhou apenas um endpoint autenticado de referência mínima para máquinas/obras ativas. Não foi criada tabela de sync nem migration. Leituras e fotos continuam nos endpoints unitários existentes e o servidor recalcula todas as regras. Consulte [fase-7-offline-sync.md](fase-7-offline-sync.md).

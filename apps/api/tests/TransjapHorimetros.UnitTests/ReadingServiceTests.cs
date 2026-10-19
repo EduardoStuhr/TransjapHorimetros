@@ -157,6 +157,9 @@ public sealed class ReadingServiceTests
 
     private sealed class FakeMachineRepository(Machine? machine) : IMachineRepository
     {
+        public Task<IReadOnlyList<Machine>> GetActiveAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Machine>>(machine is null ? [] : [machine]);
+
         public Task<Machine?> GetByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken) =>
             Task.FromResult(machine?.Id == id ? machine : null);
 

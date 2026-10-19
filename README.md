@@ -3,7 +3,7 @@
 Sistema de controle e integridade de registros de horímetros e odômetros de máquinas pesadas e veículos da **TRANSJAP Terraplenagem e Construções**.
 
 > [!WARNING]
-> A Fase 6 completa o modelo operacional da leitura. Sua migration não foi aplicada ao Azure e a fase não está em produção. Mantenha a mudança em branch e PR, sem merge, até a revisão da migration e dos resultados de validação.
+> A Fase 7 adiciona captura offline, IndexedDB e sincronização idempotente. Nenhuma migration foi necessária, nada foi aplicado ao Azure e a fase não está em produção. Mantenha a mudança em branch e PR, sem merge, até a revisão.
 
 ## Arquitetura de dados
 
@@ -102,6 +102,12 @@ O servidor valida precisão decimal, obra ativa, idempotência e sequência oper
 
 Consulte [modelo, regras e limitações](docs/fase-6-modelo-completo-leitura.md) e [relatório da Fase 6](docs/fase-6-relatorio-modelo-leitura.md). A migration `CompleteReadingModel` foi somente gerada; a CI de PR existente valida em SQL Server descartável e não faz deploy.
 
+### Offline First — Fase 7
+
+A rota `/coleta` salva leitura e foto atomicamente no IndexedDB, inclusive sem conexão. A rota `/sincronizacao` mostra pendências e falhas e permite envio manual. O motor usa o mesmo `ClientEventId` em todos os retries, envia leitura antes da foto, aplica backoff e nunca sincroniza automaticamente eventos de outro usuário.
+
+O cache local contém somente máquinas e obras ativas e os campos necessários à captura. JWT, refresh token, senhas e conteúdo privado retornado pela API não são persistidos. Consulte [arquitetura offline](docs/fase-7-offline-sync.md) e [relatório da Fase 7](docs/fase-7-relatorio-offline-sync.md).
+
 ### URLs locais
 
 - Painel: [http://localhost:3000](http://localhost:3000)
@@ -166,4 +172,4 @@ Armazene o segredo em App Service Configuration e, futuramente, Key Vault. Os wo
 - `src/`: frontend Next.js 16.
 - `scripts/`: automações de desenvolvimento, testes e backup.
 - `docs/`: decisões arquiteturais e regras de engenharia.
-- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md), [Evidência fotográfica da Fase 4](docs/fase-4-evidencia-fotografica.md), [OCR da Fase 5](docs/fase-5-ocr.md), [Modelo completo da Fase 6](docs/fase-6-modelo-completo-leitura.md) e [decisões arquiteturais](docs/decisoes.md).
+- [Regras de negócio da Fase 1](docs/regras-de-negocio.md), [QR Codes da Fase 2](docs/fase-2-qr-codes.md), [Segurança da Fase 3](docs/fase-3-seguranca-autenticacao.md), [Evidência fotográfica da Fase 4](docs/fase-4-evidencia-fotografica.md), [OCR da Fase 5](docs/fase-5-ocr.md), [Modelo completo da Fase 6](docs/fase-6-modelo-completo-leitura.md), [Offline First da Fase 7](docs/fase-7-offline-sync.md) e [decisões arquiteturais](docs/decisoes.md).

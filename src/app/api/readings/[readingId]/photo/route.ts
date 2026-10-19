@@ -25,21 +25,29 @@ export async function POST(
     return Response.json({ detail: "A foto excede o limite permitido." }, { status: 413 });
   }
 
-  const apiResponse = await fetch(
-    `${getApiBaseUrl()}/api/v1/readings/${encodeURIComponent(readingId)}/photo`,
-    {
-      method: "POST",
-      body: request.body,
-      cache: "no-store",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": contentType,
-        "X-Correlation-ID": crypto.randomUUID(),
-      },
-      duplex: "half",
-    } as RequestInit & { duplex: "half" },
-  );
+  let apiResponse: Response;
+  try {
+    apiResponse = await fetch(
+      `${getApiBaseUrl()}/api/v1/readings/${encodeURIComponent(readingId)}/photo`,
+      {
+        method: "POST",
+        body: request.body,
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": contentType,
+          "X-Correlation-ID": crypto.randomUUID(),
+        },
+        duplex: "half",
+      } as RequestInit & { duplex: "half" },
+    );
+  } catch {
+    return Response.json(
+      { detail: "O servidor está temporariamente indisponível." },
+      { status: 503 },
+    );
+  }
 
   return new Response(apiResponse.body, {
     status: apiResponse.status,

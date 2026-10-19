@@ -22,6 +22,13 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
     IAuditLogRepository,
     IUnitOfWork
 {
+    public async Task<IReadOnlyList<Machine>> GetActiveAsync(CancellationToken cancellationToken) =>
+        await dbContext.Machines
+            .AsNoTracking()
+            .Where(machine => machine.Status == MachineStatus.Active)
+            .OrderBy(machine => machine.FleetNumber)
+            .ToListAsync(cancellationToken);
+
     public Task<HourMeterReading?> GetLatestBoundaryBeforeAsync(Guid machineId, MeterUnit meterUnit,
         DateTimeOffset capturedAt, CancellationToken ct) => dbContext.HourMeterReadings.AsNoTracking()
         .Where(r => r.MachineId == machineId && r.MeterUnit == meterUnit && r.Status == ReadingStatus.Validated
@@ -112,6 +119,21 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         return query.SingleOrDefaultAsync(
             qrCode => qrCode.MachineId == machineId && qrCode.IsActive,
             cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MachineQrCode>> GetActiveByMachineIdsAsync(
+        IReadOnlyCollection<Guid> machineIds,
+        CancellationToken cancellationToken)
+    {
+        if (machineIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.MachineQrCodes
+            .AsNoTracking()
+            .Where(qrCode => qrCode.IsActive && machineIds.Contains(qrCode.MachineId))
+            .ToListAsync(cancellationToken);
     }
 
     public Task<MachineQrCode?> GetActiveByTokenAsync(

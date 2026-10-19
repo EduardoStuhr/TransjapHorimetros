@@ -6,6 +6,8 @@ namespace TransjapHorimetros.Application.Abstractions;
 
 public interface IMachineRepository
 {
+    Task<IReadOnlyList<Machine>> GetActiveAsync(CancellationToken cancellationToken);
+
     Task<Machine?> GetByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken);
 
     Task<Machine?> GetByFleetNumberAsync(int fleetNumber, bool trackChanges, CancellationToken cancellationToken);

@@ -6,12 +6,15 @@ import { LogOut } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
+import { SyncStatusIndicator } from "@/components/offline/sync-status-indicator";
 import { Button } from "@/components/ui/button";
 
 const routeTitles: Record<string, string> = {
   "/": "Dashboard",
   "/frota": "Frota",
   "/horimetros": "Horímetros",
+  "/coleta": "Registrar leitura",
+  "/sincronizacao": "Sincronização",
   "/obras": "Obras",
   "/alertas": "Alertas",
   "/relatorios": "Relatórios",
@@ -48,6 +51,7 @@ export function Header() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <SyncStatusIndicator />
           <div className="hidden text-right sm:block">
             <p className="max-w-52 truncate text-sm font-semibold text-slate-900">{user.fullName}</p>
             <p className="max-w-52 truncate text-xs text-slate-500">{user.email}</p>

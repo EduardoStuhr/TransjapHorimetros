@@ -5,12 +5,16 @@ import {
   Gauge,
   HardHat,
   MapPinned,
+  ClipboardPlus,
+  RefreshCw,
 } from "lucide-react";
 
 export const navigationItems = [
   { label: "Dashboard", href: "/", icon: ChartNoAxesCombined, roles: ["SUPERVISOR", "MANAGER", "ADMIN"] },
   { label: "Frota", href: "/frota", icon: HardHat, roles: null },
   { label: "Horímetros", href: "/horimetros", icon: Gauge, roles: null },
+  { label: "Registrar leitura", href: "/coleta", icon: ClipboardPlus, roles: null },
+  { label: "Sincronização", href: "/sincronizacao", icon: RefreshCw, roles: null },
   { label: "Obras", href: "/obras", icon: MapPinned, roles: null },
   { label: "Alertas", href: "/alertas", icon: BellRing, roles: ["SUPERVISOR", "MANAGER", "ADMIN"] },
   { label: "Relatórios", href: "/relatorios", icon: FileChartColumn, roles: ["SUPERVISOR", "MANAGER", "ADMIN"] },

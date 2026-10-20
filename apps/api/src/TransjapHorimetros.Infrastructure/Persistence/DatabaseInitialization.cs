@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TransjapHorimetros.Infrastructure.Persistence.Migrations;
@@ -19,6 +21,20 @@ public static class DatabaseInitialization
             .CreateLogger("DatabaseInitialization");
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
+
+        try
+        {
+            var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
+            if (!await databaseCreator.ExistsAsync(cancellationToken))
+            {
+                logger.LogInformation("Banco de dados não encontrado. Criando banco inicial.");
+                await databaseCreator.CreateAsync(cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Verificação de criação de banco ignorada ou banco já existente.");
+        }
 
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);
         if (pendingMigrations.Contains(ExistingMachineQrCodeDataPatch.MigrationId))

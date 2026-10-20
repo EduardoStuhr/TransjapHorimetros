@@ -142,7 +142,9 @@ public sealed class PhotoOcrIntegrationTests(TransjapApiFactory factory) : IClas
         var readingId = await UploadAsync(client);
         using var scope = factory.Services.CreateScope();
         var connection = scope.ServiceProvider.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection")!;
-        TestDatabaseGuard.EnsureSafeTestDatabase(connection);
+        TestDatabaseGuard.EnsureSafeTestDatabase(
+            TestDatabaseGuard.TestingEnvironmentName,
+            connection);
         var options = new DbContextOptionsBuilder<TransjapDbContext>().UseSqlServer(connection)
             .ReplaceService<IExecutionStrategyFactory, CommitRetryStrategyFactory>()
             .AddInterceptors(new FailFirstCommitInterceptor(afterCommit)).Options;

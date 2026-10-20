@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TransjapHorimetros.Infrastructure.Persistence.Migrations;
 using TransjapHorimetros.Infrastructure.Persistence.Seed;
@@ -21,19 +20,18 @@ public static class DatabaseInitialization
             .CreateLogger("DatabaseInitialization");
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
+        var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
 
-        try
+        if (environment.IsEnvironment(TestDatabaseGuard.TestingEnvironmentName))
         {
-            var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
-            if (!await databaseCreator.ExistsAsync(cancellationToken))
-            {
-                logger.LogInformation("Banco de dados não encontrado. Criando banco inicial.");
-                await databaseCreator.CreateAsync(cancellationToken);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Verificação de criação de banco ignorada ou banco já existente.");
+            var connectionString = dbContext.Database.GetConnectionString()
+                ?? throw new InvalidOperationException(
+                    "A connection string do banco de integração não foi configurada.");
+            await TestDatabaseBootstrapper.EnsureCreatedAsync(
+                environment.EnvironmentName,
+                connectionString,
+                logger,
+                cancellationToken);
         }
 
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);

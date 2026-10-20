@@ -36,14 +36,14 @@
 32. **UI de Sincronização (`/sincronizacao`):** Painel corporativo com cartões separados para Pendentes, Sincronizando, Falhas temporárias, Precisa de revisão e Sincronizados recentes, aviso de pendências de outros operadores e acionamento manual de retry sem expor JSON bruto.
 33. **Testes frontend:** 34 testes Vitest aprovados com `fake-indexeddb` cobrindo transporte, store, motor de sync, ciclo de 16 etapas, concorrência, idempotência e isolamento.
 34. **Testes unitários backend:** 198 testes unitários aprovados em `TransjapHorimetros.UnitTests.dll`.
-35. **Testes de integração backend:** 43 testes de integração aprovados na suíte de testes do repositório, com cobertura no CI com SQL Server containerizado.
+35. **Testes de integração backend:** 153 testes de integração aprovados no PR corretivo #12, incluindo banco inicialmente inexistente, migrations, seed e reinicialização idempotente com o banco já existente.
 36. **Compilação backend:** `dotnet build -c Release` aprovado com 0 erros e 0 avisos.
 37. **Lint frontend:** `npm run lint` aprovado com 0 erros e 0 avisos.
 38. **Build frontend:** `npm run build` (Next.js 16.3.8 Turbopack) concluído com sucesso.
-39. **Workflow de CI:** `.github/workflows/ocr-validation.yml` renomeado para `Validate Transjap Horimetros`, cobrindo build e testes de backend e frontend.
+39. **Workflow de CI:** `.github/workflows/ocr-validation.yml` renomeado para `Validate Transjap Horimetros`, cobrindo build e testes de backend e frontend. A execução #9 do PR #11 terminou com frontend verde e backend vermelho porque o catálogo de testes não existia. A correção foi feita separadamente no PR #12; a execução #11 desse PR validou backend e frontend com sucesso.
 40. **Migrations:** Nenhuma migration foi necessária; tabelas e índices de idempotência das Fases 4, 5 e 6 já suportam `ClientEventId` e replays.
 41. **Recursos Azure:** Nenhum recurso Azure foi alterado.
-42. **Pull Request:** PR #11 aberto contra `main` (título: `feat: implement offline first synchronization`), mantido sem merge.
+42. **Pull Requests:** o PR #11 (`feat: implement offline first synchronization`) foi mergeado em `main`. O bootstrap seguro do banco descartável foi corrigido separadamente no PR #12 (`fix: bootstrap integration test database in CI`), mantido aberto e sem merge automático.
 43. **Limitações conhecidas:**
     - O primeiro acesso ao sistema exige conexão para carregar o shell da aplicação e autenticação/cache inicial.
     - Sem suporte nativo a `navigator.locks` em navegadores legados, a coordenação entre abas é restrita a fallback informativo por aba.
@@ -103,10 +103,13 @@ NÃO
 MIGRATION APLICADA NO AZURE?  
 NÃO
 
-PR ABERTO?  
+PR DA FASE 7 (#11) MERGEADO?  
 SIM
 
-PR MERGEADO?  
+PR DE CORREÇÃO (#12) ABERTO?  
+SIM
+
+PR DE CORREÇÃO (#12) MERGEADO?  
 NÃO
 
 FASE 7 EM PRODUÇÃO?  

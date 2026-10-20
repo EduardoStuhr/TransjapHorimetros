@@ -31,7 +31,10 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
                 "Defina TEST_SQLSERVER_CONNECTION_STRING para executar os testes de integração.");
 
         _originalAppConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
-        TestDatabaseGuard.EnsureSafeTestDatabase(_connectionString, _originalAppConnectionString);
+        TestDatabaseGuard.EnsureSafeTestDatabase(
+            TestDatabaseGuard.TestingEnvironmentName,
+            _connectionString,
+            _originalAppConnectionString);
     }
 
     protected override IHost CreateHost(IHostBuilder builder)
@@ -125,7 +128,10 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
 
     public async Task ResetDatabaseAsync()
     {
-        TestDatabaseGuard.EnsureSafeTestDatabase(_connectionString, _originalAppConnectionString);
+        TestDatabaseGuard.EnsureSafeTestDatabase(
+            TestDatabaseGuard.TestingEnvironmentName,
+            _connectionString,
+            _originalAppConnectionString);
 
         _ = Server;
         await using var scope = Services.CreateAsyncScope();

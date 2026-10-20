@@ -1,13 +1,26 @@
 using Microsoft.Data.SqlClient;
 
-namespace TransjapHorimetros.IntegrationTests;
+namespace TransjapHorimetros.Infrastructure.Persistence;
 
 public static class TestDatabaseGuard
 {
     public const string ExpectedTestDatabaseName = "transjap_horimetros_tests";
+    public const string TestingEnvironmentName = "Testing";
 
-    public static void EnsureSafeTestDatabase(string testConnectionString, string? applicationConnectionString = null)
+    public static void EnsureSafeTestDatabase(
+        string environmentName,
+        string testConnectionString,
+        string? applicationConnectionString = null)
     {
+        if (!string.Equals(
+                environmentName,
+                TestingEnvironmentName,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "OPERAÇÃO ABORTADA: O bootstrap do banco de testes só pode ser executado no ambiente Testing.");
+        }
+
         if (string.IsNullOrWhiteSpace(testConnectionString))
         {
             throw new InvalidOperationException("A connection string de teste não foi fornecida.");

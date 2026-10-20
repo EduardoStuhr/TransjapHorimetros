@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TransjapHorimetros.Infrastructure.Persistence.Migrations;
 using TransjapHorimetros.Infrastructure.Persistence.Seed;
@@ -19,6 +20,19 @@ public static class DatabaseInitialization
             .CreateLogger("DatabaseInitialization");
         var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
+        var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+
+        if (environment.IsEnvironment(TestDatabaseGuard.TestingEnvironmentName))
+        {
+            var connectionString = dbContext.Database.GetConnectionString()
+                ?? throw new InvalidOperationException(
+                    "A connection string do banco de integração não foi configurada.");
+            await TestDatabaseBootstrapper.EnsureCreatedAsync(
+                environment.EnvironmentName,
+                connectionString,
+                logger,
+                cancellationToken);
+        }
 
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);
         if (pendingMigrations.Contains(ExistingMachineQrCodeDataPatch.MigrationId))

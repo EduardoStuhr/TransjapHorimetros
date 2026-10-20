@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using TransjapHorimetros.Domain.Entities;
 using TransjapHorimetros.Domain.Security;
+using TransjapHorimetros.Infrastructure.Persistence;
 
 namespace TransjapHorimetros.IntegrationTests;
 
@@ -12,6 +15,17 @@ public sealed class OfflineReferenceDataIntegrationTests(TransjapApiFactory fact
     public async Task ReferenceData_IsAuthenticatedMinimalAndContainsActiveQrTokens()
     {
         await factory.ResetDatabaseAsync();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+            dbContext.WorkSites.Add(new WorkSite(
+                "Obra offline de teste",
+                "OFFLINE-REF",
+                true,
+                DateTimeOffset.UtcNow));
+            await dbContext.SaveChangesAsync();
+        }
+
         using var anonymous = factory.CreateAnonymousClient();
         using var unauthorized = await anonymous.GetAsync("/api/v1/offline/reference-data");
         Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);

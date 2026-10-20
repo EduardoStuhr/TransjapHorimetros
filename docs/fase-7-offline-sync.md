@@ -117,7 +117,9 @@ Após sucesso confirmado, o blob pode ser removido depois de 5 minutos. Metadado
 
 ## Validação e Pull Request
 
-- **Pull Request:** [PR #11 — feat: implement offline first synchronization](https://github.com/EduardoStuhr/TransjapHorimetros/pull/11) (sem merge, pronto para revisão).
+- **Pull Request da Fase 7:** [PR #11 — feat: implement offline first synchronization](https://github.com/EduardoStuhr/TransjapHorimetros/pull/11), mergeado em `main`.
+- **Correção de CI:** a execução pós-implementação falhou inicialmente no backend porque o banco `transjap_horimetros_tests` ainda não existia. O [PR #12 — fix: bootstrap integration test database in CI](https://github.com/EduardoStuhr/TransjapHorimetros/pull/12) adicionou o bootstrap seguro; sua execução #11 validou backend e frontend com sucesso.
 - **Testes automatizados frontend:** 34 testes Vitest (`sync-transport.test.ts`, `indexed-db-store.test.ts`, `sync-engine.test.ts`).
 - **Testes unitários backend:** 198 testes unitários aprovados em `TransjapHorimetros.UnitTests`.
+- **Testes de integração backend:** 153 testes aprovados com SQL Server descartável no PR #12.
 - **Workflow de CI:** `Validate Transjap Horimetros` (`.github/workflows/ocr-validation.yml`).

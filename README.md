@@ -3,7 +3,7 @@
 Sistema de controle e integridade de registros de horímetros e odômetros de máquinas pesadas e veículos da **TRANSJAP Terraplenagem e Construções**.
 
 > [!WARNING]
-> A Fase 7 adiciona captura offline, IndexedDB e sincronização idempotente. Nenhuma migration foi necessária, nada foi aplicado ao Azure e a fase não está em produção. Mantenha a mudança em branch e PR, sem merge, até a revisão.
+> A Fase 7 adiciona captura offline, IndexedDB e sincronização idempotente e foi mergeada pelo PR #11. A falha inicial da CI no bootstrap do banco descartável foi corrigida separadamente no PR #12. Nenhuma migration foi necessária, nada foi aplicado ao Azure e a fase não está em produção.
 
 ## Arquitetura de dados
 

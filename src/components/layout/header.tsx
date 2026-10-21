@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
+import { isOperatorOnly } from "@/components/layout/navigation";
 import { SyncStatusIndicator } from "@/components/offline/sync-status-indicator";
 import { Button } from "@/components/ui/button";
 
@@ -23,13 +24,14 @@ const routeTitles: Record<string, string> = {
 export function Header() {
   const pathname = usePathname();
   const { logout, user } = useAuth();
+  const operatorOnly = isOperatorOnly(user.roles);
   const title = pathname.startsWith("/frota/")
     ? "Detalhes da máquina"
     : (routeTitles[pathname] ?? "Transjap Horímetros");
 
   return (
-    <header className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur-sm">
-      <div className="flex h-18 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 border-b bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-sm">
+      <div className="flex min-h-18 items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <MobileNavigation />
           <div className="relative size-10 shrink-0 overflow-hidden rounded-md border bg-slate-900 lg:hidden">
@@ -43,7 +45,7 @@ export function Header() {
           </div>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Transjap · Administração
+              Transjap · {operatorOnly ? "Operação de campo" : "Administração"}
             </p>
             <h1 className="truncate text-lg font-bold text-slate-900 sm:text-xl">
               {title}
@@ -56,7 +58,7 @@ export function Header() {
             <p className="max-w-52 truncate text-sm font-semibold text-slate-900">{user.fullName}</p>
             <p className="max-w-52 truncate text-xs text-slate-500">{user.email}</p>
           </div>
-          <Button variant="outline" size="icon" onClick={() => void logout()} aria-label="Sair">
+          <Button variant="outline" size="icon" className="size-11" onClick={() => void logout()} aria-label="Sair">
             <LogOut />
           </Button>
         </div>

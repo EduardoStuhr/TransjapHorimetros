@@ -8,9 +8,9 @@ import { Menu } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import {
-  canAccessNavigationItem,
   isNavigationItemActive,
-  navigationItems,
+  isOperatorOnly,
+  navigationItemsForRoles,
 } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,9 +26,9 @@ export function MobileNavigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
-  const visibleItems = navigationItems.filter((item) =>
-    canAccessNavigationItem(user.roles, item),
-  );
+  const visibleItems = navigationItemsForRoles(user.roles);
+
+  if (isOperatorOnly(user.roles)) return null;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -36,7 +36,7 @@ export function MobileNavigation() {
         <Button
           variant="outline"
           size="icon"
-          className="lg:hidden"
+          className="size-11 lg:hidden"
           aria-label="Abrir navegação"
         >
           <Menu />

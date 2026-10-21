@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { isOperatorOnly, isOperatorPathAllowed } from "@/components/layout/navigation";
 import type { AuthUser } from "@/lib/auth/types";
 import { getOfflineStore } from "@/offline/indexed-db-store";
 
@@ -46,11 +47,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const authenticatedUser = (await response.json()) as AuthUser;
         setUser(authenticatedUser);
         await offlineStore.cacheAuthenticatedUser(authenticatedUser);
+        if (isOperatorOnly(authenticatedUser.roles) && !isOperatorPathAllowed(pathname)) {
+          router.replace("/coleta");
+        }
       } catch (error) {
         if (!controller.signal.aborted) {
           const cachedUser = await offlineStore.getCachedAuthenticatedUser();
           if (cachedUser) {
             setUser(cachedUser);
+            if (isOperatorOnly(cachedUser.roles) && !isOperatorPathAllowed(pathname)) {
+              router.replace("/coleta");
+            }
           } else {
             if (process.env.NODE_ENV === "development") {
               console.error("[auth] Falha ao validar a sessao:", error);

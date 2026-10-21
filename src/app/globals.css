@@ -62,6 +62,7 @@
 
 html {
   background: var(--background);
+  min-height: 100%;
 }
 
 body {
@@ -72,6 +73,18 @@ body {
   font-size: 1rem;
   line-height: 1.5;
   text-rendering: optimizeLegibility;
+  padding: 0;
+}
+
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+video {
+  max-width: 100%;
 }
 
 a,

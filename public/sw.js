@@ -1,5 +1,5 @@
 /**
- * Transjap App-Shell Service Worker (Fase 7 - Offline First).
+ * Transjap App-Shell Service Worker (Fases 7 e 8 - Offline First).
  *
  * DIRETRIZES E GARANTIAS DE SEGURANÇA:
  * 1. NUNCA realiza cache de endpoints autenticados ou de APIs (/api/*):
@@ -11,13 +11,19 @@
  * 2. O cache é estritamente restrito ao App Shell e recursos estáticos seguros:
  *    - Rotas de navegação de campo: /coleta e /sincronizacao
  *    - Assets estáticos com hash: /_next/static/*
- *    - Identidade visual estática pública: /logo-transjap.png e /simbolo-transjap.png
+ *    - Identidade visual estática pública e ícones PWA
  * 3. Todas as requisições não-GET ou iniciadas para /api/ são ignoradas pelo Service Worker
  *    e repassadas diretamente à rede sem interceptação nem armazenamento.
  */
-const CACHE_NAME = "transjap-field-shell-v1";
+const CACHE_NAME = "transjap-field-shell-v2";
 const SHELL_ROUTES = new Set(["/coleta", "/sincronizacao"]);
-const SAFE_ASSETS = ["/logo-transjap.png", "/simbolo-transjap.png"];
+const SAFE_ASSETS = [
+  "/logo-transjap.png",
+  "/simbolo-transjap.png",
+  "/pwa-icon-192.png",
+  "/pwa-icon-512.png",
+  "/manifest.webmanifest",
+];
 
 async function cacheFieldShell() {
   const cache = await caches.open(CACHE_NAME);

@@ -31,6 +31,7 @@ interface SyncContextValue {
   workSites: CachedWorkSite[];
   referenceDataFetchedAt: string | null;
   lastSyncAt: string | null;
+  serviceWorkerReady: boolean;
   refresh: () => Promise<void>;
   syncNow: (manual?: boolean) => Promise<SyncRunResult>;
   refreshReferenceData: () => Promise<void>;
@@ -60,6 +61,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [authenticationRequired, setAuthenticationRequired] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [serviceWorkerReady, setServiceWorkerReady] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   const refresh = useCallback(async () => {
@@ -182,7 +184,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     void navigator.serviceWorker
       .register("/sw.js", { scope: "/", updateViaCache: "none" })
       .then(() => navigator.serviceWorker.ready)
-      .then((registration) => registration.active?.postMessage({ type: "CACHE_FIELD_SHELL" }));
+      .then((registration) => {
+        setServiceWorkerReady(true);
+        registration.active?.postMessage({ type: "CACHE_FIELD_SHELL" });
+      })
+      .catch(() => setServiceWorkerReady(false));
   }, []);
 
   const value = useMemo<SyncContextValue>(() => ({
@@ -194,6 +200,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     workSites,
     referenceDataFetchedAt,
     lastSyncAt,
+    serviceWorkerReady,
     refresh,
     syncNow,
     refreshReferenceData,
@@ -208,6 +215,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     refreshReferenceData,
     snapshot,
     syncNow,
+    serviceWorkerReady,
     workSites,
   ]);
 

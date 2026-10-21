@@ -5,6 +5,7 @@ import { Camera, CameraOff, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
+  cameraDiagnosticDetails,
   cameraErrorMessage,
   startQrScanner,
   type QrScannerSession,
@@ -33,6 +34,15 @@ export function QrCamera({ onDetected, onClose }: QrCameraProps) {
     sessionRef.current = null;
   }, []);
 
+  const reportTechnicalError = useCallback((stage: string, reason: unknown, fallbackActivated = false) => {
+    if (process.env.NODE_ENV !== "development") return;
+    console.error("[qr-camera] Falha técnica da câmera", {
+      ...cameraDiagnosticDetails(reason),
+      fallbackActivated,
+      stage,
+    });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const video = videoRef.current;
@@ -46,6 +56,16 @@ export function QrCamera({ onDetected, onClose }: QrCameraProps) {
         stop();
         if (!cancelled) onDetectedRef.current(value);
       },
+      onModeChange: (nextMode) => {
+        if (!cancelled) setMode(nextMode);
+      },
+      onDiagnostic: ({ error: reason, fallbackActivated, stage }) => {
+        reportTechnicalError(stage, reason, fallbackActivated);
+      },
+      onError: (reason) => {
+        reportTechnicalError("RUNTIME", reason);
+        if (!cancelled) setError(cameraErrorMessage(reason));
+      },
     }).then((session) => {
       if (cancelled) {
         session.stop();
@@ -55,6 +75,7 @@ export function QrCamera({ onDetected, onClose }: QrCameraProps) {
       setMode(session.mode);
       setStarting(false);
     }).catch((reason: unknown) => {
+      reportTechnicalError("START", reason);
       if (!cancelled) {
         setError(cameraErrorMessage(reason));
         setStarting(false);
@@ -65,7 +86,7 @@ export function QrCamera({ onDetected, onClose }: QrCameraProps) {
       cancelled = true;
       stop();
     };
-  }, [stop]);
+  }, [reportTechnicalError, stop]);
 
   async function switchCamera() {
     const session = sessionRef.current;
@@ -75,6 +96,7 @@ export function QrCamera({ onDetected, onClose }: QrCameraProps) {
       const switched = await session.switchCamera();
       if (!switched) setError("Não há outra câmera disponível neste dispositivo.");
     } catch (reason) {
+      reportTechnicalError("CAMERA_SWITCH", reason);
       setError(cameraErrorMessage(reason));
     } finally {
       setSwitching(false);
@@ -91,6 +113,7 @@ export function QrCamera({ onDetected, onClose }: QrCameraProps) {
       <div className="relative aspect-[3/4] max-h-[68vh] w-full bg-black sm:aspect-video">
         <video
           ref={videoRef}
+          autoPlay
           muted
           playsInline
           aria-label="Imagem ao vivo da câmera para leitura do QR code"

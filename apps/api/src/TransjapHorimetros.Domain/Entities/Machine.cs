@@ -50,4 +50,10 @@ public sealed class Machine : AuditableEntity
         MeterUnit = meterUnit;
         UpdatedAt = now.ToUniversalTime();
     }
+
+    public void ConfigureMeterUnit(MeterUnit meterUnit, DateTimeOffset now)
+    {
+        MeterUnit = meterUnit;
+        UpdatedAt = now.ToUniversalTime();
+    }
 }

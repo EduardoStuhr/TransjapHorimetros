@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReadingsTable } from "@/features/readings/components/readings-table";
+import { MachineMeterUnitForm } from "@/features/machines/components/machine-meter-unit-form";
 import {
   formatDateTime,
   formatHourMeter,
@@ -163,6 +164,7 @@ export default async function MachineDetailPage({ params }: MachinePageProps) {
               />
             </dl>
             <div className="mt-4 space-y-2"><p className="text-xs text-slate-500">Unidade da última leitura</p><MeterUnitBadge unit={machine.currentReadingMeterUnit} /></div>
+            <MachineMeterUnitForm machineId={machine.id} meterUnit={machine.meterUnit ?? null} />
           </CardContent>
         </Card>
 

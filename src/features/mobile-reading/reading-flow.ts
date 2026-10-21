@@ -23,6 +23,8 @@ export const READING_TYPE_OPTIONS: ReadonlyArray<{
 ];
 
 export const MAXIMUM_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
+export const MISSING_METER_UNIT_MESSAGE =
+  "Esta máquina ainda não possui horímetro/odômetro configurado. Solicite a configuração ao responsável.";
 export const ALLOWED_PHOTO_TYPES = new Set<OfflinePhotoPayload["mimeType"]>([
   "image/jpeg",
   "image/png",
@@ -62,7 +64,7 @@ export function validateReadingDetails(input: {
   capturedAtLocal: string;
 }) {
   if (!input.machine) return "Identifique uma máquina antes de continuar.";
-  if (!input.machine.meterUnit) return "A máquina não possui unidade de medição configurada.";
+  if (!input.machine.meterUnit) return MISSING_METER_UNIT_MESSAGE;
   if (parseReadingValue(input.readingValue) === null) {
     return "Informe uma leitura válida, com no máximo duas casas decimais.";
   }

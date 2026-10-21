@@ -145,6 +145,43 @@ public sealed class MachineService(
         return await BuildDetailsAsync(machine, cancellationToken);
     }
 
+    public async Task<MachineDetailsResponse> ConfigureMeterUnitAsync(
+        Guid id,
+        ConfigureMachineMeterUnitRequest request,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ApplicationValidationException(nameof(id), "O identificador da máquina é obrigatório.");
+        }
+        if (!request.MeterUnit.HasValue || !Enum.IsDefined(request.MeterUnit.Value))
+        {
+            throw new ApplicationValidationException(
+                nameof(request.MeterUnit),
+                "Informe a unidade HOURS ou KM confirmada para a máquina.");
+        }
+
+        var machine = await machineRepository.GetByIdAsync(id, true, cancellationToken)
+            ?? throw new EntityNotFoundException("Máquina", id);
+        var oldValue = Serialize(machine);
+        var now = timeProvider.GetUtcNow();
+        machine.ConfigureMeterUnit(request.MeterUnit.Value, now);
+        auditLogRepository.Add(new AuditLog(
+            AuditActions.MachineUpdated,
+            nameof(Machine),
+            machine.Id.ToString(),
+            oldValue,
+            Serialize(machine),
+            now,
+            correlationId,
+            currentUser?.UserId,
+            currentUser?.Email));
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await BuildDetailsAsync(machine, cancellationToken);
+    }
+
     private async Task<MachineDetailsResponse> BuildDetailsAsync(
         Machine machine,
         CancellationToken cancellationToken)

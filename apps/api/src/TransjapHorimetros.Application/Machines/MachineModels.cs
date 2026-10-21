@@ -50,6 +50,12 @@ public sealed record UpdateMachineRequest
     public MeterUnit? MeterUnit { get; init; }
 }
 
+public sealed record ConfigureMachineMeterUnitRequest
+{
+    [Required]
+    public MeterUnit? MeterUnit { get; init; }
+}
+
 public sealed record LatestReadingResponse(
     Guid Id,
     decimal Value,

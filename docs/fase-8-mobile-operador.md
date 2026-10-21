@@ -93,4 +93,4 @@ dotnet build apps/api/TransjapHorimetros.sln --configuration Release --no-restor
 dotnet test apps/api/tests/TransjapHorimetros.UnitTests/TransjapHorimetros.UnitTests.csproj --configuration Release --no-build
 ```
 
-A integração backend depende de SQL Server descartável e é executada pelo workflow oficial do pull request.
+A integração backend depende de SQL Server descartável. O workflow oficial do PR #13 provisionou esse banco e concluiu os jobs backend e frontend com sucesso na execução #13.

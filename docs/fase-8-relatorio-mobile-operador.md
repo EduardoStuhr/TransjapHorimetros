@@ -29,16 +29,16 @@
 27. **SyncEngine reutilizado:** `OfflineSyncService`, `BrowserSyncTransport`, locks, retries, IDs e provider da Fase 7 não foram duplicados.
 28. **Testes frontend:** 59 testes aprovados em 6 arquivos, incluindo 25 novos testes/variações da Fase 8 e os 34 testes de regressão existentes.
 29. **Testes backend:** 198 testes unitários aprovados localmente.
-30. **Integration tests:** sem execução local por ausência de SQL Server/Docker e da variável segura de teste; o workflow do PR provisiona SQL Server descartável e é a evidência conclusiva.
+30. **Integration tests:** sem execução local por ausência de SQL Server/Docker e da variável segura de teste; a execução #13 do workflow do PR provisionou SQL Server descartável e aprovou a suíte completa.
 31. **Lint:** ESLint aprovado sem erros ou avisos.
 32. **Build frontend:** Next.js 16.3.8/Turbopack aprovado.
 33. **Build backend:** solução .NET 10 em Release aprovada com 0 erros e 0 avisos.
-34. **CI:** validação conclusiva feita pelos jobs backend e frontend do pull request contra `main`.
+34. **CI:** execução #13 do PR #13 concluída com jobs backend e frontend verdes contra `main`.
 35. **Migration:** não necessária; nenhum schema backend ou IndexedDB foi alterado.
 36. **Azure:** nenhum recurso, configuração ou deployment Azure foi alterado.
-37. **Branch:** `feat/phase-8-mobile-operator`, criada sobre a correção de CI ainda aberta no PR #12 para manter o bootstrap dos testes de integração executável.
+37. **Branch:** `feat/phase-8-mobile-operator`; a correção de CI do PR #12 já está incorporada em `main`, portanto o PR exibe somente os commits da Fase 8.
 38. **Commits:** implementação consolidada no commit solicitado `feat: implement mobile operator experience`.
-39. **PR:** deve apontar `feat/phase-8-mobile-operator` para `main`, permanecer aberto e não ser mergeado/deployado.
+39. **PR:** [PR #13](https://github.com/EduardoStuhr/TransjapHorimetros/pull/13), de `feat/phase-8-mobile-operator` para `main`, aberto, mergeável, não mergeado e sem deploy.
 40. **Riscos restantes:** instalação depende do suporte do navegador; primeira preparação exige internet; leitura anterior só aparece quando fornecida pelo cache; sincronização automática exige o app aberto; permissões de câmera continuam sob controle do sistema/navegador.
 
 ## Critérios de aceite
@@ -54,6 +54,6 @@
 - [x] Manifesto, instalação e service worker seguro foram validados.
 - [x] Fila e tela de sincronização da Fase 7 foram reutilizadas sem duplicação.
 - [x] Lint, testes frontend, build frontend, testes unitários backend e build backend passaram localmente.
-- [ ] Jobs de CI do PR verdes (evidência registrada no próprio pull request).
+- [x] Jobs backend e frontend do PR verdes na execução #13.
 - [x] Nenhuma migration e nenhuma alteração Azure.
 - [x] PR não deve ser mergeado.

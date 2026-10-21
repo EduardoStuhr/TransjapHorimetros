@@ -5,6 +5,7 @@ using TransjapHorimetros.Application.Machines;
 using TransjapHorimetros.Application.QrCodes;
 using TransjapHorimetros.Application.Readings;
 using TransjapHorimetros.Application.Security;
+using TransjapHorimetros.Domain.Security;
 
 namespace TransjapHorimetros.Api.Controllers;
 
@@ -69,6 +70,23 @@ public sealed class MachinesController(
         [FromBody] UpdateMachineRequest request,
         CancellationToken cancellationToken) =>
         machineService.UpdateAsync(id, request, HttpContext.TraceIdentifier, cancellationToken);
+
+    /// <summary>Configura a unidade oficial da máquina sem alterar os demais dados cadastrais.</summary>
+    [HttpPatch("{id:guid}/meter-unit")]
+    [Authorize(Roles = AppRoles.Manager + "," + AppRoles.Admin)]
+    [ProducesResponseType(typeof(MachineDetailsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public Task<MachineDetailsResponse> ConfigureMeterUnit(
+        Guid id,
+        [FromBody] ConfigureMachineMeterUnitRequest request,
+        CancellationToken cancellationToken) =>
+        machineService.ConfigureMeterUnitAsync(
+            id,
+            request,
+            HttpContext.TraceIdentifier,
+            cancellationToken);
 
     /// <summary>Lista leituras de uma máquina, mais recentes primeiro.</summary>
     [HttpGet("{machineId:guid}/readings")]

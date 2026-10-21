@@ -4,6 +4,7 @@ import {
   cacheAgeState,
   canTransitionReadingStep,
   isReadingBelowPrevious,
+  MISSING_METER_UNIT_MESSAGE,
   parseReadingValue,
   tryAcquireSubmissionLock,
   validatePhoto,
@@ -39,7 +40,7 @@ describe("fluxo mobile de coleta", () => {
 
   it("valida máquina, unidade, obra e horário sem permitir unidade escolhida pelo operador", () => {
     expect(validateReadingDetails({ machine, readingValue: "120,5", workSiteId: "work-1", capturedAtLocal: "2026-10-20T10:30" })).toBeNull();
-    expect(validateReadingDetails({ machine: { ...machine, meterUnit: null }, readingValue: "120", workSiteId: "work-1", capturedAtLocal: "2026-10-20T10:30" })).toContain("unidade");
+    expect(validateReadingDetails({ machine: { ...machine, meterUnit: null }, readingValue: "120", workSiteId: "work-1", capturedAtLocal: "2026-10-20T10:30" })).toBe(MISSING_METER_UNIT_MESSAGE);
     expect(validateReadingDetails({ machine, readingValue: "120", workSiteId: "", capturedAtLocal: "2026-10-20T10:30" })).toContain("obra");
   });
 

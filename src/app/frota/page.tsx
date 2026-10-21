@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 export default async function FleetPage() {
   await connection();
   const machines = await getMachines();
+  const machinesWithoutMeterUnit = machines.filter((machine) => !machine.meterUnit).length;
 
   return (
     <div className="space-y-6">
@@ -23,6 +24,7 @@ export default async function FleetPage() {
       />
       <DataSourceNotice>
         Exibindo {machines.length} máquinas consultadas na API oficial.
+        {" "}{machinesWithoutMeterUnit} ainda sem horímetro/odômetro configurado.
         Campos sem dado operacional permanecem identificados como sem registro.
       </DataSourceNotice>
       <FleetTable data={machines} />

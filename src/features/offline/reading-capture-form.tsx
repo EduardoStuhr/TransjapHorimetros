@@ -43,6 +43,7 @@ import {
   isReadingBelowPrevious,
   localDateTimeValue,
   meterUnitLabel,
+  MISSING_METER_UNIT_MESSAGE,
   parseReadingValue,
   READING_TYPE_OPTIONS,
   tryAcquireSubmissionLock,
@@ -411,6 +412,20 @@ export function ReadingCaptureForm() {
           {step === "ENTER_READING" && machine ? (
             <div className="space-y-5">
               <MachineCard machine={machine} onChange={chooseAnotherMachine} />
+              {machine.meterUnit === null ? (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-4" role="alert">
+                  <div className="flex gap-3">
+                    <CircleAlert className="mt-0.5 size-5 shrink-0 text-amber-800" />
+                    <p className="font-semibold text-amber-950">
+                      {MISSING_METER_UNIT_MESSAGE}
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" className="mt-4 min-h-12 w-full bg-white" onClick={chooseAnotherMachine}>
+                    <RotateCcw /> Trocar máquina
+                  </Button>
+                </div>
+              ) : (
+                <>
               <div>
                 <Label htmlFor="reading-value" className="text-base">Leitura do horímetro</Label>
                 <div className="relative mt-2">
@@ -444,6 +459,8 @@ export function ReadingCaptureForm() {
                 {editingTime ? <Input type="datetime-local" value={capturedAt} onChange={(event) => setCapturedAt(event.target.value)} className="mt-3 min-h-12" aria-label="Horário da coleta" /> : null}
               </div>
               <Button type="button" className="min-h-14 w-full text-base" onClick={continueToPhoto}>Continuar para foto <ArrowRight /></Button>
+                </>
+              )}
             </div>
           ) : null}
 

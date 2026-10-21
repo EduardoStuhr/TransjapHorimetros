@@ -22,4 +22,10 @@ public interface IMachineService
         UpdateMachineRequest request,
         string correlationId,
         CancellationToken cancellationToken);
+
+    Task<MachineDetailsResponse> ConfigureMeterUnitAsync(
+        Guid id,
+        ConfigureMachineMeterUnitRequest request,
+        string correlationId,
+        CancellationToken cancellationToken);
 }

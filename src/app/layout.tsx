@@ -13,7 +13,11 @@ export const metadata: Metadata = {
   description:
     "Sistema administrativo para gestão de horímetros da frota Transjap.",
   icons: {
-    icon: "/simbolo-transjap.png",
+    icon: [
+      { url: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/pwa-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" }],
   },
 };
 

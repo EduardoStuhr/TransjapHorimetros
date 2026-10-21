@@ -8,6 +8,11 @@ import { Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  defaultAuthenticatedPath,
+  isOperatorOnly,
+  isOperatorPathAllowed,
+} from "@/components/layout/navigation";
 import type { PublicAuthResponse } from "@/lib/auth/types";
 
 const DASHBOARD_ROLES = new Set(["SUPERVISOR", "MANAGER", "ADMIN"]);
@@ -60,14 +65,14 @@ export default function LoginPage() {
     const returnNeedsDashboardRole = requestedPath === "/"
       || requestedPath?.startsWith("/alertas")
       || requestedPath?.startsWith("/relatorios");
+    const operatorOnly = isOperatorOnly(auth.user.roles);
     const safeReturnPath = requestedPath?.startsWith("/")
       && !requestedPath.startsWith("//")
       && (!returnNeedsDashboardRole || canViewDashboard)
+      && (!operatorOnly || isOperatorPathAllowed(requestedPath))
       ? requestedPath
       : null;
-    const defaultPath = canViewDashboard
-      ? "/"
-      : "/frota";
+    const defaultPath = defaultAuthenticatedPath(auth.user.roles);
 
     router.replace(safeReturnPath ?? defaultPath);
     router.refresh();

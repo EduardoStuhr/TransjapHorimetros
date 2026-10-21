@@ -7,24 +7,23 @@ import { DatabaseZap } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import {
-  canAccessNavigationItem,
   isNavigationItemActive,
-  navigationItems,
+  isOperatorOnly,
+  navigationItemsForRoles,
 } from "@/components/layout/navigation";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const visibleItems = navigationItems.filter((item) =>
-    canAccessNavigationItem(user.roles, item),
-  );
+  const visibleItems = navigationItemsForRoles(user.roles);
+  const operatorOnly = isOperatorOnly(user.roles);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-68 flex-col border-r border-white/10 bg-[var(--sidebar)] text-[var(--sidebar-foreground)] lg:flex">
       <div className="border-b border-white/10 px-5 py-5">
         <Link
-          href="/"
-          aria-label="Ir para o Dashboard"
+          href={operatorOnly ? "/coleta" : "/"}
+          aria-label={operatorOnly ? "Ir para registrar leitura" : "Ir para o Dashboard"}
           className="block rounded-md bg-white px-3 py-3 shadow-sm"
         >
           <Image
@@ -37,7 +36,7 @@ export function Sidebar() {
           />
         </Link>
         <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-blue-100/70">
-          Gestão de horímetros
+          {operatorOnly ? "Operação de campo" : "Gestão de horímetros"}
         </p>
       </div>
 

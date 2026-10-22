@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.Common;
 using TransjapHorimetros.Application.Exceptions;
+using TransjapHorimetros.Application.RegisteredDevices;
 using TransjapHorimetros.Domain.Entities;
 
 namespace TransjapHorimetros.Application.PhotoEvidence;
@@ -17,13 +18,15 @@ public sealed class PhotoEvidenceService(
     PhotoFileValidator fileValidator,
     TimeProvider timeProvider,
     ILogger<PhotoEvidenceService> logger,
-    Ocr.IPhotoOcrService? ocrService = null) : IPhotoEvidenceService
+    Ocr.IPhotoOcrService? ocrService = null,
+    IRegisteredDeviceService? registeredDeviceService = null) : IPhotoEvidenceService
 {
     public async Task<UploadPhotoEvidenceResult> UploadAsync(
         Guid readingId,
         UploadPhotoEvidenceRequest request,
         string correlationId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? deviceSessionToken = null)
     {
         ValidateRequest(readingId, request);
         var actorUserId = currentUser.UserId
@@ -51,9 +54,25 @@ public sealed class PhotoEvidenceService(
             }
         }
 
-        _ = await readingRepository.GetByIdAsync(readingId, cancellationToken)
+        var reading = await readingRepository.GetByIdAsync(readingId, cancellationToken)
             ?? throw new EntityNotFoundException("Leitura", readingId);
 
+        if (reading.RegisteredDeviceId.HasValue)
+        {
+            if (registeredDeviceService is null)
+            {
+                throw new ForbiddenException("Comprove um dispositivo autorizado antes de enviar a evidência fotográfica.");
+            }
+
+            var sessionDeviceId = await registeredDeviceService.ValidateDeviceSessionAsync(deviceSessionToken, cancellationToken);
+            if (sessionDeviceId != reading.RegisteredDeviceId.Value)
+            {
+                throw new ForbiddenException("A evidência fotográfica deve ser enviada pelo mesmo dispositivo que registrou a leitura.");
+            }
+        }
+
+        // LEGACY COMPATIBILITY EXCEPTION: readings created before device identity keep
+        // RegisteredDeviceId null; no device relationship is invented or backfilled.
         await using var file = await fileValidator.ValidateAndSpoolAsync(
             request.Content,
             request.ContentType,

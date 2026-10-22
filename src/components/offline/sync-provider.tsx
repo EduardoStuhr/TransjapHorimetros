@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { useDeviceIdentity } from "@/features/device-identity/device-identity-provider";
 import { getOfflineStore } from "@/offline/indexed-db-store";
 import { OfflineSyncService, type ConnectivityState, type SyncRunResult } from "@/offline/sync-engine";
 import { BrowserSyncTransport } from "@/offline/sync-transport";
@@ -52,6 +53,7 @@ const SyncContext = createContext<SyncContextValue | null>(null);
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { getDeviceSession } = useDeviceIdentity();
   const store = useMemo(() => getOfflineStore(), []);
   const [snapshot, setSnapshot] = useState<QueueSnapshot>(emptySnapshot);
   const [machines, setMachines] = useState<CachedMachine[]>([]);
@@ -84,7 +86,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const syncNow = useCallback(async (manual = true) => {
     setIsSyncing(true);
     notify("sync_started");
-    const engine = new OfflineSyncService(store, new BrowserSyncTransport(), {
+    const engine = new OfflineSyncService(store, new BrowserSyncTransport(getDeviceSession), {
       onConnectivityChange: setConnectivity,
       onAuthenticationRequired: () => {
         setAuthenticationRequired(true);
@@ -101,7 +103,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       notify("sync_finished");
       notify("queue_changed");
     }
-  }, [notify, refresh, store, user.id]);
+  }, [getDeviceSession, notify, refresh, store, user.id]);
 
   const refreshReferenceData = useCallback(async () => {
     try {

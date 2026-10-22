@@ -6,7 +6,8 @@ public interface IPhotoEvidenceService
         Guid readingId,
         UploadPhotoEvidenceRequest request,
         string correlationId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? deviceSessionToken = null);
 
     Task<PhotoEvidenceResponse> GetMetadataAsync(
         Guid readingId,

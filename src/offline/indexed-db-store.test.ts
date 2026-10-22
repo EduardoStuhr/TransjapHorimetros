@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { IndexedDbOfflineStore, OFFLINE_DB_VERSION } from "@/offline/indexed-db-store";
 import { sha256Hex } from "@/offline/crypto";
+import { generateDeviceIdentity } from "@/features/device-identity/device-crypto";
 import type { EnqueueReadingInput } from "@/offline/types";
 
 const databases: string[] = [];
@@ -137,6 +138,91 @@ describe("IndexedDbOfflineStore", () => {
     const deviceId3 = await reopened.getOrCreateDeviceId();
     expect(deviceId3).toBe(deviceId1);
     reopened.close();
+  });
+
+  it("persiste a CryptoKey privada nao exportavel no store dedicado", async () => {
+    const { name, store } = createStore();
+    const identity = await generateDeviceIdentity(await store.getOrCreateDeviceId(), "Tablet teste");
+    await store.saveDeviceIdentity(identity);
+    store.close();
+
+    const reopened = new IndexedDbOfflineStore(name);
+    const restored = await reopened.getDeviceIdentity();
+    expect(restored?.privateKey).toBeInstanceOf(CryptoKey);
+    expect(restored?.privateKey.extractable).toBe(false);
+    expect(restored?.publicKeySpki).toBe(identity.publicKeySpki);
+    reopened.close();
+  });
+
+  it("logout limpa apenas o usuario autenticado e preserva a identidade local", async () => {
+    const { store } = createStore();
+    const identity = await generateDeviceIdentity(await store.getOrCreateDeviceId(), "Tablet teste");
+    await store.saveDeviceIdentity(identity);
+    await store.cacheAuthenticatedUser({
+      id: "user-1",
+      email: "user@example.com",
+      fullName: "Usuario Teste",
+      isActive: true,
+      roles: ["OPERATOR"],
+      createdAt: "2026-10-22T12:00:00Z",
+      lastLoginAt: null,
+    });
+
+    await store.clearCachedAuthenticatedUser();
+
+    expect(await store.getCachedAuthenticatedUser()).toBeNull();
+    expect((await store.getDeviceIdentity())?.publicKeySpki).toBe(identity.publicKeySpki);
+    store.close();
+  });
+
+  it("migra banco v1 para v2 preservando fila, fotos e metadados", async () => {
+    const name = `transjap-v1-${crypto.randomUUID()}`;
+    databases.push(name);
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(name, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        const events = db.createObjectStore("events", { keyPath: "localEventId" });
+        events.createIndex("clientEventId", "clientEventId", { unique: true });
+        events.createIndex("userId", "userId");
+        events.createIndex("status", "status");
+        events.createIndex("createdAtLocal", "createdAtLocal");
+        db.createObjectStore("photos", { keyPath: "blobKey" });
+        db.createObjectStore("machines", { keyPath: "id" });
+        db.createObjectStore("worksites", { keyPath: "id" });
+        db.createObjectStore("metadata", { keyPath: "key" });
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction(["events", "photos", "machines", "worksites", "metadata"], "readwrite");
+        tx.objectStore("events").put({ localEventId: "event-1", clientEventId: "client-1", userId: "user-1", status: "PENDING", createdAtLocal: "2026-10-22T12:00:00Z" });
+        tx.objectStore("photos").put({ blobKey: "photo-1", blob: new Blob(["photo"]) });
+        tx.objectStore("machines").put({ id: "machine-1", fleetNumber: 1 });
+        tx.objectStore("worksites").put({ id: "site-1", name: "Obra" });
+        tx.objectStore("metadata").put({ key: "device-id", value: "web-existing" });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      request.onerror = () => reject(request.error);
+    });
+
+    const upgraded = new IndexedDbOfflineStore(name);
+    expect((await upgraded.getEventsForUser("user-1"))[0]?.localEventId).toBe("event-1");
+    expect((await upgraded.getPhotoBlob("photo-1"))?.blob).toBeInstanceOf(Blob);
+    expect(await upgraded.getOrCreateDeviceId()).toBe("web-existing");
+    expect(await upgraded.getDeviceIdentity()).toBeNull();
+    upgraded.close();
+
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    expect(db.version).toBe(OFFLINE_DB_VERSION);
+    expect(db.objectStoreNames.contains("device_identity")).toBe(true);
+    expect(db.objectStoreNames.contains("events")).toBe(true);
+    expect(db.objectStoreNames.contains("photos")).toBe(true);
+    db.close();
   });
 
   it("cleanup preserva rigorosamente eventos e blobs em PENDING, SYNCING, FAILED_RETRYABLE e FAILED_PERMANENT", async () => {

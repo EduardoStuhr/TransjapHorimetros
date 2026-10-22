@@ -73,7 +73,8 @@ public sealed record ReadingResponse(
     string? DeviceId = null,
     Guid? PreviousReadingId = null,
     decimal? DifferenceFromPrevious = null,
-    Guid? CorrectionOfReadingId = null)
+    Guid? CorrectionOfReadingId = null,
+    Guid? RegisteredDeviceId = null)
 {
     public int AnomalyCount { get; init; }
     public int OpenAnomalyCount { get; init; }

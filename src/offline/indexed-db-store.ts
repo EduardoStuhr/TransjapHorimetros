@@ -13,10 +13,11 @@ import {
   type OfflineStore,
   type QueueSnapshot,
   type StoredPhotoBlob,
+  type StoredDeviceIdentity,
 } from "@/offline/types";
 
 export const OFFLINE_DB_NAME = "transjap-horimetros-offline";
-export const OFFLINE_DB_VERSION = 1;
+export const OFFLINE_DB_VERSION = 2;
 
 const stores = {
   events: "events",
@@ -24,6 +25,7 @@ const stores = {
   machines: "machines",
   worksites: "worksites",
   metadata: "metadata",
+  deviceIdentity: "device_identity",
 } as const;
 
 interface MetadataRecord<T = unknown> {
@@ -122,6 +124,9 @@ export class IndexedDbOfflineStore implements OfflineStore {
         }
         if (!database.objectStoreNames.contains(stores.metadata)) {
           database.createObjectStore(stores.metadata, { keyPath: "key" });
+        }
+        if (!database.objectStoreNames.contains(stores.deviceIdentity)) {
+          database.createObjectStore(stores.deviceIdentity, { keyPath: "key" });
         }
       };
       request.onsuccess = () => {
@@ -439,6 +444,21 @@ export class IndexedDbOfflineStore implements OfflineStore {
     const deviceId = `web-${crypto.randomUUID()}`;
     await this.putMetadata("device-id", deviceId);
     return deviceId;
+  }
+
+  async getDeviceIdentity() {
+    const database = await this.open();
+    const transaction = database.transaction(stores.deviceIdentity, "readonly");
+    return (await requestResult<StoredDeviceIdentity | undefined>(
+      transaction.objectStore(stores.deviceIdentity).get("current"),
+    )) ?? null;
+  }
+
+  async saveDeviceIdentity(identity: StoredDeviceIdentity) {
+    const database = await this.open();
+    const transaction = database.transaction(stores.deviceIdentity, "readwrite");
+    transaction.objectStore(stores.deviceIdentity).put(identity);
+    await transactionDone(transaction);
   }
 
   cacheAuthenticatedUser(user: AuthUser) {

@@ -17,11 +17,14 @@ using TransjapHorimetros.Infrastructure.Persistence.Seed;
 
 namespace TransjapHorimetros.IntegrationTests;
 
-public sealed class TransjapApiFactory : WebApplicationFactory<Program>
+public class TransjapApiFactory : WebApplicationFactory<Program>
 {
     private const string TestSigningKey = "transjap-phase-3-integration-tests-signing-key-2026";
     private readonly string _connectionString;
     private readonly string? _originalAppConnectionString;
+    private readonly TestTimeProvider _timeProvider = new(DateTimeOffset.UtcNow);
+
+    public TestTimeProvider TimeProvider => _timeProvider;
 
     public TransjapApiFactory()
     {
@@ -57,6 +60,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
                 ["Ocr:MaximumRetries"] = "0",
                 ["RateLimiting:PermitLimit"] = "10000",
                 ["RateLimiting:AuthLogin:PermitLimit"] = "10000",
+                ["RateLimiting:DeviceIdentity:PermitLimit"] = "10000",
+                ["DeviceIdentity:EnforceForReadings"] = "false",
             });
         });
         return base.CreateHost(builder);
@@ -67,6 +72,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.ConfigureServices(services =>
         {
+            // services.RemoveAll<TimeProvider>();
+            // services.AddSingleton<TimeProvider>(_timeProvider);
             services.RemoveAll<IPhotoOcrProvider>();
             services.AddSingleton<FakePhotoOcrProvider>();
             services.AddSingleton<IPhotoOcrProvider>(p => p.GetRequiredService<FakePhotoOcrProvider>());
@@ -128,6 +135,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
 
     public async Task ResetDatabaseAsync()
     {
+        _timeProvider.SetUtcNow(DateTimeOffset.UtcNow);
         TestDatabaseGuard.EnsureSafeTestDatabase(
             TestDatabaseGuard.TestingEnvironmentName,
             _connectionString,
@@ -139,6 +147,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             DELETE FROM anomalies;
+            DELETE FROM device_challenges;
             DELETE FROM photo_ocr_results;
             DELETE FROM photo_evidence;
             DELETE FROM machine_qr_codes;
@@ -150,6 +159,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
             DELETE FROM user_roles;
             DELETE FROM user_tokens;
             DELETE FROM hour_meter_readings;
+            DELETE FROM registered_devices;
             DELETE FROM users;
             DELETE FROM work_sites;
             DELETE FROM machines;
@@ -160,6 +170,17 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         await seeder.SeedAsync();
         // Synthetic test fixture only; never backfill unknown production fleet units.
         await dbContext.Machines.ExecuteUpdateAsync(set => set.SetProperty(m => m.MeterUnit, MeterUnit.Hours));
+    }
+
+    public sealed class TestTimeProvider(DateTimeOffset initialUtcNow) : TimeProvider
+    {
+        private DateTimeOffset _utcNow = initialUtcNow;
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public void SetUtcNow(DateTimeOffset value) => _utcNow = value;
+
+        public void Advance(TimeSpan delta) => _utcNow = _utcNow.Add(delta);
     }
 
     private static void EnsureIdentitySucceeded(IdentityResult result)

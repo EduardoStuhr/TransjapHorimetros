@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { useDeviceIdentity } from "@/features/device-identity/device-identity-provider";
 import { useSync } from "@/components/offline/sync-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -171,6 +172,7 @@ function ReadinessCard() {
 
 export function ReadingCaptureForm() {
   const { user } = useAuth();
+  const { identity } = useDeviceIdentity();
   const {
     workSites,
     refresh,
@@ -296,6 +298,10 @@ export function ReadingCaptureForm() {
 
   async function saveReading() {
     if (step !== "REVIEW" || savingRef.current) return;
+    if (!identity?.registeredDeviceId || identity.status !== "AUTHORIZED") {
+      setMessage("Este dispositivo não está autorizado para registrar leituras.");
+      return;
+    }
     const detailError = validateReadingDetails({ machine, readingValue, workSiteId: effectiveWorkSiteId, capturedAtLocal: capturedAt });
     const photoError = validatePhoto(photo);
     if (detailError || photoError || !machine || !photo) {
@@ -311,7 +317,7 @@ export function ReadingCaptureForm() {
     const generation = syncGenerationRef.current + 1;
     syncGenerationRef.current = generation;
     try {
-      const deviceId = await store.getOrCreateDeviceId();
+      const deviceId = identity.localDeviceId;
       const photoSha256 = await sha256Hex(photo);
       const queued = await store.enqueueReadingWithPhoto({
         reading: {
@@ -321,6 +327,11 @@ export function ReadingCaptureForm() {
           readingType,
           capturedAtDevice: new Date(capturedAt).toISOString(),
           deviceId,
+          deviceIdentity: {
+            localDeviceId: identity.localDeviceId,
+            registeredDeviceId: identity.registeredDeviceId,
+            status: "AUTHORIZED",
+          },
         },
         photo,
         photoFileName: photo.name || `horimetro-frota-${machine.fleetNumber}.jpg`,

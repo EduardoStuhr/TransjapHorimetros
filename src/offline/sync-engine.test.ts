@@ -451,4 +451,94 @@ describe("OfflineSyncService", () => {
     const firstRun = await firstRunPromise;
     expect(firstRun.synced).toBe(2);
   });
+
+  it("revogado enquanto offline: reading vira FAILED_PERMANENT, photo permanece PENDING/BLOCKED, blob e ClientEventId permanecem íntegros", async () => {
+    const store = createStore();
+    const queued = await store.enqueueReadingWithPhoto(await input("user-1"));
+    const readingClientId = queued.readingEvent.clientEventId;
+    const photoClientId = queued.photoEvent.clientEventId;
+
+    const transport = new FakeTransport();
+    transport.reading = async () => {
+      throw new SyncTransportError("Este dispositivo foi revogado. A fila local permanece preservada para revisao.", 403);
+    };
+
+    const engine = new OfflineSyncService(store, transport);
+    const result = await engine.sync("user-1");
+
+    expect(result.permanentFailures).toBe(1);
+    expect(result.synced).toBe(0);
+
+    const readingEvent = await store.getEvent(queued.readingEvent.localEventId);
+    const photoEvent = await store.getEvent(queued.photoEvent.localEventId);
+    const photoBlob = await store.getPhotoBlob(queued.photoEvent.payload.blobKey);
+
+    expect(readingEvent?.status).toBe("FAILED_PERMANENT");
+    expect(readingEvent?.clientEventId).toBe(readingClientId);
+
+    // Foto dependente nunca foi tentada pois leitura não sincronizou
+    expect(photoEvent?.status).toBe("PENDING");
+    expect(photoEvent?.clientEventId).toBe(photoClientId);
+
+    // Nenhum dado apagado, blob permanece
+    expect(photoBlob).toBeDefined();
+
+    // Cleanup com retenção zero não remove dados com falha ou pendentes
+    await store.removeSyncedDataWhenSafe({
+      blobRetentionMs: 0,
+      eventRetentionMs: 0,
+      now: new Date(),
+    });
+
+    expect(await store.getPhotoBlob(queued.photoEvent.payload.blobKey)).toBeDefined();
+    expect(await store.getEvent(queued.readingEvent.localEventId)).toBeDefined();
+    expect(await store.getEvent(queued.photoEvent.localEventId)).toBeDefined();
+  });
+
+  it("revogação entre leitura e foto: leitura sincroniza, photo sofre 403 e vira FAILED_PERMANENT sem apagar blob local", async () => {
+    const store = createStore();
+    const queued = await store.enqueueReadingWithPhoto(await input("user-1"));
+    const readingClientId = queued.readingEvent.clientEventId;
+    const photoClientId = queued.photoEvent.clientEventId;
+    const serverReadingId = "reading-srv-revoked-after";
+
+    const transport = new FakeTransport();
+    transport.reading = async () => ({
+      status: 201,
+      resourceId: serverReadingId,
+      body: { id: serverReadingId },
+    });
+    transport.photo = async () => {
+      throw new SyncTransportError("Este dispositivo foi revogado. A fila local foi preservada, mas nao pode ser sincronizada.", 403);
+    };
+
+    const engine = new OfflineSyncService(store, transport);
+    const result = await engine.sync("user-1");
+
+    expect(result.synced).toBe(1);
+    expect(result.permanentFailures).toBe(1);
+
+    const readingEvent = await store.getEvent(queued.readingEvent.localEventId);
+    const photoEvent = await store.getEvent(queued.photoEvent.localEventId);
+    const photoBlob = await store.getPhotoBlob(queued.photoEvent.payload.blobKey);
+
+    expect(readingEvent?.status).toBe("SYNCED");
+    expect(readingEvent?.serverReadingId).toBe(serverReadingId);
+    expect(readingEvent?.clientEventId).toBe(readingClientId);
+
+    expect(photoEvent?.status).toBe("FAILED_PERMANENT");
+    expect(photoEvent?.clientEventId).toBe(photoClientId);
+
+    // Blob da foto DEVE permanecer no IndexedDB para auditoria / revisão
+    expect(photoBlob).toBeDefined();
+
+    await store.removeSyncedDataWhenSafe({
+      blobRetentionMs: 0,
+      eventRetentionMs: 0,
+      now: new Date(),
+    });
+
+    // Blob da foto com falha permanente NÃO pode ser apagado
+    expect(await store.getPhotoBlob(queued.photoEvent.payload.blobKey)).toBeDefined();
+  });
 });

@@ -19,5 +19,6 @@ public interface IReadingService
     Task<CreateReadingResult> CreateAsync(
         CreateReadingRequest request,
         string correlationId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? deviceSessionToken = null);
 }

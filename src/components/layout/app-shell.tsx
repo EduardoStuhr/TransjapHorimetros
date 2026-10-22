@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { DeviceIdentityProvider } from "@/features/device-identity/device-identity-provider";
 import { Header } from "@/components/layout/header";
 import { OperatorBottomNavigation } from "@/components/layout/operator-bottom-navigation";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -19,7 +20,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <AuthProvider>
-      <SyncProvider>
+      <DeviceIdentityProvider>
+        <SyncProvider>
         <div className="min-h-screen">
           <Sidebar />
           <div className="min-h-screen min-w-0 overflow-x-hidden lg:pl-68">
@@ -31,7 +33,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <InstallPrompt />
           <OperatorBottomNavigation />
         </div>
-      </SyncProvider>
+        </SyncProvider>
+      </DeviceIdentityProvider>
     </AuthProvider>
   );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { DeviceIdentityError } from "@/features/device-identity/device-identity-error";
 import { BrowserSyncTransport, SyncTransportError } from "@/offline/sync-transport";
 import type { OfflinePhotoEvent, OfflineReadingEvent, StoredPhotoBlob } from "@/offline/types";
 
@@ -29,6 +30,11 @@ describe("BrowserSyncTransport", () => {
       readingType: "INTERMEDIATE",
       capturedAtDevice: "2026-10-19T09:55:00.000Z",
       deviceId: "dev-abc",
+      deviceIdentity: {
+        localDeviceId: "dev-abc",
+        registeredDeviceId: "registered-1",
+        status: "AUTHORIZED",
+      },
     },
   };
 
@@ -81,7 +87,7 @@ describe("BrowserSyncTransport", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const transport = new BrowserSyncTransport();
+    const transport = new BrowserSyncTransport(async () => "device-session-token");
     const result = await transport.createReading(readingEvent);
 
     expect(result.status).toBe(201);
@@ -89,16 +95,47 @@ describe("BrowserSyncTransport", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/readings", expect.objectContaining({
       method: "POST",
       body: JSON.stringify({
-        ...readingEvent.payload,
+        machineId: "m-1",
+        workSiteId: "w-1",
+        value: 250.5,
+        readingType: "INTERMEDIATE",
+        capturedAtDevice: "2026-10-19T09:55:00.000Z",
+        deviceId: "dev-abc",
         clientEventId: "client-event-123",
       }),
+      headers: expect.objectContaining({ "X-Device-Session": "device-session-token" }),
     }));
   });
 
-  it("POST /api/readings/:id/photo envia FormData com campos de rastreabilidade", async () => {
+  it("nao envia a identidade registrada declarada pela fila sem prova", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const transport = new BrowserSyncTransport(async () => { throw new Error("Dispositivo revogado"); });
+    await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
+      status: 403,
+      message: "Dispositivo revogado",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("classifica identidade local quebrada como falha permanente sem enviar requisicao", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const transport = new BrowserSyncTransport(async () => {
+      throw new DeviceIdentityError("A identidade local e invalida. A fila foi preservada.");
+    });
+
+    await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
+      status: 403,
+      message: "A identidade local e invalida. A fila foi preservada.",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/readings/:id/photo envia FormData com campos de rastreabilidade e X-Device-Session", async () => {
     let capturedBody: FormData | null = null;
+    let capturedHeaders: HeadersInit | undefined;
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
       capturedBody = init.body as FormData;
+      capturedHeaders = init.headers;
       return new Response(JSON.stringify({ readingId: "server-reading-999" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -106,7 +143,7 @@ describe("BrowserSyncTransport", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const transport = new BrowserSyncTransport();
+    const transport = new BrowserSyncTransport(async () => "photo-session-token");
     const result = await transport.uploadPhoto(photoEvent, "server-reading-999", storedBlob);
 
     expect(result.status).toBe(200);
@@ -117,6 +154,19 @@ describe("BrowserSyncTransport", () => {
     expect(formData.get("deviceId")).toBe("dev-abc");
     expect(formData.get("clientEventId")).toBe("client-photo-456");
     expect(formData.get("file")).toBeDefined();
+    expect(capturedHeaders).toEqual(expect.objectContaining({
+      "X-Device-Session": "photo-session-token",
+    }));
+  });
+
+  it("uploadPhoto falha com 403 se dispositivo foi revogado sem enviar requisicao", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const transport = new BrowserSyncTransport(async () => { throw new Error("Dispositivo revogado"); });
+    await expect(transport.uploadPhoto(photoEvent, "server-reading-999", storedBlob)).rejects.toMatchObject({
+      status: 403,
+      message: "Dispositivo revogado",
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("sanitiza mensagens sensíveis em caso de falha de transporte", async () => {

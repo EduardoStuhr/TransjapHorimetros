@@ -46,7 +46,8 @@ public sealed class ReadingsController(
         var result = await readingService.CreateAsync(
             request,
             HttpContext.TraceIdentifier,
-            cancellationToken);
+            cancellationToken,
+            Request.Headers["X-Device-Session"].FirstOrDefault());
         return result.IsExisting
             ? Ok(result.Reading)
             : CreatedAtAction(nameof(GetById), new { id = result.Reading.Id }, result.Reading);
@@ -61,6 +62,7 @@ public sealed class ReadingsController(
     [ProducesResponseType(typeof(PhotoEvidenceResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(PhotoEvidenceResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status413PayloadTooLarge)]
@@ -85,7 +87,8 @@ public sealed class ReadingsController(
                 form.DeviceId,
                 form.ClientEventId),
             HttpContext.TraceIdentifier,
-            cancellationToken);
+            cancellationToken,
+            Request.Headers["X-Device-Session"].FirstOrDefault());
 
         return result.IsExisting
             ? Ok(result.Evidence)

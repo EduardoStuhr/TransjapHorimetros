@@ -98,6 +98,65 @@ public sealed class PhotoEvidenceServiceTests
         Assert.Equal(1, context.Storage.UploadCount);
     }
 
+    [Fact]
+    public async Task Upload_ReadingWithRegisteredDevice_MissingDeviceSession_ThrowsForbidden()
+    {
+        var deviceId = Guid.NewGuid();
+        var context = CreateContext(registeredDeviceId: deviceId, registeredDeviceService: new RegisteredDeviceServiceFake(deviceId));
+        await Assert.ThrowsAsync<ForbiddenException>(() => context.Service.UploadAsync(
+            context.Reading.Id,
+            new UploadPhotoEvidenceRequest(new MemoryStream(PhotoFileValidatorTests.CreateJpeg()), "proof.jpg", "image/jpeg", null, null, null),
+            "test-correlation",
+            CancellationToken.None,
+            deviceSessionToken: null));
+        Assert.Equal(0, context.Storage.UploadCount);
+    }
+
+    [Fact]
+    public async Task Upload_ReadingWithRegisteredDevice_MismatchedDevice_ThrowsForbidden()
+    {
+        var deviceA = Guid.NewGuid();
+        var deviceB = Guid.NewGuid();
+        var context = CreateContext(registeredDeviceId: deviceA, registeredDeviceService: new RegisteredDeviceServiceFake(deviceB));
+        var ex = await Assert.ThrowsAsync<ForbiddenException>(() => context.Service.UploadAsync(
+            context.Reading.Id,
+            new UploadPhotoEvidenceRequest(new MemoryStream(PhotoFileValidatorTests.CreateJpeg()), "proof.jpg", "image/jpeg", null, null, null),
+            "test-correlation",
+            CancellationToken.None,
+            deviceSessionToken: "valid-session-for-device-b"));
+        Assert.Contains("mesmo dispositivo", ex.Message);
+        Assert.Equal(0, context.Storage.UploadCount);
+    }
+
+    [Fact]
+    public async Task Upload_ReadingWithRegisteredDevice_MatchingDevice_Succeeds()
+    {
+        var deviceA = Guid.NewGuid();
+        var context = CreateContext(registeredDeviceId: deviceA, registeredDeviceService: new RegisteredDeviceServiceFake(deviceA));
+        var result = await context.Service.UploadAsync(
+            context.Reading.Id,
+            new UploadPhotoEvidenceRequest(new MemoryStream(PhotoFileValidatorTests.CreateJpeg()), "proof.jpg", "image/jpeg", null, null, null),
+            "test-correlation",
+            CancellationToken.None,
+            deviceSessionToken: "valid-session-for-device-a");
+        Assert.False(result.IsExisting);
+        Assert.Equal(1, context.Storage.UploadCount);
+    }
+
+    [Fact]
+    public async Task Upload_HistoricalReadingWithoutRegisteredDevice_SucceedsWithoutDeviceSession()
+    {
+        var context = CreateContext(registeredDeviceId: null);
+        var result = await context.Service.UploadAsync(
+            context.Reading.Id,
+            new UploadPhotoEvidenceRequest(new MemoryStream(PhotoFileValidatorTests.CreateJpeg()), "proof.jpg", "image/jpeg", null, null, null),
+            "test-correlation",
+            CancellationToken.None,
+            deviceSessionToken: null);
+        Assert.False(result.IsExisting);
+        Assert.Equal(1, context.Storage.UploadCount);
+    }
+
     private sealed class FailingOcr : IPhotoOcrService
     {
         public Task<PhotoOcrResponse> GetLatestAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
@@ -121,7 +180,10 @@ public sealed class PhotoEvidenceServiceTests
             "test-correlation",
             CancellationToken.None);
 
-    private static TestContext CreateContext(IPhotoOcrService? ocr = null)
+    private static TestContext CreateContext(
+        IPhotoOcrService? ocr = null,
+        IRegisteredDeviceService? registeredDeviceService = null,
+        Guid? registeredDeviceId = null)
     {
         var reading = new HourMeterReading(
             Guid.NewGuid(),
@@ -132,7 +194,8 @@ public sealed class PhotoEvidenceServiceTests
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow,
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            registeredDeviceId: registeredDeviceId);
         var readingRepository = new ReadingRepositoryFake(reading);
         var evidenceRepository = new PhotoEvidenceRepositoryFake();
         var storage = new PhotoStorageFake();
@@ -147,8 +210,29 @@ public sealed class PhotoEvidenceServiceTests
             new CurrentUserFake(),
             new PhotoFileValidator(options),
             TimeProvider.System,
-            NullLogger<PhotoEvidenceService>.Instance, ocr);
+            NullLogger<PhotoEvidenceService>.Instance,
+            ocr,
+            registeredDeviceService);
         return new TestContext(service, reading, storage, evidenceRepository, unitOfWork);
+    }
+
+    private sealed class RegisteredDeviceServiceFake(Guid? validatedDeviceId) : IRegisteredDeviceService
+    {
+        public Task<RegisteredDeviceResponse> RegisterAsync(RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<CurrentDeviceStatusResponse> GetStatusAsync(string localDeviceId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<PagedResponse<RegisteredDeviceResponse>> GetPageAsync(RegisteredDeviceQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RegisteredDeviceAuditResponse>> GetHistoryAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisteredDeviceResponse> AuthorizeAsync(Guid id, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisteredDeviceResponse> RevokeAsync(Guid id, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisteredDeviceResponse> RenameAsync(Guid id, RenameDeviceRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<DeviceChallengeResponse> CreateChallengeAsync(DeviceChallengeRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<DeviceSessionResponse> VerifyChallengeAsync(VerifyDeviceChallengeRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Guid?> ValidateDeviceSessionAsync(string? token, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(token)) throw new ForbiddenException("Comprove um dispositivo autorizado.");
+            if (validatedDeviceId.HasValue) return Task.FromResult<Guid?>(validatedDeviceId.Value);
+            throw new ForbiddenException("Dispositivo invalido.");
+        }
     }
 
     private sealed record TestContext(

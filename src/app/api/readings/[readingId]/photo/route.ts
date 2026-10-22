@@ -38,6 +38,7 @@ export async function POST(
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": contentType,
           "X-Correlation-ID": crypto.randomUUID(),
+          "X-Device-Session": request.headers.get("X-Device-Session") ?? "",
         },
         duplex: "half",
       } as RequestInit & { duplex: "half" },

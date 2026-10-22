@@ -55,9 +55,13 @@ public sealed class HourMeterReadingConfiguration : IEntityTypeConfiguration<Hou
         builder.Property(r => r.PreviousReadingId).HasColumnName("previous_reading_id");
         builder.Property(r => r.DifferenceFromPrevious).HasColumnName("difference_from_previous").HasPrecision(12, 2);
         builder.Property(r => r.CorrectionOfReadingId).HasColumnName("correction_of_reading_id");
+        builder.Property(r => r.RegisteredDeviceId).HasColumnName("registered_device_id");
         builder.HasOne<HourMeterReading>().WithMany().HasForeignKey(r => r.PreviousReadingId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<HourMeterReading>().WithMany(r => r.Corrections).HasForeignKey(r => r.CorrectionOfReadingId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(r => r.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(r => r.RegisteredDevice).WithMany(device => device.Readings)
+            .HasForeignKey(r => r.RegisteredDeviceId).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_hour_meter_readings_registered_devices_registered_device_id");
         builder.ToTable("hour_meter_readings", table =>
         {
             table.HasCheckConstraint("ck_readings_previous_pair", "(previous_reading_id IS NULL AND difference_from_previous IS NULL) OR (previous_reading_id IS NOT NULL AND difference_from_previous IS NOT NULL AND previous_reading_id <> id)");

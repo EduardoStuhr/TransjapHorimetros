@@ -10,7 +10,10 @@ export async function POST(request: Request) {
     const response = await authenticatedApiFetch("/api/v1/readings", {
       method: "POST",
       body,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Device-Session": request.headers.get("X-Device-Session") ?? "",
+      },
     });
     if (!response) return Response.json({ detail: "Sessão expirada." }, { status: 401 });
     return forwardApiResponse(response);

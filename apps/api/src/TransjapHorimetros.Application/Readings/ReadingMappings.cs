@@ -37,7 +37,8 @@ internal static class ReadingMappings
             reading.DeviceId,
             reading.PreviousReadingId,
             reading.DifferenceFromPrevious,
-            reading.CorrectionOfReadingId)
+            reading.CorrectionOfReadingId,
+            reading.RegisteredDeviceId)
         {
             AnomalyCount = summary?.AnomalyCount ?? 0,
             OpenAnomalyCount = summary?.OpenAnomalyCount ?? 0,

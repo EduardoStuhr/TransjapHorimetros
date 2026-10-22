@@ -25,7 +25,8 @@ public sealed class HourMeterReading : AuditableEntity
         string? deviceId = null,
         Guid? previousReadingId = null,
         decimal? differenceFromPrevious = null,
-        Guid? correctionOfReadingId = null)
+        Guid? correctionOfReadingId = null,
+        Guid? registeredDeviceId = null)
     {
         Id = Guid.NewGuid();
         MachineId = machineId;
@@ -44,6 +45,7 @@ public sealed class HourMeterReading : AuditableEntity
         PreviousReadingId = previousReadingId;
         DifferenceFromPrevious = differenceFromPrevious;
         CorrectionOfReadingId = correctionOfReadingId;
+        RegisteredDeviceId = registeredDeviceId;
         CreatedAt = SyncedAt;
         UpdatedAt = SyncedAt;
     }
@@ -77,11 +79,20 @@ public sealed class HourMeterReading : AuditableEntity
     public Guid? PreviousReadingId { get; private set; }
     public decimal? DifferenceFromPrevious { get; private set; }
     public Guid? CorrectionOfReadingId { get; private set; }
+    public Guid? RegisteredDeviceId { get; private set; }
+    public RegisteredDevice? RegisteredDevice { get; private set; }
     public ICollection<HourMeterReading> Corrections { get; } = new List<HourMeterReading>();
 
     public static HourMeterReading CreateOperational(Machine machine, Guid? workSiteId, decimal value,
         ReadingType type, ReadingStatus initialStatus, DateTimeOffset capturedAt, DateTimeOffset receivedAt,
         Guid clientEventId, Guid actorUserId, string actorEmail, string? deviceId,
+        HourMeterReading? previous = null, HourMeterReading? correctionOf = null)
+        => CreateOperational(machine, workSiteId, value, type, initialStatus, capturedAt, receivedAt,
+            clientEventId, actorUserId, actorEmail, deviceId, null, previous, correctionOf);
+
+    public static HourMeterReading CreateOperational(Machine machine, Guid? workSiteId, decimal value,
+        ReadingType type, ReadingStatus initialStatus, DateTimeOffset capturedAt, DateTimeOffset receivedAt,
+        Guid clientEventId, Guid actorUserId, string actorEmail, string? deviceId, Guid? registeredDeviceId,
         HourMeterReading? previous = null, HourMeterReading? correctionOf = null)
     {
         if (machine.MeterUnit is null || !Enum.IsDefined(machine.MeterUnit.Value))
@@ -108,7 +119,7 @@ public sealed class HourMeterReading : AuditableEntity
         else if (correctionOf is not null) throw new ArgumentException("Somente CORRECTION pode referenciar uma leitura corrigida.");
         return new HourMeterReading(machine.Id, workSiteId, value, type, initialStatus, capturedAt, receivedAt,
             receivedAt, clientEventId, machine.MeterUnit, actorUserId, actorEmail.Trim(), deviceId,
-            previous?.Id, previous is null ? null : value - previous.Value, correctionOf?.Id);
+            previous?.Id, previous is null ? null : value - previous.Value, correctionOf?.Id, registeredDeviceId);
     }
 
     public static string? NormalizeDeviceId(string? deviceId)

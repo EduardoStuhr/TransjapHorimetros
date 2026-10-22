@@ -7,6 +7,7 @@ import {
   MapPinned,
   ClipboardPlus,
   RefreshCw,
+  TabletSmartphone,
 } from "lucide-react";
 
 export const navigationItems = [
@@ -15,6 +16,7 @@ export const navigationItems = [
   { label: "Horímetros", href: "/horimetros", icon: Gauge, roles: null },
   { label: "Registrar leitura", href: "/coleta", icon: ClipboardPlus, roles: null },
   { label: "Sincronização", href: "/sincronizacao", icon: RefreshCw, roles: null },
+  { label: "Dispositivos", href: "/dispositivos", icon: TabletSmartphone, roles: ["MANAGER", "ADMIN"] },
   { label: "Obras", href: "/obras", icon: MapPinned, roles: null },
   { label: "Alertas", href: "/alertas", icon: BellRing, roles: ["SUPERVISOR", "MANAGER", "ADMIN"] },
   { label: "Relatórios", href: "/relatorios", icon: FileChartColumn, roles: ["SUPERVISOR", "MANAGER", "ADMIN"] },

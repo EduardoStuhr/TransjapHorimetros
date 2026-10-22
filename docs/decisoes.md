@@ -168,3 +168,11 @@ CompleteReadingModel acrescenta apenas campos ausentes, checks, índices e FKs R
 A Fase 7 usa IndexedDB versionado, com blob separado e eventos `READING_CREATED`/`PHOTO_UPLOADED`. `LocalEventId` é chave do dispositivo e `ClientEventId` é a chave global de idempotência, criada uma vez. A dependência da foto é explícita por `parentReadingClientEventId`; timing de chamadas não é usado como coordenação.
 
 O backend ganhou apenas um endpoint autenticado de referência mínima para máquinas/obras ativas. Não foi criada tabela de sync nem migration. Leituras e fotos continuam nos endpoints unitários existentes e o servidor recalcula todas as regras. Consulte [fase-7-offline-sync.md](fase-7-offline-sync.md).
+
+## 2026-10-22 — Identidade do dispositivo por posse de chave
+
+A identidade do usuário e a identidade do dispositivo são controles complementares. O JWT continua sendo a identidade da pessoa; o dispositivo usa ECDSA P-256 com chave privada não exportável no IndexedDB, cadastro administrativo e desafio descartável. Uma sessão curta vincula usuário e dispositivo, mas cada nova leitura também consulta o status atual para tornar a revogação efetiva sem esperar o token expirar.
+
+O formato público é SPKI DER em Base64 e a assinatura Web Crypto usa IEEE P1363. A API calcula o fingerprint, deriva autoria do usuário autenticado e nunca aceita `RegisteredDeviceId` como verdade declarada pelo cliente. Estados são `PENDING`, `AUTHORIZED` e `REVOKED`; revogação não possui transição de retorno nesta fase.
+
+Leituras históricas permanecem com FK nula, sem backfill. O upgrade local cria um store separado e preserva fila, fotos e referências. Dispositivo pendente mantém a fila retryable; revogado mantém eventos/blobs como falha permanente para revisão. Logout não remove a chave. Consulte [fase-9-identidade-dispositivo.md](fase-9-identidade-dispositivo.md).

@@ -74,13 +74,31 @@ async function requestWithTimeout(input: RequestInfo | URL, init: RequestInit) {
 }
 
 export class BrowserSyncTransport implements SyncTransport {
+  constructor(private readonly getDeviceSession: () => Promise<string> = async () => "") {}
+
   async createReading(event: OfflineReadingEvent) {
+    let deviceSession: string;
+    try {
+      deviceSession = await this.getDeviceSession();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Nao foi possivel comprovar o dispositivo.";
+      throw new SyncTransportError(
+        message,
+        /revogad/i.test(message) ? 403 : 425,
+      );
+    }
+    const payload = { ...event.payload };
+    delete payload.deviceIdentity;
     const response = await requestWithTimeout("/api/readings", {
       method: "POST",
       cache: "no-store",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Device-Session": deviceSession,
+      },
       body: JSON.stringify({
-        ...event.payload,
+        ...payload,
         clientEventId: event.clientEventId,
       }),
     });
@@ -88,6 +106,16 @@ export class BrowserSyncTransport implements SyncTransport {
   }
 
   async uploadPhoto(event: OfflinePhotoEvent, readingId: string, photo: StoredPhotoBlob) {
+    let deviceSession: string;
+    try {
+      deviceSession = await this.getDeviceSession();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Nao foi possivel comprovar o dispositivo.";
+      throw new SyncTransportError(
+        message,
+        /revogad/i.test(message) ? 403 : 425,
+      );
+    }
     const form = new FormData();
     form.set("file", photo.blob, photo.fileName);
     form.set("capturedAtDevice", event.payload.capturedAtDevice);
@@ -95,7 +123,15 @@ export class BrowserSyncTransport implements SyncTransport {
     form.set("clientEventId", event.clientEventId);
     const response = await requestWithTimeout(
       `/api/readings/${encodeURIComponent(readingId)}/photo`,
-      { method: "POST", cache: "no-store", body: form, headers: { Accept: "application/json" } },
+      {
+        method: "POST",
+        cache: "no-store",
+        body: form,
+        headers: {
+          Accept: "application/json",
+          "X-Device-Session": deviceSession,
+        },
+      },
     );
     return parseResponse(response);
   }

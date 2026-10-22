@@ -3,6 +3,25 @@ import type { MeterUnit, ReadingType } from "@/types/domain";
 
 export const OFFLINE_SCHEMA_VERSION = 1;
 
+export type RegisteredDeviceStatus = "PENDING" | "AUTHORIZED" | "REVOKED";
+
+export interface StoredDeviceIdentity {
+  key: "current";
+  schemaVersion: 1;
+  localDeviceId: string;
+  registeredDeviceId: string | null;
+  displayName: string;
+  platform: "WEB_PWA";
+  keyAlgorithm: "ECDSA_P256_SHA256";
+  publicKeySpki: string;
+  privateKey: CryptoKey;
+  publicKeyFingerprint: string | null;
+  status: "UNREGISTERED" | RegisteredDeviceStatus;
+  lastValidatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type OfflineEventType = "READING_CREATED" | "PHOTO_UPLOADED";
 export type OfflineEventStatus =
   | "PENDING"
@@ -18,6 +37,11 @@ export interface OfflineReadingPayload {
   readingType: Exclude<ReadingType, "CORRECTION">;
   capturedAtDevice: string;
   deviceId: string;
+  deviceIdentity?: {
+    localDeviceId: string;
+    registeredDeviceId: string;
+    status: "AUTHORIZED";
+  };
 }
 
 export interface OfflinePhotoPayload {
@@ -166,6 +190,8 @@ export interface OfflineStore {
   resolveCachedMachine(value: string): Promise<CachedMachine | undefined>;
   getReferenceDataFetchedAt(): Promise<string | null>;
   getOrCreateDeviceId(): Promise<string>;
+  getDeviceIdentity(): Promise<StoredDeviceIdentity | null>;
+  saveDeviceIdentity(identity: StoredDeviceIdentity): Promise<void>;
   cacheAuthenticatedUser(user: AuthUser): Promise<void>;
   getCachedAuthenticatedUser(): Promise<AuthUser | null>;
   clearCachedAuthenticatedUser(): Promise<void>;

@@ -248,6 +248,61 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_logs", (string)null);
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.DeviceChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CanonicalPayload")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("canonical_payload");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime>("IssuedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("issued_at");
+
+                    b.Property<string>("Nonce")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("nonce");
+
+                    b.Property<Guid>("RegisteredDeviceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("registered_device_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_device_challenges");
+
+                    b.HasIndex("Nonce")
+                        .IsUnique()
+                        .HasDatabaseName("ux_device_challenges_nonce");
+
+                    b.HasIndex("RegisteredDeviceId", "ExpiresAt")
+                        .HasDatabaseName("ix_device_challenges_device_expiry");
+
+                    b.ToTable("device_challenges", (string)null);
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.HourMeterReading", b =>
                 {
                     b.Property<Guid>("Id")
@@ -312,6 +367,10 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetime2(7)")
                         .HasColumnName("received_at_server");
 
+                    b.Property<Guid?>("RegisteredDeviceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("registered_device_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -347,6 +406,8 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("PreviousReadingId");
+
+                    b.HasIndex("RegisteredDeviceId");
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_hour_meter_readings_status");
@@ -744,6 +805,132 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.RegisteredDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AuthorizedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("authorized_at");
+
+                    b.Property<string>("AuthorizedByEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)")
+                        .HasColumnName("authorized_by_email");
+
+                    b.Property<Guid?>("AuthorizedByUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("authorized_by_user_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("KeyAlgorithm")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("key_algorithm");
+
+                    b.Property<DateTime?>("LastSeenAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("LocalDeviceId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("local_device_id");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("platform");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("public_key");
+
+                    b.Property<string>("PublicKeyFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("public_key_fingerprint");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("RequestedByEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)")
+                        .HasColumnName("requested_by_email");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("RevokedByEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)")
+                        .HasColumnName("revoked_by_email");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("revoked_by_user_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2(7)")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_registered_devices");
+
+                    b.HasIndex("AuthorizedByUserId");
+
+                    b.HasIndex("LocalDeviceId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_registered_devices_local_device_id");
+
+                    b.HasIndex("PublicKeyFingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("ux_registered_devices_key_fingerprint");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("RevokedByUserId");
+
+                    b.HasIndex("Status", "RequestedAt")
+                        .HasDatabaseName("ix_registered_devices_status_requested_at");
+
+                    b.ToTable("registered_devices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_registered_devices_status", "status IN ('PENDING', 'AUTHORIZED', 'REVOKED')");
+                        });
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.WorkSite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -970,6 +1157,17 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.Navigation("Reading");
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.DeviceChallenge", b =>
+                {
+                    b.HasOne("TransjapHorimetros.Domain.Entities.RegisteredDevice", "RegisteredDevice")
+                        .WithMany("Challenges")
+                        .HasForeignKey("RegisteredDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RegisteredDevice");
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.HourMeterReading", b =>
                 {
                     b.HasOne("TransjapHorimetros.Domain.Entities.HourMeterReading", null)
@@ -994,6 +1192,12 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PreviousReadingId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("TransjapHorimetros.Domain.Entities.RegisteredDevice", "RegisteredDevice")
+                        .WithMany("Readings")
+                        .HasForeignKey("RegisteredDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_hour_meter_readings_registered_devices_registered_device_id");
+
                     b.HasOne("TransjapHorimetros.Domain.Entities.WorkSite", "WorkSite")
                         .WithMany("Readings")
                         .HasForeignKey("WorkSiteId")
@@ -1001,6 +1205,8 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_hour_meter_readings_work_sites_work_site_id");
 
                     b.Navigation("Machine");
+
+                    b.Navigation("RegisteredDevice");
 
                     b.Navigation("WorkSite");
                 });
@@ -1054,6 +1260,25 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_refresh_tokens_users_user_id");
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.RegisteredDevice", b =>
+                {
+                    b.HasOne("TransjapHorimetros.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorizedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TransjapHorimetros.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TransjapHorimetros.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.HourMeterReading", b =>
                 {
                     b.Navigation("Anomalies");
@@ -1066,6 +1291,13 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.Machine", b =>
                 {
                     b.Navigation("QrCodes");
+
+                    b.Navigation("Readings");
+                });
+
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.RegisteredDevice", b =>
+                {
+                    b.Navigation("Challenges");
 
                     b.Navigation("Readings");
                 });

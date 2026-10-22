@@ -25,4 +25,10 @@ public static class AuditActions
     public const string PhotoEvidenceCreated = "PHOTO_EVIDENCE_CREATED";
     public const string PhotoEvidenceViewed = "PHOTO_EVIDENCE_VIEWED";
     public const string PhotoEvidenceRevoked = "PHOTO_EVIDENCE_REVOKED";
+    public const string DeviceRegistrationRequested = "DEVICE_REGISTRATION_REQUESTED";
+    public const string DeviceAuthorized = "DEVICE_AUTHORIZED";
+    public const string DeviceRevoked = "DEVICE_REVOKED";
+    public const string DeviceRenamed = "DEVICE_RENAMED";
+    public const string DeviceChallengeVerified = "DEVICE_CHALLENGE_VERIFIED";
+    public const string DeviceChallengeFailed = "DEVICE_CHALLENGE_FAILED";
 }

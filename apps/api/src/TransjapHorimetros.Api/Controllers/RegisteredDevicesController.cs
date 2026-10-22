@@ -18,10 +18,10 @@ public sealed class RegisteredDevicesController(IRegisteredDeviceService service
     public async Task<ActionResult<RegisteredDeviceResponse>> Register(
         RegisterDeviceRequest request, CancellationToken cancellationToken)
     {
-        var device = await service.RegisterAsync(request, HttpContext.TraceIdentifier, cancellationToken);
-        return device.CreatedAt == device.UpdatedAt
-            ? CreatedAtAction(nameof(Status), new { localDeviceId = device.LocalDeviceId }, device)
-            : Ok(device);
+        var result = await service.RegisterAsync(request, HttpContext.TraceIdentifier, cancellationToken);
+        return result.IsExisting
+            ? Ok(result.Device)
+            : CreatedAtAction(nameof(Status), new { localDeviceId = result.Device.LocalDeviceId }, result.Device);
     }
 
     [HttpGet("status")]

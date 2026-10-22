@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.ComponentModel.DataAnnotations;
-using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -53,6 +52,7 @@ builder.Services.AddScoped<IReadingService, ReadingService>();
 var deviceIdentityOptions = builder.Configuration
     .GetSection(DeviceIdentityOptions.SectionName)
     .Get<DeviceIdentityOptions>() ?? new DeviceIdentityOptions();
+deviceIdentityOptions.ValidateForStartup(builder.Environment.IsProduction());
 builder.Services.AddSingleton(deviceIdentityOptions);
 builder.Services.AddScoped<IRegisteredDeviceService, RegisteredDeviceService>();
 builder.Services.AddScoped<IPhotoEvidenceService, PhotoEvidenceService>();
@@ -205,7 +205,7 @@ builder.Services.AddRateLimiter(options =>
             AutoReplenishment = true,
         }));
     options.AddPolicy("device-identity", context => RateLimitPartition.GetFixedWindowLimiter(
-        $"{context.User.FindFirstValue("sub") ?? "anonymous"}:{context.Connection.RemoteIpAddress}",
+        DeviceIdentityRateLimitPartition.GetKey(context),
         _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = devicePermitLimit,
@@ -234,6 +234,12 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment() && !deviceIdentityOptions.EnforceForReadings)
+{
+    app.Logger.LogWarning(
+        "Device identity enforcement is disabled in Development; readings are not bound to a registered device.");
+}
+
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
 app.UseMiddleware<RequestLoggingMiddleware>();
@@ -244,8 +250,8 @@ if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"
 }
 
 app.UseCors("WebDevelopment");
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())

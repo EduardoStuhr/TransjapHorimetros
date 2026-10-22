@@ -23,6 +23,7 @@ export function DeviceIdentityGate({ children }: { children: React.ReactNode }) 
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
   const revoked = identity?.status === "REVOKED";
   const pending = identity?.status === "PENDING";
+  const invalid = identity?.status === "IDENTITY_INVALID";
 
   return (
     <section className="mx-auto max-w-xl rounded-xl border bg-white p-6 shadow-sm" aria-labelledby="device-gate-title">
@@ -30,11 +31,13 @@ export function DeviceIdentityGate({ children }: { children: React.ReactNode }) 
         {offline && !identity ? <WifiOff /> : revoked || pending ? <CircleAlert /> : <KeyRound />}
       </span>
       <h1 id="device-gate-title" className="mt-4 text-2xl font-black text-slate-950">
-        {revoked ? "Dispositivo revogado" : pending ? "Autorização pendente" : "Cadastre este dispositivo"}
+        {revoked ? "Dispositivo revogado" : invalid ? "Identidade do dispositivo inválida" : pending ? "Autorização pendente" : "Cadastre este dispositivo"}
       </h1>
       <p className="mt-2 text-slate-600">
         {revoked
           ? "Este dispositivo foi revogado e não pode registrar novas leituras. A fila local foi preservada para revisão."
+          : invalid
+            ? "A chave local não corresponde mais ao cadastro. A fila e as fotos foram preservadas; solicite um novo cadastro."
           : pending
             ? "Este dispositivo ainda não foi autorizado. Solicite a liberação a um gerente ou administrador."
             : offline
@@ -42,7 +45,7 @@ export function DeviceIdentityGate({ children }: { children: React.ReactNode }) 
               : "Antes da primeira coleta, identifique este dispositivo e envie uma solicitação ao responsável."}
       </p>
 
-      {!identity || identity.status === "UNREGISTERED" ? (
+      {!identity || identity.status === "UNREGISTERED" || identity.status === "IDENTITY_INVALID" ? (
         <div className="mt-6 space-y-3">
           <div>
             <Label htmlFor="device-display-name">Nome do dispositivo</Label>

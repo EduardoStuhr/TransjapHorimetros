@@ -71,6 +71,8 @@ public sealed class PhotoEvidenceService(
             }
         }
 
+        // LEGACY COMPATIBILITY EXCEPTION: readings created before device identity keep
+        // RegisteredDeviceId null; no device relationship is invented or backfilled.
         await using var file = await fileValidator.ValidateAndSpoolAsync(
             request.Content,
             request.ContentType,

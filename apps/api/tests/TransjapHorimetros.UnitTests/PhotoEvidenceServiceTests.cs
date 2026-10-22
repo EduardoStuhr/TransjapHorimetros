@@ -5,6 +5,7 @@ using TransjapHorimetros.Application.Common;
 using TransjapHorimetros.Application.Exceptions;
 using TransjapHorimetros.Application.PhotoEvidence;
 using TransjapHorimetros.Application.Readings;
+using TransjapHorimetros.Application.RegisteredDevices;
 using TransjapHorimetros.Domain.Entities;
 using TransjapHorimetros.Domain.Enums;
 
@@ -218,7 +219,7 @@ public sealed class PhotoEvidenceServiceTests
 
     private sealed class RegisteredDeviceServiceFake(Guid? validatedDeviceId) : IRegisteredDeviceService
     {
-        public Task<RegisteredDeviceResponse> RegisterAsync(RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisterDeviceResult> RegisterAsync(RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<CurrentDeviceStatusResponse> GetStatusAsync(string localDeviceId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PagedResponse<RegisteredDeviceResponse>> GetPageAsync(RegisteredDeviceQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<RegisteredDeviceAuditResponse>> GetHistoryAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();

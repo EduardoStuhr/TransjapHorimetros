@@ -302,7 +302,7 @@ public sealed class ReadingServiceTests
             return Task.FromResult<Guid?>(registeredDeviceId);
         }
 
-        public Task<RegisteredDeviceResponse> RegisterAsync(RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisterDeviceResult> RegisterAsync(RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<CurrentDeviceStatusResponse> GetStatusAsync(string localDeviceId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<PagedResponse<RegisteredDeviceResponse>> GetPageAsync(RegisteredDeviceQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<RegisteredDeviceAuditResponse>> GetHistoryAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();

@@ -1,4 +1,5 @@
 import type { OfflinePhotoEvent, OfflineReadingEvent, StoredPhotoBlob } from "@/offline/types";
+import { isPermanentDeviceIdentityError } from "@/features/device-identity/device-identity-error";
 
 export interface SyncResponse {
   status: number;
@@ -73,6 +74,21 @@ async function requestWithTimeout(input: RequestInfo | URL, init: RequestInit) {
   }
 }
 
+function deviceSessionFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : "Nao foi possivel comprovar o dispositivo.";
+  if (isPermanentDeviceIdentityError(error) || /revogad/i.test(message)) {
+    return new SyncTransportError(message, 403);
+  }
+  const status = typeof error === "object" && error !== null && "status" in error
+    && typeof error.status === "number"
+    ? error.status
+    : null;
+  if (status === 401 || status === 403 || status === 404 || status === 422 || (status !== null && status >= 500)) {
+    return new SyncTransportError(message, status);
+  }
+  return new SyncTransportError(message, 425);
+}
+
 export class BrowserSyncTransport implements SyncTransport {
   constructor(private readonly getDeviceSession: () => Promise<string> = async () => "") {}
 
@@ -81,11 +97,7 @@ export class BrowserSyncTransport implements SyncTransport {
     try {
       deviceSession = await this.getDeviceSession();
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Nao foi possivel comprovar o dispositivo.";
-      throw new SyncTransportError(
-        message,
-        /revogad/i.test(message) ? 403 : 425,
-      );
+      throw deviceSessionFailure(caught);
     }
     const payload = { ...event.payload };
     delete payload.deviceIdentity;
@@ -110,11 +122,7 @@ export class BrowserSyncTransport implements SyncTransport {
     try {
       deviceSession = await this.getDeviceSession();
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Nao foi possivel comprovar o dispositivo.";
-      throw new SyncTransportError(
-        message,
-        /revogad/i.test(message) ? 403 : 425,
-      );
+      throw deviceSessionFailure(caught);
     }
     const form = new FormData();
     form.set("file", photo.blob, photo.fileName);

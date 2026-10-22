@@ -22,6 +22,9 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
     private const string TestSigningKey = "transjap-phase-3-integration-tests-signing-key-2026";
     private readonly string _connectionString;
     private readonly string? _originalAppConnectionString;
+    private readonly TestTimeProvider _timeProvider = new(DateTimeOffset.UtcNow);
+
+    public TestTimeProvider TimeProvider => _timeProvider;
 
     public TransjapApiFactory()
     {
@@ -69,6 +72,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.ConfigureServices(services =>
         {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(_timeProvider);
             services.RemoveAll<IPhotoOcrProvider>();
             services.AddSingleton<FakePhotoOcrProvider>();
             services.AddSingleton<IPhotoOcrProvider>(p => p.GetRequiredService<FakePhotoOcrProvider>());
@@ -130,6 +135,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
 
     public async Task ResetDatabaseAsync()
     {
+        _timeProvider.SetUtcNow(DateTimeOffset.UtcNow);
         TestDatabaseGuard.EnsureSafeTestDatabase(
             TestDatabaseGuard.TestingEnvironmentName,
             _connectionString,
@@ -164,6 +170,17 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         await seeder.SeedAsync();
         // Synthetic test fixture only; never backfill unknown production fleet units.
         await dbContext.Machines.ExecuteUpdateAsync(set => set.SetProperty(m => m.MeterUnit, MeterUnit.Hours));
+    }
+
+    public sealed class TestTimeProvider(DateTimeOffset initialUtcNow) : TimeProvider
+    {
+        private DateTimeOffset _utcNow = initialUtcNow;
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public void SetUtcNow(DateTimeOffset value) => _utcNow = value;
+
+        public void Advance(TimeSpan delta) => _utcNow = _utcNow.Add(delta);
     }
 
     private static void EnsureIdentitySucceeded(IdentityResult result)

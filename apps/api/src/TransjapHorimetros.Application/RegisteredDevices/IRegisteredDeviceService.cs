@@ -4,7 +4,7 @@ namespace TransjapHorimetros.Application.RegisteredDevices;
 
 public interface IRegisteredDeviceService
 {
-    Task<RegisteredDeviceResponse> RegisterAsync(RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken);
+    Task<RegisterDeviceResult> RegisterAsync(RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken);
     Task<CurrentDeviceStatusResponse> GetStatusAsync(string localDeviceId, CancellationToken cancellationToken);
     Task<PagedResponse<RegisteredDeviceResponse>> GetPageAsync(RegisteredDeviceQuery query, CancellationToken cancellationToken);
     Task<IReadOnlyList<RegisteredDeviceAuditResponse>> GetHistoryAsync(Guid id, CancellationToken cancellationToken);

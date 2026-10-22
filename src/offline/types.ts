@@ -16,7 +16,7 @@ export interface StoredDeviceIdentity {
   publicKeySpki: string;
   privateKey: CryptoKey;
   publicKeyFingerprint: string | null;
-  status: "UNREGISTERED" | RegisteredDeviceStatus;
+  status: "UNREGISTERED" | "IDENTITY_INVALID" | RegisteredDeviceStatus;
   lastValidatedAt: string | null;
   createdAt: string;
   updatedAt: string;

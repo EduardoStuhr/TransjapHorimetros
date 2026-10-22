@@ -32,7 +32,7 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         Assert.Equal("PENDING", firstBody.GetProperty("status").GetString());
 
         using var retryResponse = await RegisterDeviceAsync(operatorClient, localDeviceId, key, "Nome Atualizado No Retry");
-        Assert.True(retryResponse.IsSuccessStatusCode);
+        Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
         var retryBody = await retryResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(deviceId, retryBody.GetProperty("id").GetGuid());
 
@@ -97,17 +97,11 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         using var operatorClient = factory.CreateClientForRole(AppRoles.Operator);
         using var managerClient = factory.CreateClientForRole(AppRoles.Manager);
 
-        var (deviceId, _) = await RegisterAndAuthorizeDeviceAsync(operatorClient, managerClient, localDeviceId, key);
+        await RegisterAndAuthorizeDeviceAsync(operatorClient, managerClient, localDeviceId, key);
         var (challengeId, payload) = await CreateChallengeAsync(operatorClient, localDeviceId);
 
-        // Simula expiração do desafio avançando no banco de testes
-        await using (var scope = factory.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
-            var challenge = await db.DeviceChallenges.FirstAsync(c => c.Id == challengeId);
-            challenge.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5);
-            await db.SaveChangesAsync();
-        }
+        // Expira o desafio avançando apenas o relógio controlado do host de teste.
+        factory.TimeProvider.Advance(TimeSpan.FromSeconds(121));
 
         var signature = SignPayload(key, payload);
         using var verifyResponse = await operatorClient.PostAsJsonAsync("/api/v1/devices/challenge/verify", new
@@ -117,6 +111,8 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         });
 
         Assert.Equal(HttpStatusCode.Conflict, verifyResponse.StatusCode);
+        Assert.DoesNotContain("deviceSessionToken", await verifyResponse.Content.ReadAsStringAsync(),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -528,7 +524,7 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         using var operatorClient = factory.CreateClientForRole(AppRoles.Operator);
         using var managerClient = factory.CreateClientForRole(AppRoles.Manager);
 
-        var (deviceId, _) = await RegisterDeviceAsync(operatorClient, localDeviceId, key);
+        var deviceId = await RegisterDeviceAndGetIdAsync(operatorClient, localDeviceId, key);
 
         // Listar
         var listResponse = await managerClient.GetAsync("/api/v1/devices");
@@ -560,7 +556,7 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         using var operatorClient = factory.CreateClientForRole(AppRoles.Operator);
         using var adminClient = factory.CreateClientForRole(AppRoles.Admin);
 
-        var (deviceId, _) = await RegisterDeviceAsync(operatorClient, localDeviceId, key);
+        var deviceId = await RegisterDeviceAndGetIdAsync(operatorClient, localDeviceId, key);
 
         var listResponse = await adminClient.GetAsync("/api/v1/devices");
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
@@ -669,6 +665,15 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         authResponse.EnsureSuccessStatusCode();
 
         return (deviceId, authResponse);
+    }
+
+    private static async Task<Guid> RegisterDeviceAndGetIdAsync(
+        HttpClient client, string localDeviceId, ECDsa key)
+    {
+        using var response = await RegisterDeviceAsync(client, localDeviceId, key);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return body.GetProperty("id").GetGuid();
     }
 
     private static async Task<(Guid Id, string Payload)> CreateChallengeAsync(HttpClient client, string localDeviceId)

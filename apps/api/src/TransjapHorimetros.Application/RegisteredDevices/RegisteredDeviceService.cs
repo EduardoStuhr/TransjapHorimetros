@@ -21,7 +21,7 @@ public sealed class RegisteredDeviceService(
 {
     public const string KeyAlgorithm = "ECDSA_P256_SHA256";
 
-    public async Task<RegisteredDeviceResponse> RegisterAsync(
+    public async Task<RegisterDeviceResult> RegisterAsync(
         RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken)
     {
         var actor = RequireActor();
@@ -35,7 +35,7 @@ public sealed class RegisteredDeviceService(
             if (!CryptographicOperations.FixedTimeEquals(
                 Convert.FromHexString(existingByLocalId.PublicKeyFingerprint), Convert.FromHexString(fingerprint)))
                 throw new ConflictException("Este identificador local ja esta vinculado a outra chave.");
-            return ToResponse(existingByLocalId);
+            return new RegisterDeviceResult(ToResponse(existingByLocalId), true);
         }
         var existingByKey = await repository.GetByFingerprintAsync(fingerprint, cancellationToken);
         if (existingByKey is not null)
@@ -62,10 +62,11 @@ public sealed class RegisteredDeviceService(
         {
             unitOfWork.ClearChanges();
             var concurrent = await repository.GetByLocalDeviceIdAsync(localDeviceId, false, cancellationToken);
-            if (concurrent?.PublicKeyFingerprint == fingerprint) return ToResponse(concurrent);
+            if (concurrent?.PublicKeyFingerprint == fingerprint)
+                return new RegisterDeviceResult(ToResponse(concurrent), true);
             throw new ConflictException("O dispositivo foi registrado simultaneamente com dados diferentes.");
         }
-        return ToResponse(device);
+        return new RegisterDeviceResult(ToResponse(device), false);
     }
 
     public async Task<CurrentDeviceStatusResponse> GetStatusAsync(string localDeviceId, CancellationToken cancellationToken)
@@ -173,6 +174,7 @@ public sealed class RegisteredDeviceService(
 
         var trackedDevice = await repository.GetByIdAsync(device.Id, true, cancellationToken)
             ?? throw new EntityNotFoundException("Dispositivo", device.Id);
+        EnsureAuthorized(trackedDevice);
         trackedDevice.MarkSeen(now, TimeSpan.FromMinutes(Math.Max(1, options.LastSeenThrottleMinutes)));
         AddAudit(AuditActions.DeviceChallengeVerified, trackedDevice, null,
             JsonSerializer.Serialize(new { challengeId = challenge.Id }), now, correlationId);
@@ -235,7 +237,7 @@ public sealed class RegisteredDeviceService(
             throw new ForbiddenException("Este dispositivo foi revogado. A fila local foi preservada, mas nao pode ser sincronizada.");
     }
 
-    private static (string PublicKey, string Fingerprint) ValidatePublicKey(string encoded)
+    internal static (string PublicKey, string Fingerprint) ValidatePublicKey(string encoded)
     {
         byte[] bytes;
         try { bytes = Convert.FromBase64String(encoded.Trim()); }
@@ -246,7 +248,10 @@ public sealed class RegisteredDeviceService(
         {
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportSubjectPublicKeyInfo(bytes, out var bytesRead);
-            if (bytesRead != bytes.Length || ecdsa.KeySize != 256)
+            var curveOid = ecdsa.ExportParameters(false).Curve.Oid.Value;
+            if (bytesRead != bytes.Length
+                || ecdsa.KeySize != 256
+                || !string.Equals(curveOid, "1.2.840.10045.3.1.7", StringComparison.Ordinal))
                 throw new CryptographicException();
             var normalized = ecdsa.ExportSubjectPublicKeyInfo();
             return (Convert.ToBase64String(normalized), Convert.ToHexString(SHA256.HashData(normalized)).ToLowerInvariant());

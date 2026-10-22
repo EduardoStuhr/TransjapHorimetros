@@ -50,6 +50,7 @@ public sealed record RegisteredDeviceResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+public sealed record RegisterDeviceResult(RegisteredDeviceResponse Device, bool IsExisting);
 public sealed record DeviceChallengeResponse(Guid ChallengeId, string Payload, DateTimeOffset ExpiresAt);
 public sealed record DeviceSessionResponse(string DeviceSessionToken, DateTimeOffset ExpiresAt, RegisteredDeviceResponse Device);
 public sealed record RegisteredDeviceAuditResponse(string Action, DateTimeOffset CreatedAt, Guid? UserId, string? UserEmail);

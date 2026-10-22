@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { DeviceIdentityError } from "@/features/device-identity/device-identity-error";
 import { BrowserSyncTransport, SyncTransportError } from "@/offline/sync-transport";
 import type { OfflinePhotoEvent, OfflineReadingEvent, StoredPhotoBlob } from "@/offline/types";
 
@@ -112,6 +113,19 @@ describe("BrowserSyncTransport", () => {
     await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
       status: 403,
       message: "Dispositivo revogado",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("classifica identidade local quebrada como falha permanente sem enviar requisicao", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const transport = new BrowserSyncTransport(async () => {
+      throw new DeviceIdentityError("A identidade local e invalida. A fila foi preservada.");
+    });
+
+    await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
+      status: 403,
+      message: "A identidade local e invalida. A fila foi preservada.",
     });
     expect(fetch).not.toHaveBeenCalled();
   });

@@ -317,7 +317,7 @@ export function ReadingCaptureForm() {
     const generation = syncGenerationRef.current + 1;
     syncGenerationRef.current = generation;
     try {
-      const deviceId = await store.getOrCreateDeviceId();
+      const deviceId = identity.localDeviceId;
       const photoSha256 = await sha256Hex(photo);
       const queued = await store.enqueueReadingWithPhoto({
         reading: {

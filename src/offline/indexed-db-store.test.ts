@@ -154,6 +154,27 @@ describe("IndexedDbOfflineStore", () => {
     reopened.close();
   });
 
+  it("logout limpa apenas o usuario autenticado e preserva a identidade local", async () => {
+    const { store } = createStore();
+    const identity = await generateDeviceIdentity(await store.getOrCreateDeviceId(), "Tablet teste");
+    await store.saveDeviceIdentity(identity);
+    await store.cacheAuthenticatedUser({
+      id: "user-1",
+      email: "user@example.com",
+      fullName: "Usuario Teste",
+      isActive: true,
+      roles: ["OPERATOR"],
+      createdAt: "2026-10-22T12:00:00Z",
+      lastLoginAt: null,
+    });
+
+    await store.clearCachedAuthenticatedUser();
+
+    expect(await store.getCachedAuthenticatedUser()).toBeNull();
+    expect((await store.getDeviceIdentity())?.publicKeySpki).toBe(identity.publicKeySpki);
+    store.close();
+  });
+
   it("migra banco v1 para v2 preservando fila, fotos e metadados", async () => {
     const name = `transjap-v1-${crypto.randomUUID()}`;
     databases.push(name);

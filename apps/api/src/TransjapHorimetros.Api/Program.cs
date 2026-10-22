@@ -21,6 +21,7 @@ using TransjapHorimetros.Application.Machines;
 using TransjapHorimetros.Application.Offline;
 using TransjapHorimetros.Application.PhotoEvidence;
 using TransjapHorimetros.Application.Readings;
+using TransjapHorimetros.Application.RegisteredDevices;
 using TransjapHorimetros.Application.QrCodes;
 using TransjapHorimetros.Application.Security;
 using TransjapHorimetros.Application.WorkSites;
@@ -49,6 +50,11 @@ builder.Services.AddScoped<IMachineService, MachineService>();
 builder.Services.AddScoped<IOfflineReferenceDataService, OfflineReferenceDataService>();
 builder.Services.AddScoped<IWorkSiteService, WorkSiteService>();
 builder.Services.AddScoped<IReadingService, ReadingService>();
+var deviceIdentityOptions = builder.Configuration
+    .GetSection(DeviceIdentityOptions.SectionName)
+    .Get<DeviceIdentityOptions>() ?? new DeviceIdentityOptions();
+builder.Services.AddSingleton(deviceIdentityOptions);
+builder.Services.AddScoped<IRegisteredDeviceService, RegisteredDeviceService>();
 builder.Services.AddScoped<IPhotoEvidenceService, PhotoEvidenceService>();
 builder.Services.AddScoped<PhotoFileValidator>();
 builder.Services.AddScoped<IAnomalyService, AnomalyService>();
@@ -129,6 +135,8 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole(AppRoles.Supervisor, AppRoles.Administrative, AppRoles.Manager, AppRoles.Admin));
     options.AddPolicy(Policies.CanManageUsers, policy =>
         policy.RequireRole(AppRoles.Admin));
+    options.AddPolicy(Policies.CanManageDevices, policy =>
+        policy.RequireRole(AppRoles.Manager, AppRoles.Admin));
 });
 
 builder.Services
@@ -172,6 +180,8 @@ var permitLimit = builder.Configuration.GetValue<int?>("RateLimiting:PermitLimit
 var windowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:WindowSeconds") ?? 60;
 var loginPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:AuthLogin:PermitLimit") ?? 5;
 var loginWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:AuthLogin:WindowSeconds") ?? 60;
+var devicePermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:DeviceIdentity:PermitLimit") ?? 20;
+var deviceWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:DeviceIdentity:WindowSeconds") ?? 60;
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -191,6 +201,15 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = loginPermitLimit,
             Window = TimeSpan.FromSeconds(loginWindowSeconds),
+            QueueLimit = 0,
+            AutoReplenishment = true,
+        }));
+    options.AddPolicy("device-identity", context => RateLimitPartition.GetFixedWindowLimiter(
+        $"{context.User.FindFirstValue("sub") ?? "anonymous"}:{context.Connection.RemoteIpAddress}",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = devicePermitLimit,
+            Window = TimeSpan.FromSeconds(deviceWindowSeconds),
             QueueLimit = 0,
             AutoReplenishment = true,
         }));

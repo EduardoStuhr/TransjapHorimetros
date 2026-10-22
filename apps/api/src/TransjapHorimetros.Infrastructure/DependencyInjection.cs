@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.PhotoEvidence;
+using TransjapHorimetros.Application.RegisteredDevices;
 using TransjapHorimetros.Infrastructure.Identity;
 using TransjapHorimetros.Infrastructure.Persistence;
 using TransjapHorimetros.Infrastructure.Persistence.Repositories;
@@ -91,7 +92,9 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogRepository>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<TransjapRepository>());
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IRegisteredDeviceRepository, RegisteredDeviceRepository>();
         services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IDeviceSessionTokenService, DeviceSessionTokenService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IUserService, UserService>();
         services.AddSingleton<IPhotoStorage, AzureBlobPhotoStorage>();

@@ -5,6 +5,7 @@ using TransjapHorimetros.Application.Common;
 using TransjapHorimetros.Application.Exceptions;
 using TransjapHorimetros.Application.Machines;
 using TransjapHorimetros.Application.Readings;
+using TransjapHorimetros.Application.RegisteredDevices;
 using TransjapHorimetros.Domain.Entities;
 using TransjapHorimetros.Domain.Enums;
 using TransjapHorimetros.Domain.Rules;
@@ -86,7 +87,8 @@ public sealed class ReadingServiceTests
         IMachineRepository machineRepository,
         IWorkSiteRepository workSiteRepository,
         FakeReadingRepository readingRepository,
-        IUnitOfWork unitOfWork) =>
+        IUnitOfWork unitOfWork,
+        IRegisteredDeviceService? deviceService = null) =>
         new(
             machineRepository,
             workSiteRepository,
@@ -97,7 +99,7 @@ public sealed class ReadingServiceTests
             new HourMeterReadingPolicy(),
             new HourMeterRulesOptions { ElapsedTimeToleranceHours = 0.25m },
             new FixedTimeProvider(Now),
-            NullLogger<ReadingService>.Instance, new FakeCurrentUser());
+            NullLogger<ReadingService>.Instance, new FakeCurrentUser(), null, deviceService);
 
     [Fact]
     public async Task CreateAsync_CapturesAuthorSnapshotDeviceAndServerCalculatedDelta()
@@ -128,6 +130,23 @@ public sealed class ReadingServiceTests
         var service = CreateService(new FakeMachineRepository(machine), new FakeWorkSiteRepository(), repository, uow);
         await Assert.ThrowsAsync<ApplicationValidationException>(() => service.CreateAsync(ValidRequest(machine.Id, Guid.NewGuid()), "test", default));
         Assert.Empty(repository.AddedReadings); Assert.Equal(0, uow.SaveCalls);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AssociatesOnlyServerValidatedRegisteredDevice()
+    {
+        var machine = new Machine(68, "Test", MachineStatus.Active, Now, MeterUnit.Hours);
+        var repository = new FakeReadingRepository();
+        var registeredDeviceId = Guid.NewGuid();
+        var deviceService = new FakeRegisteredDeviceService(registeredDeviceId);
+        var service = CreateService(new FakeMachineRepository(machine), new FakeWorkSiteRepository(),
+            repository, new FakeUnitOfWork(), deviceService);
+
+        var result = await service.CreateAsync(ValidRequest(machine.Id, Guid.NewGuid()), "test", default, "signed-session");
+
+        Assert.Equal("signed-session", deviceService.ValidatedToken);
+        Assert.Equal(registeredDeviceId, result.Reading.RegisteredDeviceId);
+        Assert.Equal(registeredDeviceId, repository.AddedReadings.Single().RegisteredDeviceId);
     }
 
     private static CreateReadingRequest ValidRequest(Guid machineId, Guid clientEventId) =>
@@ -272,5 +291,25 @@ public sealed class ReadingServiceTests
         public void ClearChanges()
         {
         }
+    }
+
+    private sealed class FakeRegisteredDeviceService(Guid registeredDeviceId) : IRegisteredDeviceService
+    {
+        public string? ValidatedToken { get; private set; }
+        public Task<Guid?> ValidateDeviceSessionAsync(string? token, CancellationToken cancellationToken)
+        {
+            ValidatedToken = token;
+            return Task.FromResult<Guid?>(registeredDeviceId);
+        }
+
+        public Task<RegisteredDeviceResponse> RegisterAsync(RegisterDeviceRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisteredDeviceResponse> GetStatusAsync(string localDeviceId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<PagedResponse<RegisteredDeviceResponse>> GetPageAsync(RegisteredDeviceQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<RegisteredDeviceAuditResponse>> GetHistoryAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisteredDeviceResponse> AuthorizeAsync(Guid id, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisteredDeviceResponse> RevokeAsync(Guid id, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisteredDeviceResponse> RenameAsync(Guid id, RenameDeviceRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<DeviceChallengeResponse> CreateChallengeAsync(DeviceChallengeRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<DeviceSessionResponse> VerifyChallengeAsync(VerifyDeviceChallengeRequest request, string correlationId, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

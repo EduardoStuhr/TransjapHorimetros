@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Application.Common;
 using TransjapHorimetros.Application.Exceptions;
+using TransjapHorimetros.Application.RegisteredDevices;
 using TransjapHorimetros.Domain.Entities;
 using TransjapHorimetros.Domain.Enums;
 using TransjapHorimetros.Domain.Rules;
@@ -22,7 +23,8 @@ public sealed class ReadingService(
     TimeProvider timeProvider,
     ILogger<ReadingService> logger,
     ICurrentUser? currentUser = null,
-    IReadingSummaryRepository? summaryRepository = null) : IReadingService
+    IReadingSummaryRepository? summaryRepository = null,
+    IRegisteredDeviceService? registeredDeviceService = null) : IReadingService
 {
     public async Task<PagedResponse<ReadingResponse>> GetPageAsync(
         ReadingQuery query,
@@ -85,7 +87,8 @@ public sealed class ReadingService(
     public async Task<CreateReadingResult> CreateAsync(
         CreateReadingRequest request,
         string correlationId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? deviceSessionToken = null)
     {
         if (currentUser?.IsAuthenticated != true || currentUser.UserId is null || string.IsNullOrWhiteSpace(currentUser.Email))
             throw new UnauthorizedException("A leitura exige autoria do usuário autenticado.");
@@ -100,6 +103,9 @@ public sealed class ReadingService(
                 throw new ConflictException("O ClientEventId já pertence a outra máquina.");
             return new CreateReadingResult(await GetByIdAsync(existing.Id, cancellationToken), true);
         }
+        var registeredDeviceId = registeredDeviceService is null
+            ? null
+            : await registeredDeviceService.ValidateDeviceSessionAsync(deviceSessionToken, cancellationToken);
         Validate(request);
         var machine = await machineRepository.GetByIdAsync(request.MachineId, false, cancellationToken)
             ?? throw new EntityNotFoundException("Máquina", request.MachineId);
@@ -167,7 +173,7 @@ public sealed class ReadingService(
         {
             reading = HourMeterReading.CreateOperational(machine, request.WorkSiteId, request.Value,
                 request.ReadingType!.Value, assessment.Status, capturedAt, receivedAtServer, request.ClientEventId,
-                currentUser.UserId.Value, currentUser.Email, request.DeviceId, previous, correctionOf);
+                currentUser.UserId.Value, currentUser.Email, request.DeviceId, registeredDeviceId, previous, correctionOf);
         }
         catch (ArgumentException ex) { throw new ApplicationValidationException("Reading", ex.Message); }
         readingRepository.Add(reading);
@@ -303,6 +309,7 @@ public sealed class ReadingService(
                 reading.PreviousReadingId,
                 reading.DifferenceFromPrevious,
                 reading.CorrectionOfReadingId,
+                reading.RegisteredDeviceId,
             },
             ApplicationJson.Options);
 

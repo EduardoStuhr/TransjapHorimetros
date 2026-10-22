@@ -28,6 +28,10 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
     public DbSet<PhotoOcrResult> PhotoOcrResults => Set<PhotoOcrResult>();
 
+    public DbSet<RegisteredDevice> RegisteredDevices => Set<RegisteredDevice>();
+
+    public DbSet<DeviceChallenge> DeviceChallenges => Set<DeviceChallenge>();
+
     public override int SaveChanges()
     {
         EnsureAppendOnlyEntitiesAreNotModifiedOrDeleted();
@@ -104,6 +108,13 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
         {
             throw new InvalidOperationException(
                 "QR codes de máquinas não podem ser excluídos; desative o QR para preservar o histórico.");
+        }
+
+        if (ChangeTracker.Entries().Any(entry =>
+            entry.Entity is RegisteredDevice or DeviceChallenge && entry.State == EntityState.Deleted))
+        {
+            throw new InvalidOperationException(
+                "Dispositivos e desafios nao podem ser excluidos; o historico deve ser preservado.");
         }
 
         var invalidEntries = ChangeTracker.Entries()

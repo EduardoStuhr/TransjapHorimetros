@@ -11,4 +11,5 @@ public static class Policies
     public const string CanViewDashboard = "CanViewDashboard";
     public const string CanReviewAnomalies = "CanReviewAnomalies";
     public const string CanManageUsers = "CanManageUsers";
+    public const string CanManageDevices = "CanManageDevices";
 }

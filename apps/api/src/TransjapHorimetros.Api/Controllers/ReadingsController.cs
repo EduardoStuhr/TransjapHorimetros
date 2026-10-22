@@ -46,7 +46,8 @@ public sealed class ReadingsController(
         var result = await readingService.CreateAsync(
             request,
             HttpContext.TraceIdentifier,
-            cancellationToken);
+            cancellationToken,
+            Request.Headers["X-Device-Session"].FirstOrDefault());
         return result.IsExisting
             ? Ok(result.Reading)
             : CreatedAtAction(nameof(GetById), new { id = result.Reading.Id }, result.Reading);

@@ -74,13 +74,31 @@ async function requestWithTimeout(input: RequestInfo | URL, init: RequestInit) {
 }
 
 export class BrowserSyncTransport implements SyncTransport {
+  constructor(private readonly getDeviceSession: () => Promise<string> = async () => "") {}
+
   async createReading(event: OfflineReadingEvent) {
+    let deviceSession: string;
+    try {
+      deviceSession = await this.getDeviceSession();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Nao foi possivel comprovar o dispositivo.";
+      throw new SyncTransportError(
+        message,
+        /revogad/i.test(message) ? 403 : 425,
+      );
+    }
+    const payload = { ...event.payload };
+    delete payload.deviceIdentity;
     const response = await requestWithTimeout("/api/readings", {
       method: "POST",
       cache: "no-store",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Device-Session": deviceSession,
+      },
       body: JSON.stringify({
-        ...event.payload,
+        ...payload,
         clientEventId: event.clientEventId,
       }),
     });

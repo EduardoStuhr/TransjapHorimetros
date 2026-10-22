@@ -29,6 +29,11 @@ describe("BrowserSyncTransport", () => {
       readingType: "INTERMEDIATE",
       capturedAtDevice: "2026-10-19T09:55:00.000Z",
       deviceId: "dev-abc",
+      deviceIdentity: {
+        localDeviceId: "dev-abc",
+        registeredDeviceId: "registered-1",
+        status: "AUTHORIZED",
+      },
     },
   };
 
@@ -81,7 +86,7 @@ describe("BrowserSyncTransport", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const transport = new BrowserSyncTransport();
+    const transport = new BrowserSyncTransport(async () => "device-session-token");
     const result = await transport.createReading(readingEvent);
 
     expect(result.status).toBe(201);
@@ -89,10 +94,26 @@ describe("BrowserSyncTransport", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/readings", expect.objectContaining({
       method: "POST",
       body: JSON.stringify({
-        ...readingEvent.payload,
+        machineId: "m-1",
+        workSiteId: "w-1",
+        value: 250.5,
+        readingType: "INTERMEDIATE",
+        capturedAtDevice: "2026-10-19T09:55:00.000Z",
+        deviceId: "dev-abc",
         clientEventId: "client-event-123",
       }),
+      headers: expect.objectContaining({ "X-Device-Session": "device-session-token" }),
     }));
+  });
+
+  it("nao envia a identidade registrada declarada pela fila sem prova", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const transport = new BrowserSyncTransport(async () => { throw new Error("Dispositivo revogado"); });
+    await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
+      status: 403,
+      message: "Dispositivo revogado",
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("POST /api/readings/:id/photo envia FormData com campos de rastreabilidade", async () => {

@@ -57,6 +57,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
                 ["Ocr:MaximumRetries"] = "0",
                 ["RateLimiting:PermitLimit"] = "10000",
                 ["RateLimiting:AuthLogin:PermitLimit"] = "10000",
+                ["RateLimiting:DeviceIdentity:PermitLimit"] = "10000",
+                ["DeviceIdentity:EnforceForReadings"] = "false",
             });
         });
         return base.CreateHost(builder);
@@ -139,6 +141,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             DELETE FROM anomalies;
+            DELETE FROM device_challenges;
             DELETE FROM photo_ocr_results;
             DELETE FROM photo_evidence;
             DELETE FROM machine_qr_codes;
@@ -150,6 +153,7 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
             DELETE FROM user_roles;
             DELETE FROM user_tokens;
             DELETE FROM hour_meter_readings;
+            DELETE FROM registered_devices;
             DELETE FROM users;
             DELETE FROM work_sites;
             DELETE FROM machines;

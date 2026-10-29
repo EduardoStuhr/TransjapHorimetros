@@ -140,7 +140,18 @@ Todos os testes automatizados do repositório foram executados, sem exclusão/fi
 
 A integração obrigatória é `.github/workflows/ocr-validation.yml`, **Validate Transjap Horimetros**, com jobs `backend` (restore/build/unitários/SQL Server) e `frontend` (npm ci/lint/test/build). Os workflows de deploy de main não devem rodar nesta branch.
 
-**FASE 9 PARCIALMENTE VALIDADA** enquanto a execução do PR não comprovar ambos os jobs verdes no commit final. A validação local não substitui essa condição. O commit, o PR e a execução final serão conferidos depois do push; nenhuma incorporação em main está autorizada.
+**FASE 9 PRONTA PARA APROVAÇÃO**, com evidência de CI completa no [PR #18](https://github.com/EduardoStuhr/TransjapHorimetros/pull/18), sem merge ou deploy.
+
+A [execução 40936258717](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/40936258717) aprovou o commit de implementação/documentação inicial `82f22bc9b49802c730af678c90229f0d55b6152a`:
+
+| Job | Resultado e evidência |
+| --- | --- |
+| [backend](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/40936258717/job/123667475908) | SUCCESS: restore, build Release, 223 unitários e 192 integrações SQL Server; zero falhas e zero ignorados; artefatos TRX publicados |
+| [frontend](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/40936258717/job/123667475294) | SUCCESS: npm ci, lint, 92 testes e build Next.js 16.4.3 em Node 26 |
+
+Esta atualização registra o resultado e altera somente este relatório. A aprovação do commit que efetivamente será incorporado exige também a execução verde correspondente ao HEAD final; ela deve ser conferida na [aba Checks do PR](https://github.com/EduardoStuhr/TransjapHorimetros/pull/18/checks). O SHA final e o link da execução desse HEAD são entregues no encerramento da tarefa, após verificação individual dos jobs.
+
+São **507 testes aprovados** (223 + 192 + 92), sem falhas ou testes automatizados ignorados. Os workflows de deploy não foram acionados e main permanece em `79c0c3bbae1df4d0e22927d67c547437c20fffd0`.
 
 ## Riscos residuais e operação
 

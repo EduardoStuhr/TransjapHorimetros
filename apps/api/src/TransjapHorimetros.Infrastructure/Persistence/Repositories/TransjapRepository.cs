@@ -424,6 +424,11 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         {
             return await dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateConcurrencyException exception) when (
+            exception.Entries.All(entry => entry.Entity is RegisteredDevice))
+        {
+            throw new ConflictException("O estado do dispositivo mudou durante a operacao. Consulte o estado atual antes de tentar novamente.");
+        }
         catch (DbUpdateException exception) when (
             exception.InnerException is SqlException { Number: 2601 or 2627 } sqlException)
         {

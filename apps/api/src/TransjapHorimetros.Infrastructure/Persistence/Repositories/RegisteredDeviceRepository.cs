@@ -57,7 +57,7 @@ public sealed class RegisteredDeviceRepository(TransjapDbContext dbContext) : IR
         await dbContext.DeviceChallenges
             .Where(challenge => challenge.Id == challengeId
                 && challenge.ConsumedAt == null
-                && challenge.ExpiresAt >= consumedAt)
+                && challenge.ExpiresAt > consumedAt)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(challenge => challenge.ConsumedAt, consumedAt)
                 .SetProperty(challenge => challenge.UpdatedAt, consumedAt), cancellationToken) == 1;

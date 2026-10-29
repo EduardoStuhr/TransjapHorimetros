@@ -35,11 +35,17 @@ public sealed class RegisteredDeviceService(
             if (!CryptographicOperations.FixedTimeEquals(
                 Convert.FromHexString(existingByLocalId.PublicKeyFingerprint), Convert.FromHexString(fingerprint)))
                 throw new ConflictException("Este identificador local ja esta vinculado a outra chave.");
-            return new RegisterDeviceResult(ToResponse(existingByLocalId), true);
+            return new RegisterDeviceResult(ToCurrentStatus(existingByLocalId), true);
         }
         var existingByKey = await repository.GetByFingerprintAsync(fingerprint, cancellationToken);
         if (existingByKey is not null)
+        {
+            // A concurrent registration may commit between the local-ID lookup
+            // and this lookup. The same identity is still an idempotent retry.
+            if (existingByKey.LocalDeviceId == localDeviceId)
+                return new RegisterDeviceResult(ToCurrentStatus(existingByKey), true);
             throw new ConflictException("Esta chave ja esta vinculada a outro identificador local.");
+        }
 
         var now = timeProvider.GetUtcNow();
         RegisteredDevice device;
@@ -63,10 +69,10 @@ public sealed class RegisteredDeviceService(
             unitOfWork.ClearChanges();
             var concurrent = await repository.GetByLocalDeviceIdAsync(localDeviceId, false, cancellationToken);
             if (concurrent?.PublicKeyFingerprint == fingerprint)
-                return new RegisterDeviceResult(ToResponse(concurrent), true);
+                return new RegisterDeviceResult(ToCurrentStatus(concurrent), true);
             throw new ConflictException("O dispositivo foi registrado simultaneamente com dados diferentes.");
         }
-        return new RegisterDeviceResult(ToResponse(device), false);
+        return new RegisterDeviceResult(ToCurrentStatus(device), false);
     }
 
     public async Task<CurrentDeviceStatusResponse> GetStatusAsync(string localDeviceId, CancellationToken cancellationToken)
@@ -75,16 +81,7 @@ public sealed class RegisteredDeviceService(
         var normalized = Normalize(localDeviceId, 100, nameof(localDeviceId));
         var device = await repository.GetByLocalDeviceIdAsync(normalized, false, cancellationToken)
             ?? throw new EntityNotFoundException("Dispositivo", normalized);
-        return new CurrentDeviceStatusResponse(
-            device.Id,
-            device.LocalDeviceId,
-            device.DisplayName,
-            device.Platform,
-            device.Status,
-            device.KeyAlgorithm,
-            device.PublicKeyFingerprint,
-            device.LastSeenAt,
-            device.RequestedAt);
+        return ToCurrentStatus(device);
     }
 
     public async Task<PagedResponse<RegisteredDeviceResponse>> GetPageAsync(
@@ -179,8 +176,13 @@ public sealed class RegisteredDeviceService(
         AddAudit(AuditActions.DeviceChallengeVerified, trackedDevice, null,
             JsonSerializer.Serialize(new { challengeId = challenge.Id }), now, correlationId);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        // Recheck after persistence as well: revocation may have committed while
+        // the audit was saved, including when LastSeen was throttled.
+        var currentDevice = await repository.GetByIdAsync(device.Id, false, cancellationToken)
+            ?? throw new EntityNotFoundException("Dispositivo", device.Id);
+        EnsureAuthorized(currentDevice);
         var session = tokenService.Create(trackedDevice.Id, actor.UserId);
-        return new DeviceSessionResponse(session.Token, session.ExpiresAt, ToResponse(trackedDevice));
+        return new DeviceSessionResponse(session.Token, session.ExpiresAt, ToCurrentStatus(currentDevice));
     }
 
     public async Task<Guid?> ValidateDeviceSessionAsync(string? token, CancellationToken cancellationToken)
@@ -313,6 +315,10 @@ public sealed class RegisteredDeviceService(
         device.RequestedAt, device.AuthorizedByUserId, device.AuthorizedByEmail, device.AuthorizedAt,
         device.RevokedByUserId, device.RevokedByEmail, device.RevokedAt, device.LastSeenAt,
         device.CreatedAt, device.UpdatedAt);
+
+    private static CurrentDeviceStatusResponse ToCurrentStatus(RegisteredDevice device) => new(
+        device.Id, device.LocalDeviceId, device.DisplayName, device.Platform, device.Status,
+        device.KeyAlgorithm, device.PublicKeyFingerprint, device.LastSeenAt, device.RequestedAt);
 
     private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     private sealed record Actor(Guid UserId, string Email);

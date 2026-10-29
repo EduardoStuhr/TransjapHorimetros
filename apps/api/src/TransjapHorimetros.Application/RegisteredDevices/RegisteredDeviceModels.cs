@@ -6,11 +6,11 @@ namespace TransjapHorimetros.Application.RegisteredDevices;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record RegisterDeviceRequest(
-    [property: Required, MaxLength(100)] string LocalDeviceId,
-    [property: Required, MaxLength(100)] string DisplayName,
-    [property: Required, MaxLength(50)] string Platform,
-    [property: Required, MaxLength(1024)] string PublicKey,
-    [property: Required, MaxLength(50)] string KeyAlgorithm);
+    [Required, MaxLength(100)] string LocalDeviceId,
+    [Required, MaxLength(100)] string DisplayName,
+    [Required, MaxLength(50)] string Platform,
+    [Required, MaxLength(1024)] string PublicKey,
+    [Required, MaxLength(50)] string KeyAlgorithm);
 
 public sealed record RegisteredDeviceQuery
 {
@@ -21,13 +21,13 @@ public sealed record RegisteredDeviceQuery
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record RenameDeviceRequest([property: Required, MaxLength(100)] string DisplayName);
+public sealed record RenameDeviceRequest([Required, MaxLength(100)] string DisplayName);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record DeviceChallengeRequest([property: Required, MaxLength(100)] string LocalDeviceId);
+public sealed record DeviceChallengeRequest([Required, MaxLength(100)] string LocalDeviceId);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record VerifyDeviceChallengeRequest(Guid ChallengeId, [property: Required, MaxLength(200)] string Signature);
+public sealed record VerifyDeviceChallengeRequest(Guid ChallengeId, [Required, MaxLength(200)] string Signature);
 
 public sealed record RegisteredDeviceResponse(
     Guid Id,
@@ -50,9 +50,9 @@ public sealed record RegisteredDeviceResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-public sealed record RegisterDeviceResult(RegisteredDeviceResponse Device, bool IsExisting);
+public sealed record RegisterDeviceResult(CurrentDeviceStatusResponse Device, bool IsExisting);
 public sealed record DeviceChallengeResponse(Guid ChallengeId, string Payload, DateTimeOffset ExpiresAt);
-public sealed record DeviceSessionResponse(string DeviceSessionToken, DateTimeOffset ExpiresAt, RegisteredDeviceResponse Device);
+public sealed record DeviceSessionResponse(string DeviceSessionToken, DateTimeOffset ExpiresAt, CurrentDeviceStatusResponse Device);
 public sealed record RegisteredDeviceAuditResponse(string Action, DateTimeOffset CreatedAt, Guid? UserId, string? UserEmail);
 
 public sealed record CurrentDeviceStatusResponse(

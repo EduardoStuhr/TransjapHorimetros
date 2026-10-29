@@ -19,7 +19,8 @@ public sealed class RegisteredDeviceConfiguration : IEntityTypeConfiguration<Reg
         builder.Property(device => device.Platform).HasColumnName("platform").HasMaxLength(50).IsRequired();
         builder.Property(device => device.Status).HasColumnName("status").HasMaxLength(16)
             .HasConversion(status => status.ToString().ToUpperInvariant(),
-                value => Enum.Parse<RegisteredDeviceStatus>(value, true)).IsRequired();
+                value => Enum.Parse<RegisteredDeviceStatus>(value, true)).IsRequired()
+            .IsConcurrencyToken();
         builder.Property(device => device.PublicKey).HasColumnName("public_key").HasMaxLength(1024).IsRequired();
         builder.Property(device => device.PublicKeyFingerprint).HasColumnName("public_key_fingerprint").HasMaxLength(64).IsRequired();
         builder.Property(device => device.KeyAlgorithm).HasColumnName("key_algorithm").HasMaxLength(50).IsRequired();

@@ -27,7 +27,7 @@ A entrega implementa identidade assimétrica local, cadastro pendente, administr
 | Assinatura inválida | Desafio consumido, registrado na auditoria e `403 Forbidden` |
 | Sessão de dispositivo expirada | Rejeitada com `403 Forbidden` na criação de leitura e upload de foto |
 | Sessão vinculada a usuário | Token emitido para User A rejeitado se usado por User B |
-| Revogação contra sessão já emitida | Status do dispositivo é relido atonicamente antes de aceitar leitura ou foto (`403 Forbidden`) |
+| Revogação contra sessão já emitida | Status do dispositivo é consultado no banco durante a validação de novas leituras/fotos (`403 Forbidden`) |
 | Foto protegida por DeviceSession | `POST /api/v1/readings/{readingId}/photo` exige `X-Device-Session` válido |
 | Foto vinculada ao dispositivo da leitura | Device da sessão deve ser idêntico ao `RegisteredDeviceId` da leitura; mismatch rejeitado com `403` |
 | Compatibilidade de foto histórica | Leituras legadas (`RegisteredDeviceId == null`) aceitam upload sem quebrar histórico (sem backfill) |
@@ -68,14 +68,79 @@ A entrega implementa identidade assimétrica local, cadastro pendente, administr
 
 `20261022121009_AddRegisteredDeviceIdentity` contém a coluna anulável `registered_device_id` em `hour_meter_readings`, as tabelas `registered_devices` e `device_challenges`, índices únicos (`local_device_id`, `public_key_fingerprint`, `nonce`), e chave estrangeira `RESTRICT`. Não há alteração de migrations anteriores, delete, backfill, seed ou aplicação em Azure.
 
-## Validação executada
+## Diagnóstico confirmado em 29/10/2026
 
-- `npm run lint`: aprovado com 0 erros;
-- `npm test`: aprovado com 82 testes passando em 9 arquivos;
-- `npm run build`: aprovado com Next.js 16.3.8 (todas as 14 páginas estáticas/dinâmicas otimizadas);
-- `dotnet build TransjapHorimetros.sln -c Release`: validado com zero warnings e zero erros;
-- Unitários .NET em Release: aprovados com 206 testes unitários;
-- Integração SQL local: marcada como `NÃO VALIDADO LOCALMENTE — CI EXECUTARÁ` (executada pelo workflow de PR com container descartável SQL Server 2022).
+- `main` local e remota estavam limpas e em `79c0c3bbae1df4d0e22927d67c547437c20fffd0`; nenhuma divergência. A correção parte dessa main em `fix/phase-9-final-ci`.
+- [PR #16](https://github.com/EduardoStuhr/TransjapHorimetros/pull/16) incorporado; [PR #17](https://github.com/EduardoStuhr/TransjapHorimetros/pull/17) fechado sem merge e sem reaproveitamento direto de branch.
+- [CI anterior](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/39832164288): frontend aprovado, backend com 214 unitários aprovados e integração com 150 aprovados / 26 falhas / zero ignorados. Os deploys verdes de main não foram considerados prova de integração.
+- Reprodução local do código base: **214 unitários aprovados; integração SQL com 151 aprovados e 25 falhas em 176 testes**. A diferença de uma falha é o teste de QR: timestamps congelados empatam e o desempate por GUID pode passar ou falhar.
+- O log detalhado de cadastro revelou `InvalidOperationException` em `ModelMetadata.ThrowIfRecordTypeHasValidationOnProperties`: DataAnnotations estavam direcionadas a propriedades de records posicionais. O erro ocorria antes da action; **CreatedAtAction e sua rota não eram a causa**. O mesmo defeito afetava cadastro, desafio, verificação e renomeação.
+- O relógio congelado fora da suíte de dispositivos impedia a passagem do cooldown mesmo após `Task.Delay(1100)`, afetando as quatro variações de reprocessamento, a concorrência de OCR e a unidade histórica; também empatava a emissão dos QR codes.
+- A nova prova de concorrência inicialmente passou e depois reproduziu uma falha (191/192 integrações aprovadas): o commit de outro cadastro entre a consulta por ID e a consulta por fingerprint levava ao conflito indevido para a mesma identidade. Corrigido com retorno idempotente também nesse intervalo; duas variações unitárias determinísticas preservam o 409 para outro ID.
+- A revisão encontrou exposição de metadados administrativos no retry de cadastro e na resposta de verificação; status já usava DTO mínimo. Encontrou ainda classificação permanente do bloqueio por cadastro ausente/pendente e ausência de controle de concorrência na transição de status do dispositivo.
+
+A localização correta dos atributos é descrita na [documentação oficial de model binding de records](https://learn.microsoft.com/aspnet/core/mvc/models/model-binding?view=aspnetcore-10.0#record-types-validation-and-binding-metadata).
+
+## Correções e arquivos desta finalização
+
+| Arquivos | Correção / justificativa |
+| --- | --- |
+| `RegisteredDeviceModels.cs`, `RegisteredDevicesController.cs` | DataAnnotations nos parâmetros dos records; DTO mínimo para cadastro e sessão. Mantidos 201/200/409 e CreatedAtAction. |
+| `RegisteredDeviceService.cs` | Idempotência também quando um cadastro concorrente confirma entre as duas consultas de identidade; mesmo DTO mínimo de status em todas as respostas acessíveis ao operador; nova consulta sem tracking após persistência, antes de emitir sessão. |
+| `RegisteredDeviceConfiguration.cs`, `TransjapRepository.cs` | Status existente como token de concorrência otimista; uma autorização obsoleta não sobrescreve revogação já confirmada. Conflito traduzido para 409, sem alterar schema. |
+| `RegisteredDeviceRepository.cs` | Desafio expira também na fronteira exata: `ExpiresAt > now`. |
+| `DeviceIdentityOptions.cs` | Inicialização rejeita desafio fora de 1–300 segundos, sessão fora de 1–15 minutos e throttle fora de 1–60 minutos. Mantidas validações de enforcement e chave. |
+| `TransjapApiFactory.cs`, novo `DeviceIdentityApiFactory.cs` | Relógio real para fixtures anteriores; relógio congelado exclusivo para identidade, resetado entre testes. |
+| `RegisteredDeviceIntegrationTests.cs`, `RegisteredDeviceTests.cs` | Contratos HTTP e Location real; entradas inválidas; privacidade; idempotência concorrente; consumo concorrente; expiração exata; revogação durante verificação; autorização obsoleta; fotos históricas. |
+| `device-identity-error.ts`, `device-identity-provider.tsx`, `types.ts` | Bloqueio temporário gera erro retryable; revogação/identidade quebrada continuam permanentes. Tipos frontend acompanham DTO mínimo. |
+| `sync-engine.test.ts`, `sync-transport.test.ts` | Fila e blob preservados para dispositivo pendente/sem cadastro; retomada após autorização com o mesmo ClientEventId. |
+| `package.json`, `package-lock.json` | Next.js e eslint-config-next 16.4.3; Zod 4.6.7. Correções dos alertas críticos/altos encontrados na auditoria. |
+| Documentação da Fase 9 e este relatório | Diagnóstico, evidências, comandos, contagens e limites reais da validação. |
+
+Não foram alterados workflows de deploy, migrations, schema SQL, implementação/versão do IndexedDB ou regras operacionais de OCR/QR. O teste com duas instâncias de DbContext confirma que não há mudanças pendentes no modelo de migrations após configurar concorrência otimista.
+
+## Validação local desta finalização
+
+Ambiente: .NET SDK 10.0.401, Node 24.21.0, Next.js 16.4.3; CI oficial usa Node 26. SQL Server 2022 em container Docker dedicado, porta publicada somente em loopback e banco estritamente `transjap_horimetros_tests`, conforme o workflow oficial. Não houve acesso a banco Azure.
+
+Comandos executados:
+
+```bash
+dotnet restore apps/api/TransjapHorimetros.sln
+dotnet build apps/api/TransjapHorimetros.sln -c Release --no-restore
+# TEST_SQLSERVER_CONNECTION_STRING configurada somente para o container descartável local.
+dotnet test apps/api/TransjapHorimetros.sln -c Release --no-build --logger trx
+npm ci
+npm run lint
+npm test
+npm run build
+npm audit --omit=dev --json
+git diff --check
+git status
+git diff --stat
+```
+
+| Verificação | Resultado |
+| --- | --- |
+| Restore / build .NET Release | Aprovados; zero warnings e zero erros |
+| Unitários .NET | 223 aprovados, zero falhas, zero ignorados |
+| Integração SQL Server | 192 aprovados, zero falhas, zero ignorados |
+| npm ci | Aprovado com lockfile atualizado |
+| Lint | Aprovado |
+| Frontend | 92 aprovados em 9 arquivos, zero falhas |
+| Build frontend | Aprovado em Next.js 16.4.3 |
+| Auditoria npm de produção | Zero alertas críticos/altos; dois moderados transitivos, descritos abaixo |
+| Integridade do diff | Sem erros de whitespace; sem alterações em Azure, migrations ou IndexedDB |
+
+A integração cobre a matriz original de segurança e as novas regressões. OCR preserva cooldown, uma única reserva concorrente, histórico, valor e unidade históricos. QR preserva os dois registros e a desativação do anterior. Os testes offline cobrem revogação antes/depois da leitura, blobs preservados, idempotência, retentativas, isolamento por usuário, Web Crypto não exportável e upgrade real de IndexedDB v1→v2 via fake-indexeddb.
+
+Todos os testes automatizados do repositório foram executados, sem exclusão/filtro na validação final. Não foram executados ensaios manuais em celular físico, OCR Azure real ou testes de atestado de hardware; esses resultados não são inferidos dos testes Node/SQL. Nenhum deploy ou migration remota foi realizado.
+
+## GitHub Actions e veredito
+
+A integração obrigatória é `.github/workflows/ocr-validation.yml`, **Validate Transjap Horimetros**, com jobs `backend` (restore/build/unitários/SQL Server) e `frontend` (npm ci/lint/test/build). Os workflows de deploy de main não devem rodar nesta branch.
+
+**FASE 9 PARCIALMENTE VALIDADA** enquanto a execução do PR não comprovar ambos os jobs verdes no commit final. A validação local não substitui essa condição. O commit, o PR e a execução final serão conferidos depois do push; nenhuma incorporação em main está autorizada.
 
 ## Riscos residuais e operação
 
@@ -84,3 +149,12 @@ A entrega implementa identidade assimétrica local, cadastro pendente, administr
 - **Revogação Offline**: Dispositivo revogado no servidor enquanto offline apenas terá as requisições bloqueadas ao retornar a conectividade, momento no qual a fila local é protegida e marcada para revisão manual sem exclusão de dados ou blobs.
 - **Limpeza do Navegador**: Limpar o armazenamento do navegador (IndexedDB) exclui o par de chaves Web Crypto gerado localmente, exigindo nova solicitação de registro pelo operador e autorização pelo gestor.
 - **Atestado de Hardware**: A identidade comprova a posse da chave privada assimétrica não exportável gerada no Web Crypto do navegador, mas não constitui atestado de hardware (TPM/Secure Enclave).
+
+
+## Auditoria de dependências e riscos residuais adicionais
+
+O `npm audit` original encontrou alertas em Next.js e Zod. Foram atualizados para versões corrigidas conforme os avisos [Next.js / otimização de imagem](https://github.com/advisories/GHSA-2464-fhr4-w9xw), [Next.js / Server Actions](https://github.com/advisories/GHSA-p3m5-59mp-jv5r), [Next.js / use cache](https://github.com/advisories/GHSA-673q-mjm6-r5xr) e [Zod](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5).
+
+Restam dois pacotes classificados como moderados pelo npm, `exceljs` e seu `uuid` transitivo, derivados do mesmo [aviso sobre buffers em UUID v3/v5/v6](https://github.com/advisories/GHSA-w5hq-g745-h8pq). A importação encontrada em `exceljs/lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js` usa somente `v4`, fora dos métodos descritos no aviso. A identidade de dispositivo usa `crypto.randomUUID`/Web Crypto, sem esse pacote. Não foi imposto downgrade ou override de versão principal em exportação de planilhas; a dependência transitiva permanece uma pendência de manutenção registrada, sem falha observada no fluxo da Fase 9.
+
+Uma revogação concorrente após a última consulta da verificação pode fazer uma resposta de sessão chegar já inválida. As novas operações online consultam o estado atual e rejeitam esse token; a consulta não deve ser descrita como uma transação única envolvendo toda a requisição. Dados capturados offline continuam preservados para revisão. Limpar os dados do navegador continua removendo a chave; não há promessa de recuperação dessa chave ou atestado físico do dispositivo.

@@ -47,7 +47,7 @@ O teste de upgrade abre um banco v1 real, grava evento, foto e metadado, reabre 
 
 Endpoints autenticados:
 
-- `POST /api/v1/devices/registration`: cadastro idempotente, sempre inicialmente `PENDING`;
+- `POST /api/v1/devices/registration`: cadastro idempotente, sempre inicialmente `PENDING`; novo cadastro retorna 201 com `Location` consultável, retry retorna 200 e conflitos retornam 409;
 - `GET /api/v1/devices/status`: consulta minimizada por `LocalDeviceId` retornando `CurrentDeviceStatusResponse` (sem expor e-mails ou dados administrativos ao operador);
 - `POST /api/v1/devices/challenge`: emite desafio para dispositivo autorizado;
 - `POST /api/v1/devices/challenge/verify`: consome desafio, verifica assinatura e emite sessão curta;
@@ -57,11 +57,11 @@ Endpoints autenticados:
 - `POST /api/v1/devices/{id}/revoke`: revogação irreversível no escopo atual;
 - `PATCH /api/v1/devices/{id}`: renomeação.
 
-Solicitante, e-mail e timestamps vêm do usuário e relógio do servidor. A API valida que o SPKI recebido é realmente ECDSA P-256 e calcula o fingerprint após normalizá-lo. Chave pública completa não é devolvida nos DTOs administrativos. O endpoint `GET /api/v1/devices/status` retorna o DTO estrito `CurrentDeviceStatusResponse`, expondo apenas Id, DisplayName, Status, PublicKeyFingerprint, LastSeenAt e RequestedAt, protegendo metadados de auditoria e e-mails de outros usuários contra vazamento no perfil de operador.
+Solicitante, e-mail e timestamps vêm do usuário e relógio do servidor. A API valida que o SPKI recebido é realmente ECDSA P-256 e calcula o fingerprint após normalizá-lo. Chave pública completa não é devolvida nos DTOs administrativos. Cadastro (inclusive retry autorizado/revogado), status e a propriedade `device` da verificação de desafio retornam o DTO estrito `CurrentDeviceStatusResponse`, expondo apenas Id, LocalDeviceId, DisplayName, Platform, Status, KeyAlgorithm, PublicKeyFingerprint, LastSeenAt e RequestedAt, protegendo metadados de auditoria e e-mails de outros usuários contra vazamento no perfil de operador.
 
 ## Desafio-resposta e sessão curta
 
-Cada desafio tem nonce aleatório de 256 bits, validade padrão de 120 segundos e consumo atômico único. O payload UTF-8 é retornado pronto e assinado sem reconstrução pelo cliente:
+Cada desafio tem nonce aleatório de 256 bits, validade padrão de 120 segundos e consumo SQL atômico único. Na fronteira exata de expiração ele já é rejeitado (`ExpiresAt > now` é obrigatório). O payload UTF-8 é retornado pronto e assinado sem reconstrução pelo cliente:
 
 ```text
 TRANSJAP-DEVICE-CHALLENGE
@@ -74,7 +74,7 @@ v1
 
 O desafio é consumido antes da verificação, portanto uma assinatura inválida também inutiliza o nonce. Replay, expiração, assinatura inválida, dispositivo pendente e dispositivo revogado são rejeitados. Sucesso emite uma credencial HMAC de sessão de dispositivo, vinculada ao `RegisteredDeviceId` e ao `UserId`, com validade padrão de cinco minutos e armazenamento somente em memória no frontend. A assinatura do token de sessão utiliza preferencialmente `DeviceIdentity:SessionSigningKey`; caso não esteja configurada, recorre de forma segura a `Authentication:Jwt:SigningKey`.
 
-Ao criar uma leitura e ao enviar uma foto, a API valida simultaneamente JWT, sessão curta e status atual do dispositivo. Uma sessão emitida antes da revogação deixa de funcionar imediatamente porque o status é relido no banco. Sessões são estritamente vinculadas ao usuário autenticado: um token de sessão emitido para o Usuário A não pode ser utilizado pelo Usuário B. `LastSeenAt` é atualizado no máximo uma vez a cada cinco minutos. Sucessos são auditados uma vez por desafio; tentativas inválidas são auditadas pelo desafio consumido, evitando flood por retry do mesmo nonce.
+Ao criar uma leitura e ao enviar uma foto, a API valida simultaneamente JWT, sessão curta e status atual do dispositivo. Uma sessão emitida antes da revogação deixa de funcionar imediatamente porque o status é relido no banco. A verificação também relê o estado sem tracking após persistir a auditoria, antes de emitir a sessão. O status é token de concorrência otimista do EF: uma autorização carregada antes de uma revogação não consegue sobrescrever o estado revogado, retornando conflito. Isso usa a coluna existente, sem migration ou alteração de schema. Se uma revogação concorrer após a última consulta da verificação, uma credencial eventualmente retornada já estará inutilizável nas novas operações online. Sessões são estritamente vinculadas ao usuário autenticado: um token de sessão emitido para o Usuário A não pode ser utilizado pelo Usuário B. `LastSeenAt` é atualizado no máximo uma vez a cada cinco minutos. Sucessos são auditados uma vez por desafio; tentativas inválidas são auditadas pelo desafio consumido, evitando flood por retry do mesmo nonce.
 
 Cadastro, emissão e verificação usam rate limit específico, além do limitador global.
 
@@ -130,6 +130,8 @@ Seção `DeviceIdentity`:
 }
 ```
 
+A inicialização rejeita janelas fora dos limites: desafio de 1–300 segundos, sessão de 1–15 minutos e throttle de 1–60 minutos. Uma chave dedicada configurada precisa ter ao menos 32 bytes UTF-8; na ausência dela, a chave JWT também é validada na inicialização.
+
 `EnforceForReadings=false` existe exclusivamente para fixtures legadas de integração que testam regras anteriores isoladamente. Produção usa `true` por padrão. `SessionSigningKey` permite segregar a chave de assinatura de sessões de dispositivo do secret do JWT de autenticação; quando vazio, o sistema utiliza com segurança a chave JWT configurada.
 
 ## Riscos residuais e operação futura
@@ -141,3 +143,12 @@ Seção `DeviceIdentity`:
 - Limpar o armazenamento do site perde a chave e exige nova solicitação.
 - A credencial curta fica somente em memória e é renovada por desafio conforme necessário.
 - A identidade comprova posse da chave do perfil do navegador; não promete atestado de hardware.
+
+
+## Regressões e validação final de 29/10/2026
+
+Os atributos DataAnnotations dos records de entrada ficam nos parâmetros do construtor primário, conforme o model binding do ASP.NET Core. O uso anterior de `[property: ...]` lançava `InvalidOperationException` antes da action e provocava HTTP 500 em cadastro, desafio, verificação e renomeação; `CreatedAtAction` não era a causa. O teste do contrato segue o `Location` real retornado no cadastro.
+
+As fixtures legadas usam `TimeProvider.System`. Somente `DeviceIdentityApiFactory` congela o relógio para testes de expiração e o reseta entre testes. O congelamento global anterior impedia o cooldown de OCR de avançar e empatava timestamps de emissões de QR, tornando a ordem dependente de IDs aleatórios. As regras de OCR, QR, captura, foto e IndexedDB permanecem preservadas.
+
+O frontend distingue bloqueio temporário (sem cadastro/pendente) de revogação/identidade inválida. O primeiro mantém a fila em `FAILED_RETRYABLE`, com foto dependente e blob intactos; a mesma fila retoma após autorização, preservando `ClientEventId`. Consulte os comandos, contagens, limites da validação e referências de CI no [relatório final](fase-9-relatorio-identidade-dispositivo.md).

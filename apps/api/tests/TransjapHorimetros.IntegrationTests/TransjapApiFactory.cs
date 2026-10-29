@@ -17,17 +17,18 @@ using TransjapHorimetros.Infrastructure.Persistence.Seed;
 
 namespace TransjapHorimetros.IntegrationTests;
 
-public sealed class TransjapApiFactory : WebApplicationFactory<Program>
+public class TransjapApiFactory : WebApplicationFactory<Program>
 {
     private const string TestSigningKey = "transjap-phase-3-integration-tests-signing-key-2026";
     private readonly string _connectionString;
     private readonly string? _originalAppConnectionString;
-    private readonly TestTimeProvider _timeProvider = new(DateTimeOffset.UtcNow);
+    private readonly TimeProvider _timeProvider;
 
-    public TestTimeProvider TimeProvider => _timeProvider;
+    public TransjapApiFactory() : this(TimeProvider.System) { }
 
-    public TransjapApiFactory()
+    protected TransjapApiFactory(TimeProvider timeProvider)
     {
+        _timeProvider = timeProvider;
         _connectionString =
             Environment.GetEnvironmentVariable("TEST_SQLSERVER_CONNECTION_STRING")
             ?? throw new InvalidOperationException(
@@ -135,7 +136,8 @@ public sealed class TransjapApiFactory : WebApplicationFactory<Program>
 
     public async Task ResetDatabaseAsync()
     {
-        _timeProvider.SetUtcNow(DateTimeOffset.UtcNow);
+        if (_timeProvider is TestTimeProvider clock)
+            clock.SetUtcNow(DateTimeOffset.UtcNow);
         TestDatabaseGuard.EnsureSafeTestDatabase(
             TestDatabaseGuard.TestingEnvironmentName,
             _connectionString,

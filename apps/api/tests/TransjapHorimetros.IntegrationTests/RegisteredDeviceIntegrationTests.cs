@@ -7,15 +7,17 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TransjapHorimetros.Application.Common;
+using TransjapHorimetros.Application.Exceptions;
 using TransjapHorimetros.Application.RegisteredDevices;
 using TransjapHorimetros.Domain.Entities;
 using TransjapHorimetros.Domain.Enums;
 using TransjapHorimetros.Domain.Security;
 using TransjapHorimetros.Infrastructure.Persistence;
+using TransjapHorimetros.Infrastructure.Persistence.Repositories;
 
 namespace TransjapHorimetros.IntegrationTests;
 
-public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory) : IClassFixture<TransjapApiFactory>
+public sealed class RegisteredDeviceIntegrationTests(DeviceIdentityApiFactory factory) : IClassFixture<DeviceIdentityApiFactory>
 {
     [Fact]
     public async Task RegisterSameIdSameKey_IsIdempotent()
@@ -31,10 +33,19 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         var deviceId = firstBody.GetProperty("id").GetGuid();
         Assert.Equal("PENDING", firstBody.GetProperty("status").GetString());
 
+        Assert.NotNull(firstResponse.Headers.Location);
+        using var statusResponse = await operatorClient.GetAsync(firstResponse.Headers.Location);
+        Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+        var statusBody = await statusResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(deviceId, statusBody.GetProperty("id").GetGuid());
+        Assert.Equal(localDeviceId, statusBody.GetProperty("localDeviceId").GetString());
+
         using var retryResponse = await RegisterDeviceAsync(operatorClient, localDeviceId, key, "Nome Atualizado No Retry");
         Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
         var retryBody = await retryResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(deviceId, retryBody.GetProperty("id").GetGuid());
+        Assert.Equal("Tablet Campo", retryBody.GetProperty("displayName").GetString());
+        Assert.Null(retryResponse.Headers.Location);
 
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
@@ -88,8 +99,10 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, challengeResponse.StatusCode);
     }
 
-    [Fact]
-    public async Task ChallengeExpires()
+    [Theory]
+    [InlineData(120)]
+    [InlineData(121)]
+    public async Task ChallengeExpires(int elapsedSeconds)
     {
         await factory.ResetDatabaseAsync();
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -101,7 +114,7 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         var (challengeId, payload) = await CreateChallengeAsync(operatorClient, localDeviceId);
 
         // Expira o desafio avançando apenas o relógio controlado do host de teste.
-        factory.TimeProvider.Advance(TimeSpan.FromSeconds(121));
+        factory.TimeProvider.Advance(TimeSpan.FromSeconds(elapsedSeconds));
 
         var signature = SignPayload(key, payload);
         using var verifyResponse = await operatorClient.PostAsJsonAsync("/api/v1/devices/challenge/verify", new
@@ -624,6 +637,225 @@ public sealed class RegisteredDeviceIntegrationTests(TransjapApiFactory factory)
         var statusObj = JsonSerializer.Deserialize<JsonElement>(json);
         Assert.Equal(deviceId, statusObj.GetProperty("id").GetGuid());
         Assert.Equal("AUTHORIZED", statusObj.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task OperatorResponses_RegistrationAndVerificationHideAdministrativeData()
+    {
+        await factory.ResetDatabaseAsync();
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var localId = $"web-{Guid.NewGuid():D}";
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        using var manager = factory.CreateClientForRole(AppRoles.Manager);
+        var (deviceId, _) = await RegisterAndAuthorizeDeviceAsync(op, manager, localId, key);
+
+        using var retry = await RegisterDeviceAsync(op, localId, key);
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        AssertPrivateMetadataAbsent(await retry.Content.ReadAsStringAsync());
+
+        var (challengeId, payload) = await CreateChallengeAsync(op, localId);
+        using var verify = await op.PostAsJsonAsync("/api/v1/devices/challenge/verify",
+            new { challengeId, signature = SignPayload(key, payload) });
+        verify.EnsureSuccessStatusCode();
+        AssertPrivateMetadataAbsent(await verify.Content.ReadAsStringAsync());
+
+        using var revoke = await manager.PostAsync($"/api/v1/devices/{deviceId}/revoke", null);
+        revoke.EnsureSuccessStatusCode();
+        using var revokedRetry = await RegisterDeviceAsync(op, localId, key);
+        Assert.Equal(HttpStatusCode.OK, revokedRetry.StatusCode);
+        var json = await revokedRetry.Content.ReadAsStringAsync();
+        AssertPrivateMetadataAbsent(json);
+        Assert.Equal("REVOKED", JsonSerializer.Deserialize<JsonElement>(json).GetProperty("status").GetString());
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("oversized")]
+    [InlineData("spki")]
+    [InlineData("trailing-spki")]
+    [InlineData("curve")]
+    [InlineData("algorithm")]
+    public async Task InvalidRegistration_Returns4xxWithoutPersistingDevice(string invalid)
+    {
+        await factory.ResetDatabaseAsync();
+        using var key = ECDsa.Create(invalid == "curve" ? ECCurve.NamedCurves.nistP384 : ECCurve.NamedCurves.nistP256);
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        var spki = key.ExportSubjectPublicKeyInfo();
+        using var response = await op.PostAsJsonAsync("/api/v1/devices/registration", new
+        {
+            localDeviceId = $"web-{Guid.NewGuid():D}",
+            displayName = invalid == "missing" ? "" : invalid == "oversized" ? new string('a', 101) : "Tablet",
+            platform = "WEB_PWA",
+            publicKey = invalid == "spki" ? "invalid-base64" : Convert.ToBase64String(
+                invalid == "trailing-spki" ? [.. spki, 0] : spki),
+            keyAlgorithm = invalid == "algorithm" ? "RSA" : RegisteredDeviceService.KeyAlgorithm,
+        });
+        Assert.Equal(invalid is "missing" or "oversized" ? HttpStatusCode.BadRequest : HttpStatusCode.UnprocessableEntity,
+            response.StatusCode);
+        await using var scope = factory.Services.CreateAsyncScope();
+        Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<TransjapDbContext>().RegisteredDevices.CountAsync());
+    }
+
+    [Fact]
+    public async Task InvalidDeviceCommands_Return400InsteadOf500()
+    {
+        await factory.ResetDatabaseAsync();
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        using var manager = factory.CreateClientForRole(AppRoles.Manager);
+        using var challenge = await op.PostAsJsonAsync("/api/v1/devices/challenge", new { localDeviceId = "" });
+        using var verify = await op.PostAsJsonAsync("/api/v1/devices/challenge/verify", new { challengeId = Guid.NewGuid(), signature = "" });
+        using var rename = await manager.PatchAsJsonAsync($"/api/v1/devices/{Guid.NewGuid()}", new { displayName = "" });
+        Assert.Equal(HttpStatusCode.BadRequest, challenge.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, verify.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, rename.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConcurrentRegistration_IsIdempotentAndAuditedOnce()
+    {
+        await factory.ResetDatabaseAsync();
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        var localId = $"web-{Guid.NewGuid():D}";
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => RegisterDeviceAsync(op, localId, key)));
+        try
+        {
+            Assert.All(responses, r => Assert.Contains(r.StatusCode, new[] { HttpStatusCode.Created, HttpStatusCode.OK }));
+            Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.Created));
+            Assert.Equal(3, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
+            var ids = new List<Guid>();
+            foreach (var response in responses)
+                ids.Add((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
+            Assert.Single(ids.Distinct());
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+            Assert.Equal(1, await db.RegisteredDevices.CountAsync());
+            Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.Action == "DEVICE_REGISTRATION_REQUESTED"));
+        }
+        finally { foreach (var response in responses) response.Dispose(); }
+    }
+
+    [Fact]
+    public async Task ConcurrentChallengeVerification_ConsumesNonceOnce()
+    {
+        await factory.ResetDatabaseAsync();
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        using var manager = factory.CreateClientForRole(AppRoles.Manager);
+        var localId = $"web-{Guid.NewGuid():D}";
+        await RegisterAndAuthorizeDeviceAsync(op, manager, localId, key);
+        var (challengeId, payload) = await CreateChallengeAsync(op, localId);
+        var signature = SignPayload(key, payload);
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ =>
+            op.PostAsJsonAsync("/api/v1/devices/challenge/verify", new { challengeId, signature })));
+        try
+        {
+            Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
+            Assert.Equal(3, responses.Count(r => r.StatusCode == HttpStatusCode.Conflict));
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+            Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.Action == "DEVICE_CHALLENGE_VERIFIED"));
+        }
+        finally { foreach (var response in responses) response.Dispose(); }
+    }
+
+    [Fact]
+    public async Task StaleAuthorization_CannotOverwriteCommittedRevocation()
+    {
+        await factory.ResetDatabaseAsync();
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var manager = factory.CreateClientForRole(AppRoles.Manager);
+        var id = await RegisterDeviceAndGetIdAsync(manager, $"web-{Guid.NewGuid():D}", key);
+        await using var staleScope = factory.Services.CreateAsyncScope();
+        var staleDb = staleScope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        var staleDevice = await staleDb.RegisteredDevices.SingleAsync(d => d.Id == id);
+        var actor = await staleDb.Users.SingleAsync(u => u.Email!.StartsWith("manager."));
+        using var revoke = await manager.PostAsync($"/api/v1/devices/{id}/revoke", null);
+        revoke.EnsureSuccessStatusCode();
+
+        staleDevice.Authorize(actor.Id, actor.Email!, factory.TimeProvider.GetUtcNow());
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            new TransjapRepository(staleDb).SaveChangesAsync(default));
+        await staleDb.Entry(staleDevice).ReloadAsync();
+        Assert.Equal(RegisteredDeviceStatus.Revoked, staleDevice.Status);
+        Assert.False(staleDb.Database.HasPendingModelChanges());
+    }
+
+    [Theory]
+    [InlineData(300)]
+    [InlineData(301)]
+    public async Task IssuedSessionExpires_ForNewReadingAndPendingPhoto(int seconds)
+    {
+        await factory.ResetDatabaseAsync();
+        SetDeviceEnforcement(true);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        using var manager = factory.CreateClientForRole(AppRoles.Manager);
+        var localId = $"web-{Guid.NewGuid():D}";
+        await RegisterAndAuthorizeDeviceAsync(op, manager, localId, key);
+        var (challengeId, payload) = await CreateChallengeAsync(op, localId);
+        var token = await VerifyChallengeAndGetTokenAsync(op, challengeId, SignPayload(key, payload));
+        var machineId = await GetFirstMachineIdAsync();
+        var readingId = await CreateReadingWithSessionAsync(op, machineId, token);
+        factory.TimeProvider.Advance(TimeSpan.FromSeconds(seconds));
+        op.DefaultRequestHeaders.Add("X-Device-Session", token);
+        using var reading = await op.PostAsJsonAsync("/api/v1/readings", new
+        {
+            machineId, value = 101m, readingType = "INTERMEDIATE",
+            capturedAtDevice = DateTimeOffset.UtcNow, clientEventId = Guid.NewGuid(),
+        });
+        using var form = CreatePhotoForm(CreateJpeg());
+        using var photo = await op.PostAsync($"/api/v1/readings/{readingId}/photo", form);
+        Assert.Equal(HttpStatusCode.Forbidden, reading.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, photo.StatusCode);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        Assert.Equal(1, await db.HourMeterReadings.CountAsync());
+        Assert.Equal(0, await db.PhotoEvidences.CountAsync());
+    }
+
+    [Fact]
+    public async Task LegacyReading_AcceptsPhotoWithoutInventingDeviceIdentity()
+    {
+        await factory.ResetDatabaseAsync();
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        SetDeviceEnforcement(false);
+        var readingId = await CreateReadingWithSessionAsync(op, await GetFirstMachineIdAsync(), "");
+        SetDeviceEnforcement(true);
+        using var form = CreatePhotoForm(CreateJpeg());
+        using var photo = await op.PostAsync($"/api/v1/readings/{readingId}/photo", form);
+        Assert.Equal(HttpStatusCode.Created, photo.StatusCode);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        Assert.Null((await db.HourMeterReadings.SingleAsync()).RegisteredDeviceId);
+        Assert.Equal(1, await db.PhotoEvidences.CountAsync());
+    }
+
+    [Fact]
+    public async Task RevocationAfterChallenge_RejectsVerificationAndNewChallenges()
+    {
+        await factory.ResetDatabaseAsync();
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        using var manager = factory.CreateClientForRole(AppRoles.Manager);
+        var localId = $"web-{Guid.NewGuid():D}";
+        var (id, _) = await RegisterAndAuthorizeDeviceAsync(op, manager, localId, key);
+        var (challengeId, payload) = await CreateChallengeAsync(op, localId);
+        using var revoke = await manager.PostAsync($"/api/v1/devices/{id}/revoke", null);
+        revoke.EnsureSuccessStatusCode();
+        using var verify = await op.PostAsJsonAsync("/api/v1/devices/challenge/verify",
+            new { challengeId, signature = SignPayload(key, payload) });
+        using var challenge = await op.PostAsJsonAsync("/api/v1/devices/challenge", new { localDeviceId = localId });
+        Assert.Equal(HttpStatusCode.Forbidden, verify.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, challenge.StatusCode);
+        Assert.DoesNotContain("deviceSessionToken", await verify.Content.ReadAsStringAsync());
+    }
+
+    private static void AssertPrivateMetadataAbsent(string json)
+    {
+        foreach (var field in new[] { "requestedByEmail", "authorizedByEmail", "revokedByEmail",
+                     "requestedByUserId", "authorizedByUserId", "revokedByUserId", "publicKey\"" })
+            Assert.DoesNotContain(field, json, StringComparison.OrdinalIgnoreCase);
     }
 
     private void SetDeviceEnforcement(bool enforce)

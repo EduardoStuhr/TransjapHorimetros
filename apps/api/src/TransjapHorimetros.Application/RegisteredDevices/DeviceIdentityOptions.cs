@@ -11,6 +11,13 @@ public sealed class DeviceIdentityOptions
 
     public void ValidateForStartup(bool isProduction)
     {
+        if (ChallengeLifetimeSeconds is < 1 or > 300)
+            throw new InvalidOperationException("DeviceIdentity:ChallengeLifetimeSeconds deve estar entre 1 e 300 segundos.");
+        if (SessionLifetimeMinutes is < 1 or > 15)
+            throw new InvalidOperationException("DeviceIdentity:SessionLifetimeMinutes deve estar entre 1 e 15 minutos.");
+        if (LastSeenThrottleMinutes is < 1 or > 60)
+            throw new InvalidOperationException("DeviceIdentity:LastSeenThrottleMinutes deve estar entre 1 e 60 minutos.");
+
         if (!string.IsNullOrWhiteSpace(SessionSigningKey)
             && System.Text.Encoding.UTF8.GetByteCount(SessionSigningKey) < 32)
         {

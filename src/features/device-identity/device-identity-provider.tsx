@@ -16,12 +16,11 @@ import {
   signDeviceChallenge,
   validateStoredDeviceIdentity,
 } from "@/features/device-identity/device-crypto";
-import { DeviceIdentityError } from "@/features/device-identity/device-identity-error";
+import { deviceAuthorizationError, DeviceIdentityError } from "@/features/device-identity/device-identity-error";
 import type {
   CurrentDeviceStatusResponse,
   DeviceChallengeResponse,
   DeviceSessionResponse,
-  RegisteredDeviceResponse,
 } from "@/features/device-identity/types";
 import { getOfflineStore } from "@/offline/indexed-db-store";
 import type { StoredDeviceIdentity } from "@/offline/types";
@@ -60,7 +59,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 
 async function mergeServerIdentity(
   local: StoredDeviceIdentity,
-  server: Pick<CurrentDeviceStatusResponse | RegisteredDeviceResponse, "id" | "displayName" | "status" | "publicKeyFingerprint">,
+  server: Pick<CurrentDeviceStatusResponse, "id" | "displayName" | "status" | "publicKeyFingerprint">,
 ): Promise<StoredDeviceIdentity> {
   await validateStoredDeviceIdentity(local, server.publicKeyFingerprint);
   const now = new Date().toISOString();
@@ -174,7 +173,7 @@ export function DeviceIdentityProvider({ children }: { children: ReactNode }) {
         current = { ...current, displayName: displayName.trim(), updatedAt: new Date().toISOString() };
         await persist(current);
       }
-      const server = await apiRequest<RegisteredDeviceResponse>("/api/devices/registration", {
+      const server = await apiRequest<CurrentDeviceStatusResponse>("/api/devices/registration", {
         method: "POST",
         body: JSON.stringify({
           localDeviceId: current.localDeviceId,
@@ -205,11 +204,7 @@ export function DeviceIdentityProvider({ children }: { children: ReactNode }) {
       const current = identityRef.current;
       if (!navigator.onLine) throw new Error("Sem conexao para comprovar a identidade do dispositivo.");
       if (!current || current.status !== "AUTHORIZED") {
-        throw new DeviceIdentityError(current?.status === "REVOKED"
-          ? "Este dispositivo foi revogado. A fila local permanece preservada para revisao."
-          : current?.status === "IDENTITY_INVALID"
-            ? "A identidade local e invalida. A fila foi preservada; solicite um novo cadastro."
-            : "Este dispositivo ainda nao foi autorizado.");
+        throw deviceAuthorizationError(current?.status);
       }
       try {
         await validateStoredDeviceIdentity(current);

@@ -154,8 +154,10 @@ public sealed class RegisteredDeviceTests
         options.ValidateForStartup(isProduction: false);
     }
 
-    [Fact]
-    public async Task VerifyChallenge_RevokedTrackedDevice_DoesNotIssueSession()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task VerifyChallenge_RevokedBeforeOrDuringSave_DoesNotIssueSession(bool revokeDuringSave)
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var publicKey = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo());
@@ -177,9 +179,12 @@ public sealed class RegisteredDeviceTests
         var signature = Convert.ToBase64String(key.SignData(
             System.Text.Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256,
             DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
-        var repository = new RaceRepository(challenge, revoked);
+        var repository = new RaceRepository(challenge, revokeDuringSave ? authorized : revoked);
         var tokenService = new RecordingDeviceSessionTokenService();
-        var service = new RegisteredDeviceService(repository, new AuditRepository(), new UnitOfWork(),
+        var unitOfWork = new UnitOfWork(revokeDuringSave
+            ? () => authorized.Revoke(Guid.NewGuid(), "manager@tests.local", Now.AddSeconds(1))
+            : null);
+        var service = new RegisteredDeviceService(repository, new AuditRepository(), unitOfWork,
             tokenService, new CurrentUser(userId), new DeviceIdentityOptions(), new FixedTimeProvider(Now));
 
         await Assert.ThrowsAsync<ForbiddenException>(() => service.VerifyChallengeAsync(
@@ -188,13 +193,61 @@ public sealed class RegisteredDeviceTests
         Assert.False(tokenService.WasCreated);
     }
 
+    [Theory]
+    [InlineData("challenge", 0)]
+    [InlineData("challenge", 301)]
+    [InlineData("session", 0)]
+    [InlineData("session", 16)]
+    [InlineData("lastSeen", 0)]
+    [InlineData("lastSeen", 61)]
+    public void DeviceIdentityOptions_RejectsInvalidSecurityWindows(string setting, int value)
+    {
+        var options = new DeviceIdentityOptions();
+        switch (setting)
+        {
+            case "challenge": options.ChallengeLifetimeSeconds = value; break;
+            case "session": options.SessionLifetimeMinutes = value; break;
+            case "lastSeen": options.LastSeenThrottleMinutes = value; break;
+        }
+        Assert.Throws<InvalidOperationException>(() => options.ValidateForStartup(isProduction: true));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Register_ConcurrentCommitBetweenLookups_OnlySameIdentityIsIdempotent(bool sameLocalId)
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var spki = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo());
+        var (_, fingerprint) = RegisteredDeviceService.ValidatePublicKey(spki);
+        var userId = Guid.NewGuid();
+        var existing = new RegisteredDevice("web-local", "Tablet", "WEB_PWA", spki,
+            fingerprint, RegisteredDeviceService.KeyAlgorithm, userId, "operator@tests.local", Now);
+        var service = new RegisteredDeviceService(new RaceRepository(null, existing), new AuditRepository(),
+            new UnitOfWork(), new RecordingDeviceSessionTokenService(), new CurrentUser(userId),
+            new DeviceIdentityOptions(), new FixedTimeProvider(Now));
+        var request = new RegisterDeviceRequest(sameLocalId ? "web-local" : "web-other", "Tablet", "WEB_PWA",
+            spki, RegisteredDeviceService.KeyAlgorithm);
+
+        if (sameLocalId)
+        {
+            var result = await service.RegisterAsync(request, "race", default);
+            Assert.True(result.IsExisting);
+            Assert.Equal(existing.Id, result.Device.Id);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<ConflictException>(() => service.RegisterAsync(request, "race", default));
+        }
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public DateTimeOffset UtcNow { get; set; } = now;
         public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 
-    private sealed class RaceRepository(DeviceChallenge challenge, RegisteredDevice trackedDevice)
+    private sealed class RaceRepository(DeviceChallenge? challenge, RegisteredDevice trackedDevice)
         : IRegisteredDeviceRepository
     {
         public Task<DeviceChallenge?> GetChallengeAsync(Guid challengeId, CancellationToken cancellationToken) =>
@@ -204,9 +257,9 @@ public sealed class RegisteredDeviceTests
         public Task<RegisteredDevice?> GetByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken) =>
             Task.FromResult<RegisteredDevice?>(trackedDevice);
         public Task<RegisteredDevice?> GetByLocalDeviceIdAsync(string localDeviceId, bool trackChanges, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult<RegisteredDevice?>(null);
         public Task<RegisteredDevice?> GetByFingerprintAsync(string fingerprint, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult<RegisteredDevice?>(trackedDevice);
         public Task<RepositoryPage<RegisteredDevice>> GetPageAsync(RegisteredDeviceQuery query, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<IReadOnlyList<AuditLog>> GetHistoryAsync(Guid deviceId, CancellationToken cancellationToken) =>
@@ -241,9 +294,13 @@ public sealed class RegisteredDeviceTests
         public void Add(AuditLog auditLog) { }
     }
 
-    private sealed class UnitOfWork : IUnitOfWork
+    private sealed class UnitOfWork(Action? onSave = null) : IUnitOfWork
     {
-        public Task<int> SaveChangesAsync(CancellationToken cancellationToken) => Task.FromResult(1);
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            onSave?.Invoke();
+            return Task.FromResult(1);
+        }
         public void ClearChanges() { }
     }
 }

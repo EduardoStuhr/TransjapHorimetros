@@ -13,9 +13,9 @@ public sealed class RegisteredDevicesController(IRegisteredDeviceService service
 {
     [HttpPost("registration")]
     [EnableRateLimiting("device-identity")]
-    [ProducesResponseType(typeof(RegisteredDeviceResponse), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(RegisteredDeviceResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<RegisteredDeviceResponse>> Register(
+    [ProducesResponseType(typeof(CurrentDeviceStatusResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(CurrentDeviceStatusResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<CurrentDeviceStatusResponse>> Register(
         RegisterDeviceRequest request, CancellationToken cancellationToken)
     {
         var result = await service.RegisterAsync(request, HttpContext.TraceIdentifier, cancellationToken);

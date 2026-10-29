@@ -43,7 +43,7 @@ export interface DeviceChallengeResponse {
 export interface DeviceSessionResponse {
   deviceSessionToken: string;
   expiresAt: string;
-  device: RegisteredDeviceResponse;
+  device: CurrentDeviceStatusResponse;
 }
 
 export interface PagedDevicesResponse {

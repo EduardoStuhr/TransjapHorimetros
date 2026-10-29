@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { deviceAuthorizationError } from "@/features/device-identity/device-identity-error";
 import { sha256Hex } from "@/offline/crypto";
 import { IndexedDbOfflineStore } from "@/offline/indexed-db-store";
 import { OfflineSyncService } from "@/offline/sync-engine";
-import { SyncTransportError, type SyncResponse, type SyncTransport } from "@/offline/sync-transport";
+import { BrowserSyncTransport, SyncTransportError, type SyncResponse, type SyncTransport } from "@/offline/sync-transport";
 import type { EnqueueReadingInput, OfflinePhotoEvent, OfflineReadingEvent, StoredPhotoBlob } from "@/offline/types";
 
 const databases: Array<{ name: string; store: IndexedDbOfflineStore }> = [];
@@ -73,6 +74,25 @@ afterEach(async () => {
 });
 
 describe("OfflineSyncService", () => {
+  it.each(["PENDING", "UNREGISTERED", undefined] as const)(
+    "preserva fila e foto para nova tentativa quando o dispositivo esta %s e retoma apos autorizacao",
+    async (status) => {
+      const store = createStore();
+      const queued = await store.enqueueReadingWithPhoto(await input());
+      const transport = new BrowserSyncTransport(async () => { throw deviceAuthorizationError(status); });
+      const result = await new OfflineSyncService(store, transport).sync("user-1");
+      expect(result.retryableFailures).toBe(1);
+      expect(result.permanentFailures).toBe(0);
+      expect((await store.getEvent(queued.readingEvent.localEventId))?.status).toBe("FAILED_RETRYABLE");
+      expect((await store.getEvent(queued.photoEvent.localEventId))?.status).toBe("PENDING");
+      expect(await store.getPhotoBlob(queued.photoEvent.payload.blobKey)).toBeDefined();
+      const approved = await new OfflineSyncService(store, new FakeTransport()).sync("user-1", true);
+      expect(approved.synced).toBe(2);
+      expect((await store.getEvent(queued.readingEvent.localEventId))?.clientEventId)
+        .toBe(queued.readingEvent.clientEventId);
+    },
+  );
+
   it("sincroniza leitura antes da foto e persiste o ID retornado pelo servidor", async () => {
     const store = createStore();
     await store.enqueueReadingWithPhoto(await input());

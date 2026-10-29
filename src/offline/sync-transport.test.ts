@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { DeviceIdentityError } from "@/features/device-identity/device-identity-error";
+import { deviceAuthorizationError, DeviceIdentityError } from "@/features/device-identity/device-identity-error";
 import { BrowserSyncTransport, SyncTransportError } from "@/offline/sync-transport";
 import type { OfflinePhotoEvent, OfflineReadingEvent, StoredPhotoBlob } from "@/offline/types";
 
@@ -127,6 +127,18 @@ describe("BrowserSyncTransport", () => {
       status: 403,
       message: "A identidade local e invalida. A fila foi preservada.",
     });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("mantem dispositivo pendente retryable ate a autorizacao, inclusive para fotos", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const transport = new BrowserSyncTransport(async () => {
+      throw deviceAuthorizationError("PENDING");
+    });
+
+    await expect(transport.createReading(readingEvent)).rejects.toMatchObject({ status: 425 });
+    await expect(transport.uploadPhoto(photoEvent, "reading-1", storedBlob))
+      .rejects.toMatchObject({ status: 425 });
     expect(fetch).not.toHaveBeenCalled();
   });
 

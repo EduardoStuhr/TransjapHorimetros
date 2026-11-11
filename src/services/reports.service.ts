@@ -34,7 +34,7 @@ export interface ReportAvailability {
   type: ReportType;
 }
 
-export type ReportData =
+export type ReportData = { filters?: ReadingFilters } & (
   | {
       items: readonly Anomaly[];
       type: "anomalies";
@@ -42,7 +42,7 @@ export type ReportData =
   | {
       items: readonly HourMeterReading[];
       type: Exclude<ReportType, "anomalies">;
-    };
+    });
 
 export function isReportType(value: string): value is ReportType {
   return reportDefinitions.some((report) => report.type === value);
@@ -54,7 +54,7 @@ export function getReportDefinition(type: ReportType) {
 
 export async function getReportData(type: ReportType, filters: ReadingFilters = {}): Promise<ReportData> {
   if (type === "anomalies") {
-    return { type, items: await getAllAnomalies(filters) };
+    return { type, items: await getAllAnomalies(filters), filters };
   }
 
   const readings = [...(await getAllReadings(filters))];
@@ -77,7 +77,7 @@ export async function getReportData(type: ReportType, filters: ReadingFilters = 
     );
   }
 
-  return { type, items: readings };
+  return { type, items: readings, filters };
 }
 
 export async function getReportAvailability(filters: ReadingFilters = {}): Promise<

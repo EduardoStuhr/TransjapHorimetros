@@ -128,6 +128,10 @@ export async function createExcelReport(data: ReportData) {
   worksheet.getCell(2, 1).value = `Período dos dados: ${report.period} | Gerado em: ${formatDateTime(new Date().toISOString())}`;
   worksheet.getCell(2, 1).font = { color: { argb: "FF475569" }, italic: true };
 
+  worksheet.mergeCells(3, 1, 3, lastColumn);
+  worksheet.getCell(3, 1).value = "Filtros: " + Object.entries(data.filters ?? {}).filter(([,v]) => v).map(([k,v]) => k + "=" + v).join(" | ");
+  worksheet.getCell(3, 1).alignment = {wrapText:true};
+  worksheet.getRow(3).height = 30;
   const headerRow = worksheet.getRow(4);
   headerRow.values = report.columns.map((column) => column.label);
   headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -184,7 +188,13 @@ export async function createPdfReport(data: ReportData) {
     page.drawText(normalizePdfText("Transjap - " + report.title), {x:32,y:560,font:bold,size:16});
     page.drawText(normalizePdfText("Período dos dados: " + report.period), {x:32,y:541,font,size:9});
     page.drawText("Gerado em: " + formatDateTime(new Date().toISOString()), {x:32,y:526,font,size:9});
+    const filterText = "Filtros: " + Object.entries(data.filters ?? {}).filter(([,v]) => v).map(([k,v]) => k + "=" + v).join(" | ");
     y = 505;
+    for (const line of normalizePdfText(filterText).match(/.{1,120}/g) ?? []) {
+      page.drawText(line, {x:32,y,font,size:8});
+      y -= 12;
+    }
+    y -= 8;
   };
   header();
   for (const row of report.rows) {

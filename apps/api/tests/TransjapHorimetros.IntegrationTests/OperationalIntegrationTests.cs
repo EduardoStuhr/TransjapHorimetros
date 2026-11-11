@@ -4,12 +4,24 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TransjapHorimetros.Domain.Security;
+using TransjapHorimetros.Application.Dashboard;
+using TransjapHorimetros.Application.Abstractions;
 using TransjapHorimetros.Infrastructure.Persistence;
 
 namespace TransjapHorimetros.IntegrationTests;
 
 public sealed class OperationalIntegrationTests(TransjapApiFactory factory) : IClassFixture<TransjapApiFactory>
 {
+    private sealed class ReviewActor(Guid id) : ICurrentUser
+    {
+        public Guid? UserId => id;
+        public string? Email => "review@tests.local";
+        public string? FullName => "Reviewer";
+        public IReadOnlyList<string> Roles => [AppRoles.Admin];
+        public bool IsAuthenticated => true;
+        public bool IsInRole(string role) => role == AppRoles.Admin;
+    }
+
     [Fact]
     public async Task OperatorCannotReviewOrReadAudit()
     {
@@ -26,6 +38,8 @@ public sealed class OperationalIntegrationTests(TransjapApiFactory factory) : IC
     {
         await factory.ResetDatabaseAsync();
         using var client = factory.CreateClient();
+        using (var diagnosticScope = factory.Services.CreateScope())
+            await diagnosticScope.ServiceProvider.GetRequiredService<IOperationalService>().GetSummaryAsync(new(), default);
         var summary = await client.GetFromJsonAsync<JsonElement>("/api/v1/operations/summary");
         Assert.True(summary.GetProperty("totalMachines").GetInt32() > 0);
         Assert.Equal(0, summary.GetProperty("readings").GetInt32());
@@ -53,6 +67,13 @@ public sealed class OperationalIntegrationTests(TransjapApiFactory factory) : IC
         var suspect = await Create(90);
         var id = suspect.GetProperty("id").GetGuid();
         var url = $"/api/v1/operations/readings/{id}/review";
+        using (var diagnosticScope = factory.Services.CreateScope())
+        {
+            var database = diagnosticScope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+            var actor = new ReviewActor(await database.Users.Select(u => u.Id).FirstAsync());
+            var service = new OperationalService(database, actor, TimeProvider.System);
+            await service.ReviewAsync(id, new ReviewRequest(true, "Conferida a evidência"), "integration", default);
+        }
         var responses = await Task.WhenAll(
             client.PostAsJsonAsync(url, new { approved = true, reason = "Conferida a evidência" }),
             client.PostAsJsonAsync(url, new { approved = false, reason = "Solicitada nova leitura" }));

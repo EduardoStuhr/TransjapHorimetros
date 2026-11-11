@@ -1,3 +1,5 @@
+import { apiFetch } from "@/services/api-client";
+import type { AuthUser } from "@/lib/auth/types";
 import { parseOperationalFilters } from "@/lib/operational-filters";
 import {
   createExcelReport,
@@ -21,6 +23,10 @@ export async function GET(
     return Response.json({ message: "Relatório não encontrado." }, { status: 404 });
   }
 
+  const user = await apiFetch<AuthUser>("/api/v1/auth/me");
+  if (!user.roles.some(role => ["ADMIN","MANAGER","SUPERVISOR","ADMINISTRATIVE"].includes(role))) {
+    return Response.json({ message: "Acesso restrito à supervisão." }, { status: 403 });
+  }
   const parsed = new URL(request.url).searchParams;
   let filters;
   try { filters = parseOperationalFilters(Object.fromEntries(parsed)); }

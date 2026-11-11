@@ -1,15 +1,23 @@
+import { getMachines } from "@/services/machines.service";
+import { getWorkSites } from "@/services/worksites.service";
 import type { ReadingsFilterValues } from "@/schemas/readings-filter.schema";
 
-export function OperationalFilters({ filters }: { filters: ReadingsFilterValues }) {
+export async function OperationalFilters({ filters }: { filters: ReadingsFilterValues }) {
+  const [machines, worksites] = await Promise.all([getMachines(), getWorkSites()]);
   const fields = [
     ["startDate", "Período inicial", "date"], ["endDate", "Período final", "date"],
-    ["fleetNumber", "Frota", "number"], ["machineId", "ID da máquina", "text"],
-    ["workSiteId", "ID da obra", "text"], ["operatorId", "ID do operador", "text"],
+    ["fleetNumber", "Frota", "number"], ["operatorId", "ID do operador", "text"],
   ] as const;
   return <form className="grid gap-3 rounded-lg border bg-white p-4 sm:grid-cols-3">
     {fields.map(([key, label, type]) => <label key={key} className="text-sm">{label}
       <input className="mt-1 block w-full rounded border p-2" name={key} type={type} defaultValue={filters[key]} />
     </label>)}
+    <label className="text-sm">Máquina<select name="machineId" defaultValue={filters.machineId} className="mt-1 block w-full rounded border p-2">
+      <option value="">Todas</option>{machines.map(m => <option key={m.id} value={m.id}>{m.fleetNumber} · {m.model}</option>)}
+    </select></label>
+    <label className="text-sm">Obra<select name="workSiteId" defaultValue={filters.workSiteId} className="mt-1 block w-full rounded border p-2">
+      <option value="">Todas</option>{worksites.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+    </select></label>
     <label className="text-sm">Status<select name="status" defaultValue={filters.status} className="mt-1 block w-full rounded border p-2">
       <option value="">Todos</option>{["VALIDATED", "PENDING", "SUSPECT", "CORRECTED", "REJECTED"].map(s => <option key={s}>{s}</option>)}
     </select></label>

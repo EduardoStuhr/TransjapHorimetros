@@ -1,5 +1,8 @@
 import { OperationalFilters } from "@/components/shared/operational-filters";
-import { parseOperationalFilters, filterSearch } from "@/lib/operational-filters";
+import {
+  parseOperationalFilters,
+  filterSearch,
+} from "@/lib/operational-filters";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -32,9 +35,18 @@ const reportIcons = {
   anomalies: AlertTriangle,
 } as const;
 
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await connection();
-  const filters = parseOperationalFilters(await searchParams);
+  let filters: ReturnType<typeof parseOperationalFilters>;
+  try {
+    filters = parseOperationalFilters(await searchParams);
+  } catch {
+    return <div role="alert" className="rounded border p-4">Revise o período e os identificadores informados nos filtros. <Link className="underline" href="/relatorios">Limpar filtros</Link></div>;
+  }
   const query = filterSearch(filters);
   const availability = await getReportAvailability(filters);
 
@@ -55,7 +67,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           const canExport = itemCount > 0;
 
           return (
-            <Card key={report.type} className="gap-4 border-slate-200 shadow-sm">
+            <Card
+              key={report.type}
+              className="gap-4 border-slate-200 shadow-sm"
+            >
               <CardHeader className="flex-row items-start justify-between gap-4">
                 <div className="flex gap-3">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-[#2c5b9e]">
@@ -77,7 +92,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   {canExport ? (
                     <>
                       <Button asChild variant="outline">
-                        <Link href={`/api/reports/${report.type}/xlsx?${query}`}>
+                        <Link
+                          href={`/api/reports/${report.type}/xlsx?${query}`}
+                        >
                           <FileSpreadsheet />
                           Exportar Excel
                         </Link>

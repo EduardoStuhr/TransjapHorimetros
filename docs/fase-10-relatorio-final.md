@@ -10,7 +10,7 @@ Alertas paginados e filtrados por status com reconhecimento/resolução auditado
 
 Auditoria paginada com filtros por identificador. A resposta pública contém ação, recurso, ator e data, sem os payloads internos.
 
-Exportações server-side reutilizam a API autenticada, recebem período, frota, máquina, obra, operador, status, tipo e anomalias. Excel inclui números e datas tipados. PDF apresenta os campos completos em registros detalhados com paginação. A saída inclui unidade, valor anterior derivado da diferença persistida, diferença, operador, OCR e dispositivo informado. Horas e quilômetros não são somados.
+Exportações server-side reutilizam a API autenticada, recebem período, frota, máquina, obra, operador, status, tipo e anomalias. Excel inclui números e datas tipados. PDF apresenta os campos completos em registros detalhados com paginação. A saída inclui unidade, valor anterior derivado da diferença persistida, diferença, operador, OCR e dispositivo cadastrado quando disponível, com fallback para o identificador informado nos registros antigos. Horas e quilômetros não são somados.
 
 ## Limitações de aceite
 
@@ -35,3 +35,11 @@ Frontend: npm ci, lint, testes automatizados e build executados localmente. Nova
 Backend: restore e build Release executados localmente. Testes de integração adicionados para autorização de operadores, tradução SQL das agregações, filtros e período inválido, decisões concorrentes, retentativa e preservação do registro original.
 
 A CI do PR executa o conjunto completo com SQL Server descartável, incluindo migrations e regressões das Fases 1 a 9. O resultado da CI deve ser conferido no commit final antes do aceite.
+
+## Resultados locais
+
+Build .NET Release sem warnings nem erros, 225 testes unitários .NET aprovados, lint aprovado, 98 testes frontend aprovados e build de produção aprovado. A suíte SQL permanece vinculada ao resultado do HEAD final do PR #19.
+
+## Evidência de CI
+
+O commit de implementação e correção e38eb80 aprovou backend e frontend na execução [43065586230](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43065586230), incluindo 225 testes unitários .NET, 195 testes SQL Server e 98 testes frontend. A revisão final acrescenta uma regressão SQL para justificativa e concorrência na resolução de alertas. O aceite deve conferir a execução correspondente ao HEAD final na aba Checks do PR #19.

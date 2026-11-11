@@ -39,6 +39,35 @@ public sealed class OperationalIntegrationTests(TransjapApiFactory factory) : IC
     }
 
     [Fact]
+    public async Task AlertReviewRequiresReasonAndRejectsStaleStatus()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        Guid id;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+            var machineId = await database.Machines.Select(m => m.Id).FirstAsync();
+            var anomaly = new TransjapHorimetros.Domain.Entities.Anomaly(machineId, null,
+                TransjapHorimetros.Domain.Enums.AnomalyType.MissingReading,
+                TransjapHorimetros.Domain.Enums.AnomalySeverity.Warning, "Revisão necessária", DateTimeOffset.UtcNow);
+            database.Anomalies.Add(anomaly);
+            await database.SaveChangesAsync();
+            id = anomaly.Id;
+        }
+        var path = $"/api/v1/operations/anomalies/{id}/review";
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(path,
+            new { expectedStatus = "OPEN", status = "RESOLVED", reason = "" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(path,
+            new { expectedStatus = "OPEN", status = "RESOLVED", reason = "Verificada a operação" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(path,
+            new { expectedStatus = "OPEN", status = "ACKNOWLEDGED", reason = "Tela desatualizada" })).StatusCode);
+        using var finalScope = factory.Services.CreateScope();
+        var db = finalScope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.Action == "ANOMALY_REVIEWED"));
+    }
+
+    [Fact]
     public async Task ConflictingReviewsPersistOneDecisionAndAuditWithoutChangingReading()
     {
         await factory.ResetDatabaseAsync();

@@ -52,7 +52,10 @@ export default async function ReadingsPage({
     : emptyReadingsFilters;
   const hasFilters = Object.values(filters).some(Boolean);
   const rawPage = Number(getSearchParam(params, "page") || "1");
-  const page = Number.isSafeInteger(rawPage) && rawPage >= 1 && rawPage <= 1000000 ? rawPage : 1;
+  const page =
+    Number.isSafeInteger(rawPage) && rawPage >= 1 && rawPage <= 1000000
+      ? rawPage
+      : 1;
   const [machines, readingsPage, workSites] = await Promise.all([
     getMachines(),
     getReadingsPage(filters, page),
@@ -61,7 +64,9 @@ export default async function ReadingsPage({
 
   const readings = readingsPage.items;
   function pageUrl(nextPage: number) {
-    const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)));
+    const query = new URLSearchParams(
+      Object.entries(filters).filter(([, value]) => Boolean(value)),
+    );
     query.set("page", String(nextPage));
     return `/horimetros?${query.toString()}`;
   }
@@ -91,12 +96,25 @@ export default async function ReadingsPage({
             : "Nenhuma leitura foi registrada pela API."
         }
       />
-      <nav aria-label="Páginas de leituras" className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+      <nav
+        aria-label="Páginas de leituras"
+        className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600"
+      >
         <span>{readingsPage.totalItems} registros</span>
         <div className="flex items-center gap-3">
-          {page > 1 && <Button asChild variant="outline"><Link href={pageUrl(page - 1)}>Anterior</Link></Button>}
-          <span>{page} / {Math.max(1, readingsPage.totalPages)}</span>
-          {page < readingsPage.totalPages && <Button asChild variant="outline"><Link href={pageUrl(page + 1)}>Próxima</Link></Button>}
+          {page > 1 && (
+            <Button asChild variant="outline">
+              <Link href={pageUrl(page - 1)}>Anterior</Link>
+            </Button>
+          )}
+          <span>
+            {page} / {Math.max(1, readingsPage.totalPages)}
+          </span>
+          {page < readingsPage.totalPages && (
+            <Button asChild variant="outline">
+              <Link href={pageUrl(page + 1)}>Próxima</Link>
+            </Button>
+          )}
         </div>
       </nav>
     </div>

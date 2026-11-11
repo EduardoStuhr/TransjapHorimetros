@@ -4,11 +4,20 @@ import { PDFDocument } from "pdf-lib";
 import { createExcelReport, createPdfReport } from "./report-export.service";
 import type { ReportData } from "./reports.service";
 
-const data: ReportData = {type:"anomalies",items: Array.from({length:30}, (_,i) => ({
-  id:String(i), readingId:"r",machineId:"m",machineFleetNumber:84,
-  type:"READING_DECREASE",severity:"WARNING",status:"OPEN",description:"Leitura para revisão humana",
-  createdAt:"2026-11-11T12:00:00Z",
-}))};
+const data: ReportData = {
+  type: "anomalies",
+  items: Array.from({ length: 30 }, (_, i) => ({
+    id: String(i),
+    readingId: "r",
+    machineId: "m",
+    machineFleetNumber: 84,
+    type: "READING_DECREASE",
+    severity: "WARNING",
+    status: "OPEN",
+    description: "Leitura para revisão humana",
+    createdAt: "2026-11-11T12:00:00Z",
+  })),
+};
 describe("report exports", () => {
   it("generates a valid workbook with filters and numeric fleet values", async () => {
     const workbook = new ExcelJS.Workbook();

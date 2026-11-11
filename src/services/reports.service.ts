@@ -42,7 +42,8 @@ export type ReportData = { filters?: ReadingFilters } & (
   | {
       items: readonly HourMeterReading[];
       type: Exclude<ReportType, "anomalies">;
-    });
+    }
+);
 
 export function isReportType(value: string): value is ReportType {
   return reportDefinitions.some((report) => report.type === value);
@@ -52,7 +53,10 @@ export function getReportDefinition(type: ReportType) {
   return reportDefinitions.find((report) => report.type === type)!;
 }
 
-export async function getReportData(type: ReportType, filters: ReadingFilters = {}): Promise<ReportData> {
+export async function getReportData(
+  type: ReportType,
+  filters: ReadingFilters = {},
+): Promise<ReportData> {
   if (type === "anomalies") {
     return { type, items: await getAllAnomalies(filters), filters };
   }
@@ -80,14 +84,17 @@ export async function getReportData(type: ReportType, filters: ReadingFilters = 
   return { type, items: readings, filters };
 }
 
-export async function getReportAvailability(filters: ReadingFilters = {}): Promise<
-  readonly ReportAvailability[]
-> {
+export async function getReportAvailability(
+  filters: ReadingFilters = {},
+): Promise<readonly ReportAvailability[]> {
   const [readings, anomalies] = await Promise.all([
-    apiFetch<PagedApiResponse<HourMeterReading>>(buildReadingsPath(filters, 1, 1)),
+    apiFetch<PagedApiResponse<HourMeterReading>>(
+      buildReadingsPath(filters, 1, 1),
+    ),
     getAllAnomalies(filters),
   ]);
-  return reportDefinitions.map(report => ({
-    type: report.type, count: report.type === "anomalies" ? anomalies.length : readings.totalItems,
+  return reportDefinitions.map((report) => ({
+    type: report.type,
+    count: report.type === "anomalies" ? anomalies.length : readings.totalItems,
   }));
 }

@@ -48,10 +48,14 @@ interface ApiReading {
   createdByUserId: string | null;
   createdByEmail: string | null;
   deviceId: string | null;
+  registeredDeviceId?: string | null;
   anomalyCount: number;
   openAnomalyCount: number;
   correctionCount: number;
-  ocr: Pick<PhotoOcrResult, "status" | "detectedValue" | "confidence" | "matchesOperatorValue"> | null;
+  ocr: Pick<
+    PhotoOcrResult,
+    "status" | "detectedValue" | "confidence" | "matchesOperatorValue"
+  > | null;
   anomalies: ReadingAnomalySummary[] | null;
   corrections: ReadingCorrectionSummary[] | null;
 }
@@ -82,6 +86,7 @@ function mapReading(reading: ApiReading): HourMeterReading {
     createdByUserId: reading.createdByUserId,
     createdByEmail: reading.createdByEmail,
     deviceId: reading.deviceId,
+    registeredDeviceId: reading.registeredDeviceId ?? null,
     previousReadingId: reading.previousReadingId,
     correctionOfReadingId: reading.correctionOfReadingId,
     anomalyCount: reading.anomalyCount,
@@ -94,7 +99,9 @@ function mapReading(reading: ApiReading): HourMeterReading {
   };
 }
 
-async function fetchReadings(path: string): Promise<readonly HourMeterReading[]> {
+async function fetchReadings(
+  path: string,
+): Promise<readonly HourMeterReading[]> {
   const response = await apiFetch<PagedApiResponse<ApiReading>>(path);
   return response.items.map(mapReading);
 }
@@ -121,7 +128,14 @@ export function buildReadingsPath(
     searchParams.set("status", filters.status);
   }
 
-  for (const key of ["operatorId", "machineId", "meterUnit", "readingType", "hasPhotoEvidence", "hasAnomaly"] as const) {
+  for (const key of [
+    "operatorId",
+    "machineId",
+    "meterUnit",
+    "readingType",
+    "hasPhotoEvidence",
+    "hasAnomaly",
+  ] as const) {
     if (filters[key]) searchParams.set(key, filters[key]);
   }
 
@@ -150,7 +164,9 @@ export async function getAllReadings(
   );
   const items = firstPage.items.map(mapReading);
   for (let page = 2; page <= firstPage.totalPages; page++) {
-    const response = await apiFetch<PagedApiResponse<ApiReading>>(buildReadingsPath(filters, page));
+    const response = await apiFetch<PagedApiResponse<ApiReading>>(
+      buildReadingsPath(filters, page),
+    );
     items.push(...response.items.map(mapReading));
   }
   return items;
@@ -178,6 +194,8 @@ export async function getPhotoEvidence(readingId: string) {
 }
 
 export async function getReadingsPage(filters: ReadingFilters = {}, page = 1) {
-  const response = await apiFetch<PagedApiResponse<ApiReading>>(buildReadingsPath(filters, page, 20));
+  const response = await apiFetch<PagedApiResponse<ApiReading>>(
+    buildReadingsPath(filters, page, 20),
+  );
   return { ...response, items: response.items.map(mapReading) };
 }

@@ -60,6 +60,7 @@ export interface HourMeterReading {
   createdByUserId: string | null;
   createdByEmail: string | null;
   deviceId: string | null;
+  registeredDeviceId?: string | null;
   previousReadingId: string | null;
   correctionOfReadingId: string | null;
   anomalyCount: number;

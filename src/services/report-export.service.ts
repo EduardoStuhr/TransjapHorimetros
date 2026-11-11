@@ -92,9 +92,12 @@ function prepareReport(data: ReportData): PreparedReport {
       unit: item.meterUnit ?? "Não definida",
       operator: item.createdByEmail ?? "Não informado",
       difference: item.differenceFromPrevious ?? "",
-      previous: item.differenceFromPrevious == null ? "" : item.value - item.differenceFromPrevious,
+      previous:
+        item.differenceFromPrevious == null
+          ? ""
+          : item.value - item.differenceFromPrevious,
       ocr: item.ocrDetectedValue ?? "",
-      device: item.deviceId ?? "",
+      device: item.registeredDeviceId ?? item.deviceId ?? "",
       type: item.readingType,
       workSite: item.workSiteName ?? "Sem obra informada",
       status: formatReadingStatus(item.status),
@@ -116,7 +119,11 @@ export async function createExcelReport(data: ReportData) {
 
   worksheet.mergeCells(1, 1, 1, lastColumn);
   worksheet.getCell(1, 1).value = `Transjap — ${report.title}`;
-  worksheet.getCell(1, 1).font = { bold: true, color: { argb: "FFFFFFFF" }, size: 16 };
+  worksheet.getCell(1, 1).font = {
+    bold: true,
+    color: { argb: "FFFFFFFF" },
+    size: 16,
+  };
   worksheet.getCell(1, 1).fill = {
     type: "pattern",
     pattern: "solid",
@@ -125,12 +132,18 @@ export async function createExcelReport(data: ReportData) {
   worksheet.getRow(1).height = 28;
 
   worksheet.mergeCells(2, 1, 2, lastColumn);
-  worksheet.getCell(2, 1).value = `Período dos dados: ${report.period} | Gerado em: ${formatDateTime(new Date().toISOString())}`;
+  worksheet.getCell(2, 1).value =
+    `Período dos dados: ${report.period} | Gerado em: ${formatDateTime(new Date().toISOString())}`;
   worksheet.getCell(2, 1).font = { color: { argb: "FF475569" }, italic: true };
 
   worksheet.mergeCells(3, 1, 3, lastColumn);
-  worksheet.getCell(3, 1).value = "Filtros: " + Object.entries(data.filters ?? {}).filter(([,v]) => v).map(([k,v]) => k + "=" + v).join(" | ");
-  worksheet.getCell(3, 1).alignment = {wrapText:true};
+  worksheet.getCell(3, 1).value =
+    "Filtros: " +
+    Object.entries(data.filters ?? {})
+      .filter(([, v]) => v)
+      .map(([k, v]) => k + "=" + v)
+      .join(" | ");
+  worksheet.getCell(3, 1).alignment = { wrapText: true };
   worksheet.getRow(3).height = 30;
   const headerRow = worksheet.getRow(4);
   headerRow.values = report.columns.map((column) => column.label);
@@ -142,16 +155,26 @@ export async function createExcelReport(data: ReportData) {
   };
 
   for (const row of report.rows) {
-    worksheet.addRow(report.columns.map((column) =>
-      ["date","received","synced"].includes(column.key) && row[column.key] ? new Date(String(row[column.key])) : row[column.key]));
+    worksheet.addRow(
+      report.columns.map((column) =>
+        ["date", "received", "synced"].includes(column.key) && row[column.key]
+          ? new Date(String(row[column.key]))
+          : row[column.key],
+      ),
+    );
   }
 
   report.columns.forEach((column, index) => {
     worksheet.getColumn(index + 1).width = column.width;
-    if (["date","received","synced"].includes(column.key)) worksheet.getColumn(index + 1).numFmt = "dd/mm/yyyy hh:mm";
-    if (["value","previous","difference","ocr"].includes(column.key)) worksheet.getColumn(index + 1).numFmt = "0.00";
+    if (["date", "received", "synced"].includes(column.key))
+      worksheet.getColumn(index + 1).numFmt = "dd/mm/yyyy hh:mm";
+    if (["value", "previous", "difference", "ocr"].includes(column.key))
+      worksheet.getColumn(index + 1).numFmt = "0.00";
   });
-  worksheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: lastColumn } };
+  worksheet.autoFilter = {
+    from: { row: 4, column: 1 },
+    to: { row: 4, column: lastColumn },
+  };
   worksheet.views = [{ state: "frozen", ySplit: 4 }];
   worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
     if (rowNumber > 4) {
@@ -185,13 +208,33 @@ export async function createPdfReport(data: ReportData) {
   let page = document.addPage([841.89, 595.28]);
   let y = 510;
   const header = () => {
-    page.drawText(normalizePdfText("Transjap - " + report.title), {x:32,y:560,font:bold,size:16});
-    page.drawText(normalizePdfText("Período dos dados: " + report.period), {x:32,y:541,font,size:9});
-    page.drawText("Gerado em: " + formatDateTime(new Date().toISOString()), {x:32,y:526,font,size:9});
-    const filterText = "Filtros: " + Object.entries(data.filters ?? {}).filter(([,v]) => v).map(([k,v]) => k + "=" + v).join(" | ");
+    page.drawText(normalizePdfText("Transjap - " + report.title), {
+      x: 32,
+      y: 560,
+      font: bold,
+      size: 16,
+    });
+    page.drawText(normalizePdfText("Período dos dados: " + report.period), {
+      x: 32,
+      y: 541,
+      font,
+      size: 9,
+    });
+    page.drawText("Gerado em: " + formatDateTime(new Date().toISOString()), {
+      x: 32,
+      y: 526,
+      font,
+      size: 9,
+    });
+    const filterText =
+      "Filtros: " +
+      Object.entries(data.filters ?? {})
+        .filter(([, v]) => v)
+        .map(([k, v]) => k + "=" + v)
+        .join(" | ");
     y = 505;
     for (const line of normalizePdfText(filterText).match(/.{1,120}/g) ?? []) {
-      page.drawText(line, {x:32,y,font,size:8});
+      page.drawText(line, { x: 32, y, font, size: 8 });
       y -= 12;
     }
     y -= 8;
@@ -200,17 +243,32 @@ export async function createPdfReport(data: ReportData) {
   for (const row of report.rows) {
     // Complete key/value rows avoid truncating evidence identifiers and operator names.
     for (const column of report.columns) {
-      const value = ["date","received","synced"].includes(column.key) && row[column.key] ? formatDateTime(String(row[column.key])) : row[column.key];
+      const value =
+        ["date", "received", "synced"].includes(column.key) && row[column.key]
+          ? formatDateTime(String(row[column.key]))
+          : row[column.key];
       const text = normalizePdfText(column.label + ": " + value);
       const lines = text.match(/.{1,120}/g) ?? [""];
       for (const line of lines) {
-        if (y < 45) { page = document.addPage([841.89,595.28]); header(); }
-        page.drawText(line, {x:36,y,font,size:9});
+        if (y < 45) {
+          page = document.addPage([841.89, 595.28]);
+          header();
+        }
+        page.drawText(line, { x: 36, y, font, size: 9 });
         y -= 13;
       }
     }
     y -= 14;
   }
-  document.getPages().forEach((p, index) => p.drawText(`Página ${index + 1} / ${document.getPageCount()}`, {x:32,y:20,font,size:8}));
+  document
+    .getPages()
+    .forEach((p, index) =>
+      p.drawText(`Página ${index + 1} / ${document.getPageCount()}`, {
+        x: 32,
+        y: 20,
+        font,
+        size: 8,
+      }),
+    );
   return document.save();
 }

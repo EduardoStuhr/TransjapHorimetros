@@ -20,17 +20,30 @@ export async function GET(
   const { format, reportType } = await context.params;
 
   if (!isReportType(reportType) || (format !== "xlsx" && format !== "pdf")) {
-    return Response.json({ message: "Relatório não encontrado." }, { status: 404 });
+    return Response.json(
+      { message: "Relatório não encontrado." },
+      { status: 404 },
+    );
   }
 
   const user = await apiFetch<AuthUser>("/api/v1/auth/me");
-  if (!user.roles.some(role => ["ADMIN","MANAGER","SUPERVISOR","ADMINISTRATIVE"].includes(role))) {
-    return Response.json({ message: "Acesso restrito à supervisão." }, { status: 403 });
+  if (
+    !user.roles.some((role) =>
+      ["ADMIN", "MANAGER", "SUPERVISOR", "ADMINISTRATIVE"].includes(role),
+    )
+  ) {
+    return Response.json(
+      { message: "Acesso restrito à supervisão." },
+      { status: 403 },
+    );
   }
   const parsed = new URL(request.url).searchParams;
   let filters;
-  try { filters = parseOperationalFilters(Object.fromEntries(parsed)); }
-  catch { return Response.json({ message: "Filtros inválidos." }, { status: 400 }); }
+  try {
+    filters = parseOperationalFilters(Object.fromEntries(parsed));
+  } catch {
+    return Response.json({ message: "Filtros inválidos." }, { status: 400 });
+  }
   const data = await getReportData(reportType, filters);
 
   if (data.items.length === 0) {

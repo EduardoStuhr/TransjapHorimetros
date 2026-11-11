@@ -4,12 +4,25 @@ export const readingsFilterSchema = z
   .object({
     operatorId: z.string().uuid().or(z.literal("")).optional(),
     meterUnit: z.enum(["HOURS", "KM", ""]),
-    readingType: z.enum(["OPENING", "CLOSING", "INTERMEDIATE", "MAINTENANCE", "CORRECTION", ""]),
+    readingType: z.enum([
+      "OPENING",
+      "CLOSING",
+      "INTERMEDIATE",
+      "MAINTENANCE",
+      "CORRECTION",
+      "",
+    ]),
     hasPhotoEvidence: z.enum(["true", "false", ""]),
     hasAnomaly: z.enum(["true", "false", ""]),
     machineId: z.string().uuid().or(z.literal("")),
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .or(z.literal("")),
+    endDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .or(z.literal("")),
     fleetNumber: z.string().regex(/^\d+$/).or(z.literal("")),
     workSiteId: z.string().uuid().or(z.literal("")),
     status: z

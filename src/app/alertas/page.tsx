@@ -20,9 +20,16 @@ export const metadata: Metadata = {
   title: "Alertas",
 };
 
-export default async function AlertsPage({ searchParams }: { searchParams: Promise<{page?: string; status?: string}> }) {
+export default async function AlertsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; status?: string }>;
+}) {
   const params = await searchParams;
-  const page = Math.max(1, Math.min(1000000, Math.floor(Number(params.page) || 1)));
+  const page = Math.max(
+    1,
+    Math.min(1000000, Math.floor(Number(params.page) || 1)),
+  );
   const status = params.status ?? "";
   const result = await getAnomaliesPage(page, status);
   const anomalies = result.items;
@@ -35,10 +42,35 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
         description="Revise as inconsistências identificadas pelo motor de regras, preservando a evidência e a análise humana."
       />
 
-      <form className="flex gap-3"><label>Status<select className="mx-2 rounded border p-2" name="status" defaultValue={status}>
-        <option value="">Todos</option><option value="OPEN">Aberto</option><option value="ACKNOWLEDGED">Reconhecido</option><option value="RESOLVED">Resolvido</option>
-      </select></label><button className="rounded border p-2">Filtrar</button></form>
-      <nav className="flex gap-4" aria-label="Páginas de alertas">{page > 1 && <Link href={`?page=${page-1}&status=${encodeURIComponent(status)}`}>Anterior</Link>}<span>{result.totalItems} registros</span>{page < result.totalPages && <Link href={`?page=${page+1}&status=${encodeURIComponent(status)}`}>Próxima</Link>}</nav>
+      <form className="flex gap-3">
+        <label>
+          Status
+          <select
+            className="mx-2 rounded border p-2"
+            name="status"
+            defaultValue={status}
+          >
+            <option value="">Todos</option>
+            <option value="OPEN">Aberto</option>
+            <option value="ACKNOWLEDGED">Reconhecido</option>
+            <option value="RESOLVED">Resolvido</option>
+          </select>
+        </label>
+        <button className="rounded border p-2">Filtrar</button>
+      </form>
+      <nav className="flex gap-4" aria-label="Páginas de alertas">
+        {page > 1 && (
+          <Link href={`?page=${page - 1}&status=${encodeURIComponent(status)}`}>
+            Anterior
+          </Link>
+        )}
+        <span>{result.totalItems} registros</span>
+        {page < result.totalPages && (
+          <Link href={`?page=${page + 1}&status=${encodeURIComponent(status)}`}>
+            Próxima
+          </Link>
+        )}
+      </nav>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
         <Card className="gap-0 border-slate-200 py-0 shadow-sm">
           <CardHeader className="border-b border-slate-100 px-5 py-4">
@@ -83,7 +115,9 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
                     <p className="text-xs text-slate-500">
                       Identificada em {formatDateTime(anomaly.createdAt)}
                     </p>
-                    {anomaly.status !== "RESOLVED" && <AlertReview id={anomaly.id} status={anomaly.status} />}
+                    {anomaly.status !== "RESOLVED" && (
+                      <AlertReview id={anomaly.id} status={anomaly.status} />
+                    )}
                   </article>
                 ))}
               </div>

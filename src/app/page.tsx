@@ -24,7 +24,11 @@ import { getAnomalies } from "@/services/anomalies.service";
 import { getDashboardSummary } from "@/services/dashboard.service";
 import { getReadings } from "@/services/readings.service";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await connection();
   const [summary, readings, anomalies] = await Promise.all([
     getDashboardSummary(),
@@ -40,11 +44,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         description="Acompanhe o cadastro de máquinas, as leituras e as inconsistências registradas no banco operacional."
       />
 
-      <Link className="underline" href="/auditoria">Consultar auditoria operacional</Link>
+      <Link className="underline" href="/auditoria">
+        Consultar auditoria operacional
+      </Link>
       <OperationalSummaryPanel params={await searchParams} />
       <section aria-labelledby="indicadores-title">
-        <h3 id="indicadores-title" className="sr-only">
-          Indicadores
+        <h3 id="indicadores-title" className="mb-3 text-lg font-bold">
+          Indicadores globais
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           <MetricCard

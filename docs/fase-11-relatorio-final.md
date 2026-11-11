@@ -23,10 +23,15 @@ foram preservadas.
 Validações executadas nesta branch:
 
 - `dotnet build apps/api/TransjapHorimetros.sln --configuration Release`
-- `dotnet test apps/api/TransjapHorimetros.sln`
+- testes unitários backend: 226 aprovados
 - `npm test`
 - `npm run lint`
 - `npm run build`
+
+A suíte de integração SQL Server foi iniciada, mas não pôde ser concluída neste
+ambiente porque `TEST_SQLSERVER_CONNECTION_STRING` não está configurada e o
+Docker não está disponível. Ela deve ser validada pela CI/ambiente com SQL
+Server antes do merge.
 
 O teste físico de QR Code, câmera, OCR e sincronização em celular permanece
 fora do escopo desta fase.

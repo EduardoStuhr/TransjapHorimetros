@@ -10,10 +10,6 @@ import {
   getReportDefinition,
   isReportType,
 } from "@/services/reports.service";
-import {
-  apiUnavailableResponse,
-  authenticatedUserHasRole,
-} from "@/lib/auth/authenticated-api-proxy";
 
 export const runtime = "nodejs";
 
@@ -21,23 +17,6 @@ export async function GET(
   request: Request,
   context: RouteContext<"/api/reports/[reportType]/[format]">,
 ) {
-  let authorization: boolean | Response;
-  try {
-    authorization = await authenticatedUserHasRole([
-      "SUPERVISOR",
-      "ADMINISTRATIVE",
-      "MANAGER",
-      "ADMIN",
-    ]);
-  } catch {
-    return apiUnavailableResponse();
-  }
-
-  if (authorization instanceof Response) return authorization;
-  if (!authorization) {
-    return Response.json({ detail: "Acesso negado." }, { status: 403 });
-  }
-
   const { format, reportType } = await context.params;
 
   if (!isReportType(reportType) || (format !== "xlsx" && format !== "pdf")) {

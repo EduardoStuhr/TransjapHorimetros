@@ -6,11 +6,11 @@ A árvore analisada já possui JWT com emissor, audiência, assinatura e expira�
 validados, fallback de autenticação, rate limiting, políticas por papel,
 identidade de dispositivo P-256, auditoria de mutações e proteção de uploads.
 
-O endpoint `GET /operations/readings/{id}/review` e a migration
-`AddReadingReviews` mencionados no escopo não estão presentes nesta revisão do
-repositório. Portanto, não foi criado um contrato de revisão sem entidade,
-persistência ou regra de negócio correspondente. Esse item permanece uma
-pendência de integração com a versão que contém a Fase 10.
+O fluxo administrativo da Fase 10 está presente: a entidade `ReadingReview`, a
+migration `20261111170305_AddReadingReviews`, o serviço operacional e os
+endpoints `GET`/`POST /api/v1/operations/readings/{id}/review`. O GET estava
+protegido por `CanRecordReading`, permitindo que operadores consultassem
+justificativas e e-mails de revisores.
 
 Foram encontrados dois problemas concretos nesta árvore:
 
@@ -19,6 +19,9 @@ Foram encontrados dois problemas concretos nesta árvore:
 2. Consultas de leitura autenticadas retornavam para operadores e-mails,
    identificadores de usuário/dispositivo, detalhes de OCR, anomalias e
    correções administrativas.
+3. O build Release falhava por argumentos C# nomeados e posicionais fora de
+   ordem, e dois testes de exportação usavam um mock incompatível com a nova
+   camada de autenticação.
 
 ## Matriz de permissões efetiva
 
@@ -50,11 +53,15 @@ ficam redigidos para operadores.
   Contagens e status operacionais permanecem disponíveis.
 - A criação de leitura preserva a resposta completa necessária à
   compatibilidade do fluxo offline; a redação aplica-se às consultas.
+- `GET /api/v1/operations/readings/{id}/review` agora reutiliza
+  `CanReviewAnomalies`, bloqueando operadores no backend e preservando
+  justificativa/e-mail somente para perfis administrativos.
+- O Route Handler de relatórios voltou a usar a chamada autenticada existente
+  (`apiFetch`), preservando os testes de filtros e a autorização sem duplicar
+  a consulta de sessão.
 
 ## Riscos residuais e pendências
 
-- O contrato de revisão administrativa citado no plano precisa ser integrado
-  antes de implementar aprovação/rejeição e auditoria de decisões.
 - Downloads de fotos ainda usam a policy operacional ampla e não registram
   visualização; isso deve ser resolvido junto com a regra de escopo por obra ou
   máquina.
@@ -63,6 +70,7 @@ ficam redigidos para operadores.
 
 ## Compatibilidade
 
-Não houve alteração de schema ou migration. A identidade de dispositivos,
-fila offline, JWT, auditoria histórica e dados de máquinas, obras, leituras,
-fotos e OCR foram preservados.
+Não houve alteração de schema ou migration. A migration da Fase 10 foi
+preservada. A identidade de dispositivos, fila offline, JWT, auditoria
+histórica e dados de máquinas, obras, leituras, fotos, OCR e revisões foram
+preservados.

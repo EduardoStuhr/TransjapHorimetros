@@ -33,32 +33,3 @@ export function apiUnavailableResponse() {
     { status: 503, headers: { "Cache-Control": "no-store" } },
   );
 }
-
-export async function authenticatedUserHasRole(
-  roles: readonly string[],
-): Promise<boolean | Response> {
-  const response = await authenticatedApiFetch("/api/v1/auth/me");
-  if (!response) {
-    return Response.json({ detail: "Sessão expirada." }, { status: 401 });
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    return new Response(response.body, {
-      status: response.status,
-      headers: {
-        "Content-Type": response.headers.get("content-type") ?? "application/json",
-      },
-    });
-  }
-
-  if (!response.ok) {
-    return apiUnavailableResponse();
-  }
-
-  const user = (await response.json()) as { roles?: unknown };
-  return Array.isArray(user.roles)
-    && user.roles.some(
-      (role): role is string =>
-        typeof role === "string" && roles.includes(role),
-    );
-}

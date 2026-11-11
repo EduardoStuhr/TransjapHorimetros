@@ -2,11 +2,11 @@
 
 ## Resultado
 
-A árvore atual recebeu correções de autorização para exportações e de
-minimização de dados em consultas operacionais. A exposição específica de
-`/operations/readings/{id}/review` não pôde ser corrigida nesta branch porque
-essa rota, a entidade de revisão e a migration correspondente não existem no
-commit analisado.
+A árvore atual recebeu correções de autorização para exportações, minimização
+de dados em consultas operacionais e proteção do endpoint
+`GET /api/v1/operations/readings/{id}/review`. A entidade
+`ReadingReview` e a migration `20261111170305_AddReadingReviews` da Fase 10
+foram preservadas.
 
 ## Arquivos alterados
 
@@ -15,23 +15,30 @@ commit analisado.
 - `src/app/api/reports/[reportType]/[format]/route.ts`
 - `src/lib/auth/authenticated-api-proxy.ts`
 - `src/components/layout/navigation.tsx`
+- `apps/api/src/TransjapHorimetros.Api/Controllers/OperationsController.cs`
+- `apps/api/tests/TransjapHorimetros.IntegrationTests/OperationalIntegrationTests.cs`
 
 ## Validação
 
-Os comandos de validação devem ser executados nesta branch:
+Validações executadas nesta branch:
 
-- `dotnet test apps/api/TransjapHorimetros.sln`
+- `dotnet build apps/api/TransjapHorimetros.sln --configuration Release`
+- testes unitários backend: 226 aprovados
 - `npm test`
 - `npm run lint`
 - `npm run build`
+
+A suíte de integração SQL Server foi iniciada, mas não pôde ser concluída neste
+ambiente porque `TEST_SQLSERVER_CONNECTION_STRING` não está configurada e o
+Docker não está disponível. Ela deve ser validada pela CI/ambiente com SQL
+Server antes do merge.
 
 O teste físico de QR Code, câmera, OCR e sincronização em celular permanece
 fora do escopo desta fase.
 
 ## Encerramento administrativo da Fase 10
 
-As capacidades administrativas existentes — políticas de anomalias, OCR,
-dispositivos, auditoria e modelo completo de leitura — foram mantidas. A
-implementação da revisão administrativa deve ser ligada ao commit que
-introduzir a migration `AddReadingReviews`; não foi feita alteração de
-produção, Azure ou banco.
+As capacidades administrativas existentes — revisão de leituras, políticas de
+anomalias, OCR, dispositivos, auditoria e modelo completo de leitura — foram
+mantidas. A correção não executa migrations, deploy manual ou alterações no
+Azure de produção.

@@ -160,6 +160,7 @@ public class TransjapApiFactory : WebApplicationFactory<Program>
             DELETE FROM user_logins;
             DELETE FROM user_roles;
             DELETE FROM user_tokens;
+            DELETE FROM reading_reviews;
             DELETE FROM hour_meter_readings;
             DELETE FROM registered_devices;
             DELETE FROM users;

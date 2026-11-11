@@ -268,6 +268,7 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
             readings = readings.Where(reading => reading.Status == query.Status.Value);
         }
 
+        if (query.OperatorId.HasValue) readings = readings.Where(r => r.CreatedByUserId == query.OperatorId);
         if (query.MeterUnit.HasValue) readings = readings.Where(r => r.MeterUnit == query.MeterUnit);
         if (query.ReadingType.HasValue) readings = readings.Where(r => r.ReadingType == query.ReadingType);
         if (query.HasPhotoEvidence.HasValue) readings = readings.Where(r => (r.PhotoEvidence != null) == query.HasPhotoEvidence.Value);
@@ -383,6 +384,13 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
                 anomaly => anomaly.MachineId == query.MachineId.Value);
         }
 
+        if (query.FleetNumber.HasValue) anomalies = anomalies.Where(a => a.Machine.FleetNumber == query.FleetNumber);
+        if (query.WorkSiteId.HasValue) anomalies = anomalies.Where(a => a.Reading != null && a.Reading.WorkSiteId == query.WorkSiteId);
+        if (query.OperatorId.HasValue) anomalies = anomalies.Where(a => a.Reading != null && a.Reading.CreatedByUserId == query.OperatorId);
+        if (query.From.HasValue) anomalies = anomalies.Where(a => a.Reading != null && a.Reading.CapturedAtDevice >= query.From);
+        if (query.To.HasValue) anomalies = anomalies.Where(a => a.Reading != null && a.Reading.CapturedAtDevice <= query.To);
+        if (query.ReadingStatus.HasValue) anomalies = anomalies.Where(a => a.Reading != null && a.Reading.Status == query.ReadingStatus);
+        if (query.ReadingType.HasValue) anomalies = anomalies.Where(a => a.Reading != null && a.Reading.ReadingType == query.ReadingType);
         if (query.Type.HasValue)
         {
             anomalies = anomalies.Where(anomaly => anomaly.Type == query.Type.Value);

@@ -5,6 +5,13 @@ namespace TransjapHorimetros.Application.Anomalies;
 
 public sealed record AnomalyQuery
 {
+    public int? FleetNumber { get; init; }
+    public Guid? WorkSiteId { get; init; }
+    public Guid? OperatorId { get; init; }
+    public DateTimeOffset? From { get; init; }
+    public DateTimeOffset? To { get; init; }
+    public TransjapHorimetros.Domain.Enums.ReadingStatus? ReadingStatus { get; init; }
+    public TransjapHorimetros.Domain.Enums.ReadingType? ReadingType { get; init; }
     public Guid? MachineId { get; init; }
 
     public AnomalyType? Type { get; init; }

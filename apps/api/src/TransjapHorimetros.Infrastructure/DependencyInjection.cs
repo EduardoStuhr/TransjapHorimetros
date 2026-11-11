@@ -26,6 +26,8 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "A connection string 'DefaultConnection' deve ser configurada por variável de ambiente ou appsettings.");
 
+        services.AddScoped<TransjapHorimetros.Application.Dashboard.IOperationalService, OperationalService>();
+
         services.AddDbContext<TransjapDbContext>(options =>
             options.UseSqlServer(
                 connectionString,

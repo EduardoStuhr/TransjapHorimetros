@@ -1,3 +1,5 @@
+import { OperationalFilters } from "@/components/shared/operational-filters";
+import { parseOperationalFilters, filterSearch } from "@/lib/operational-filters";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -30,9 +32,11 @@ const reportIcons = {
   anomalies: AlertTriangle,
 } as const;
 
-export default async function ReportsPage() {
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection();
-  const availability = await getReportAvailability();
+  const filters = parseOperationalFilters(await searchParams);
+  const query = filterSearch(filters);
+  const availability = await getReportAvailability(filters);
 
   return (
     <div className="space-y-6">
@@ -42,6 +46,7 @@ export default async function ReportsPage() {
         description="Exporte em Excel ou PDF os dados operacionais disponíveis na API."
       />
 
+      <OperationalFilters filters={filters} />
       <div className="grid gap-4 md:grid-cols-2">
         {reportDefinitions.map((report) => {
           const Icon = reportIcons[report.type];
@@ -72,13 +77,13 @@ export default async function ReportsPage() {
                   {canExport ? (
                     <>
                       <Button asChild variant="outline">
-                        <Link href={`/api/reports/${report.type}/xlsx`}>
+                        <Link href={`/api/reports/${report.type}/xlsx?${query}`}>
                           <FileSpreadsheet />
                           Exportar Excel
                         </Link>
                       </Button>
                       <Button asChild variant="outline">
-                        <Link href={`/api/reports/${report.type}/pdf`}>
+                        <Link href={`/api/reports/${report.type}/pdf?${query}`}>
                           <FileDown />
                           Exportar PDF
                         </Link>

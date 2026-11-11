@@ -1,3 +1,4 @@
+import { parseOperationalFilters } from "@/lib/operational-filters";
 import {
   createExcelReport,
   createPdfReport,
@@ -11,7 +12,7 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext<"/api/reports/[reportType]/[format]">,
 ) {
   const { format, reportType } = await context.params;
@@ -20,7 +21,11 @@ export async function GET(
     return Response.json({ message: "Relatório não encontrado." }, { status: 404 });
   }
 
-  const data = await getReportData(reportType);
+  const parsed = new URL(request.url).searchParams;
+  let filters;
+  try { filters = parseOperationalFilters(Object.fromEntries(parsed)); }
+  catch { return Response.json({ message: "Filtros inválidos." }, { status: 400 }); }
+  const data = await getReportData(reportType, filters);
 
   if (data.items.length === 0) {
     return Response.json(
@@ -44,6 +49,7 @@ export async function GET(
 
   return new Response(responseBody, {
     headers: {
+      "Cache-Control": "private, no-store",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Content-Type":
         format === "xlsx"

@@ -1,3 +1,5 @@
+import { ReviewPanel } from "@/features/readings/components/review-panel";
+import type { ReadingReview } from "@/services/operations.service";
 import { ReadingOperationalDetails } from "@/features/readings/components/reading-operational-details";
 import { ReadingStatusBadge } from "@/features/readings/components/reading-badges";
 import { PhotoOcrPanel } from "@/features/readings/components/photo-ocr-panel";
@@ -39,6 +41,7 @@ export default async function ReadingDetailPage({ params }: ReadingDetailPagePro
     throw error;
   }
 
+  const review = await apiFetch<ReadingReview | null>(`/api/v1/operations/readings/${encodeURIComponent(reading.id)}/review`);
   const evidence = reading.hasPhotoEvidence
     ? await getPhotoEvidence(reading.id)
     : null;
@@ -71,6 +74,7 @@ export default async function ReadingDetailPage({ params }: ReadingDetailPagePro
 
       <div className="space-y-6">
         <ReadingOperationalDetails reading={reading} />
+        <ReviewPanel id={reading.id} review={review} canReview={["PENDING","SUSPECT"].includes(reading.status)} />
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="border-b">

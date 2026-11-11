@@ -6,6 +6,8 @@ namespace TransjapHorimetros.Application.Readings;
 
 public sealed record ReadingQuery
 {
+    public Guid? OperatorId { get; init; }
+
     public Guid? MachineId { get; init; }
 
     public int? FleetNumber { get; init; }

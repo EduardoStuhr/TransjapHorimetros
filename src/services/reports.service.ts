@@ -1,5 +1,7 @@
 import { getAllAnomalies } from "@/services/anomalies.service";
-import { getAllReadings } from "@/services/readings.service";
+import type { ReadingFilters } from "@/services/readings.service";
+import { apiFetch, type PagedApiResponse } from "@/services/api-client";
+import { getAllReadings, buildReadingsPath } from "@/services/readings.service";
 import type { Anomaly, HourMeterReading } from "@/types/domain";
 
 export const reportDefinitions = [
@@ -50,12 +52,12 @@ export function getReportDefinition(type: ReportType) {
   return reportDefinitions.find((report) => report.type === type)!;
 }
 
-export async function getReportData(type: ReportType): Promise<ReportData> {
+export async function getReportData(type: ReportType, filters: ReadingFilters = {}): Promise<ReportData> {
   if (type === "anomalies") {
-    return { type, items: await getAllAnomalies() };
+    return { type, items: await getAllAnomalies(filters) };
   }
 
-  const readings = [...(await getAllReadings())];
+  const readings = [...(await getAllReadings(filters))];
 
   if (type === "machines") {
     readings.sort(
@@ -78,16 +80,14 @@ export async function getReportData(type: ReportType): Promise<ReportData> {
   return { type, items: readings };
 }
 
-export async function getReportAvailability(): Promise<
+export async function getReportAvailability(filters: ReadingFilters = {}): Promise<
   readonly ReportAvailability[]
 > {
   const [readings, anomalies] = await Promise.all([
-    getAllReadings(),
-    getAllAnomalies(),
+    apiFetch<PagedApiResponse<HourMeterReading>>(buildReadingsPath(filters, 1, 1)),
+    getAllAnomalies(filters),
   ]);
-
-  return reportDefinitions.map((report) => ({
-    type: report.type,
-    count: report.type === "anomalies" ? anomalies.length : readings.length,
+  return reportDefinitions.map(report => ({
+    type: report.type, count: report.type === "anomalies" ? anomalies.length : readings.totalItems,
   }));
 }

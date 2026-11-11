@@ -160,6 +160,7 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasColumnName("severity");
 
                     b.Property<string>("Status")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("nvarchar(24)")
@@ -750,6 +751,35 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.ReadingReview", b =>
+                {
+                    b.Property<Guid>("ReadingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Approved")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("ReadingId");
+
+                    b.ToTable("reading_reviews", (string)null);
+                });
+
             modelBuilder.Entity("TransjapHorimetros.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -896,6 +926,7 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasColumnName("revoked_by_user_id");
 
                     b.Property<string>("Status")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)")
@@ -1246,6 +1277,15 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.HasOne("TransjapHorimetros.Domain.Entities.PhotoEvidence", null)
                         .WithMany()
                         .HasForeignKey("PhotoEvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TransjapHorimetros.Domain.Entities.ReadingReview", b =>
+                {
+                    b.HasOne("TransjapHorimetros.Domain.Entities.HourMeterReading", null)
+                        .WithMany()
+                        .HasForeignKey("ReadingId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

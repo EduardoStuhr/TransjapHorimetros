@@ -11,6 +11,7 @@ import type {
 } from "@/types/domain";
 
 export interface ReadingFilters {
+  operatorId?: string;
   endDate?: string;
   fleetNumber?: string;
   startDate?: string;
@@ -98,7 +99,7 @@ async function fetchReadings(path: string): Promise<readonly HourMeterReading[]>
   return response.items.map(mapReading);
 }
 
-function buildReadingsPath(
+export function buildReadingsPath(
   filters: ReadingFilters,
   page = 1,
   pageSize = 100,
@@ -120,7 +121,7 @@ function buildReadingsPath(
     searchParams.set("status", filters.status);
   }
 
-  for (const key of ["machineId", "meterUnit", "readingType", "hasPhotoEvidence", "hasAnomaly"] as const) {
+  for (const key of ["operatorId", "machineId", "meterUnit", "readingType", "hasPhotoEvidence", "hasAnomaly"] as const) {
     if (filters[key]) searchParams.set(key, filters[key]);
   }
 
@@ -147,15 +148,12 @@ export async function getAllReadings(
   const firstPage = await apiFetch<PagedApiResponse<ApiReading>>(
     buildReadingsPath(filters),
   );
-  const pages = await Promise.all(
-    Array.from({ length: Math.max(0, firstPage.totalPages - 1) }, (_, index) =>
-      apiFetch<PagedApiResponse<ApiReading>>(
-        buildReadingsPath(filters, index + 2),
-      ),
-    ),
-  );
-
-  return [firstPage, ...pages].flatMap((page) => page.items.map(mapReading));
+  const items = firstPage.items.map(mapReading);
+  for (let page = 2; page <= firstPage.totalPages; page++) {
+    const response = await apiFetch<PagedApiResponse<ApiReading>>(buildReadingsPath(filters, page));
+    items.push(...response.items.map(mapReading));
+  }
+  return items;
 }
 
 export async function getMachineReadings(

@@ -1,12 +1,11 @@
 import ExcelJS from "exceljs";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 
 import {
   formatAnomalySeverity,
   formatAnomalyStatus,
   formatAnomalyType,
   formatDateTime,
-  formatHourMeter,
   formatReadingStatus,
 } from "@/lib/domain-formatters";
 import {
@@ -53,7 +52,7 @@ function prepareReport(data: ReportData): PreparedReport {
         { key: "readingId", label: "ID da leitura", width: 38 },
       ],
       rows: data.items.map((item) => ({
-        date: formatDateTime(item.createdAt),
+        date: item.createdAt,
         fleet: item.machineFleetNumber,
         type: formatAnomalyType(item.type),
         severity: formatAnomalySeverity(item.severity),
@@ -71,7 +70,13 @@ function prepareReport(data: ReportData): PreparedReport {
       { key: "date", label: "Data/hora", width: 20 },
       { key: "fleet", label: "Frota", width: 10 },
       { key: "model", label: "Modelo", width: 24 },
-      { key: "value", label: "Horímetro", width: 14 },
+      { key: "value", label: "Valor", width: 14 },
+      { key: "unit", label: "Unidade", width: 12 },
+      { key: "operator", label: "Operador", width: 30 },
+      { key: "previous", label: "Valor anterior", width: 16 },
+      { key: "difference", label: "Diferença", width: 14 },
+      { key: "ocr", label: "OCR", width: 14 },
+      { key: "device", label: "Dispositivo", width: 22 },
       { key: "type", label: "Tipo", width: 18 },
       { key: "workSite", label: "Obra", width: 28 },
       { key: "status", label: "Status", width: 14 },
@@ -80,15 +85,21 @@ function prepareReport(data: ReportData): PreparedReport {
       { key: "eventId", label: "ID do evento", width: 38 },
     ],
     rows: data.items.map((item) => ({
-      date: formatDateTime(item.capturedAtDevice),
+      date: item.capturedAtDevice,
       fleet: item.machineFleetNumber,
       model: item.model,
-      value: formatHourMeter(item.value),
+      value: item.value,
+      unit: item.meterUnit ?? "Não definida",
+      operator: item.createdByEmail ?? "Não informado",
+      difference: item.differenceFromPrevious ?? "",
+      previous: item.differenceFromPrevious == null ? "" : item.value - item.differenceFromPrevious,
+      ocr: item.ocrDetectedValue ?? "",
+      device: item.deviceId ?? "",
       type: item.readingType,
       workSite: item.workSiteName ?? "Sem obra informada",
       status: formatReadingStatus(item.status),
-      received: formatDateTime(item.receivedAtServer),
-      synced: formatDateTime(item.syncedAt),
+      received: item.receivedAtServer,
+      synced: item.syncedAt ?? "",
       eventId: item.clientEventId,
     })),
   };
@@ -127,11 +138,14 @@ export async function createExcelReport(data: ReportData) {
   };
 
   for (const row of report.rows) {
-    worksheet.addRow(report.columns.map((column) => row[column.key]));
+    worksheet.addRow(report.columns.map((column) =>
+      ["date","received","synced"].includes(column.key) && row[column.key] ? new Date(String(row[column.key])) : row[column.key]));
   }
 
   report.columns.forEach((column, index) => {
     worksheet.getColumn(index + 1).width = column.width;
+    if (["date","received","synced"].includes(column.key)) worksheet.getColumn(index + 1).numFmt = "dd/mm/yyyy hh:mm";
+    if (["value","previous","difference","ocr"].includes(column.key)) worksheet.getColumn(index + 1).numFmt = "0.00";
   });
   worksheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: lastColumn } };
   worksheet.views = [{ state: "frozen", ySplit: 4 }];
@@ -155,123 +169,38 @@ function normalizePdfText(value: string | number) {
   return String(value)
     .replaceAll("—", "-")
     .replaceAll("–", "-")
-    .replaceAll("•", "-");
-}
-
-function fitPdfText(value: string | number, maxCharacters: number) {
-  const normalized = normalizePdfText(value);
-  return normalized.length <= maxCharacters
-    ? normalized
-    : `${normalized.slice(0, Math.max(0, maxCharacters - 3))}...`;
+    .replaceAll("•", "-")
+    .replace(/[^\x20-\x7E\xA0-\xFF]/g, "?");
 }
 
 export async function createPdfReport(data: ReportData) {
   const report = prepareReport(data);
   const document = await PDFDocument.create();
-  const regularFont = await document.embedFont(StandardFonts.Helvetica);
-  const boldFont = await document.embedFont(StandardFonts.HelveticaBold);
-  const pageSize: [number, number] = [841.89, 595.28];
-  const margin = 28;
-  const headerHeight = 82;
-  const tableHeaderHeight = 24;
-  const rowHeight = 22;
-  const usableWidth = pageSize[0] - margin * 2;
-  const totalWeight = report.columns.reduce((sum, column) => sum + column.width, 0);
-  const widths = report.columns.map((column) =>
-    (column.width / totalWeight) * usableWidth,
-  );
-  let page = document.addPage(pageSize);
-  let y = pageSize[1] - margin;
-
-  const drawPageHeader = () => {
-    page.drawRectangle({
-      x: 0,
-      y: pageSize[1] - 64,
-      width: pageSize[0],
-      height: 64,
-      color: rgb(0.09, 0.23, 0.4),
-    });
-    page.drawText(`Transjap - ${normalizePdfText(report.title)}`, {
-      x: margin,
-      y: pageSize[1] - 34,
-      font: boldFont,
-      size: 16,
-      color: rgb(1, 1, 1),
-    });
-    page.drawText(
-      `Periodo dos dados: ${normalizePdfText(report.period)} | Gerado em: ${normalizePdfText(formatDateTime(new Date().toISOString()))}`,
-      {
-        x: margin,
-        y: pageSize[1] - 51,
-        font: regularFont,
-        size: 8,
-        color: rgb(0.88, 0.93, 0.98),
-      },
-    );
-    y = pageSize[1] - headerHeight;
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  let page = document.addPage([841.89, 595.28]);
+  let y = 510;
+  const header = () => {
+    page.drawText(normalizePdfText("Transjap - " + report.title), {x:32,y:560,font:bold,size:16});
+    page.drawText(normalizePdfText("Período dos dados: " + report.period), {x:32,y:541,font,size:9});
+    page.drawText("Gerado em: " + formatDateTime(new Date().toISOString()), {x:32,y:526,font,size:9});
+    y = 505;
   };
-
-  const drawTableHeader = () => {
-    page.drawRectangle({
-      x: margin,
-      y: y - tableHeaderHeight + 6,
-      width: usableWidth,
-      height: tableHeaderHeight,
-      color: rgb(0.17, 0.36, 0.62),
-    });
-    let x = margin + 4;
-    report.columns.forEach((column, index) => {
-      page.drawText(fitPdfText(column.label, Math.max(5, Math.floor(widths[index] / 5))), {
-        x,
-        y: y - 10,
-        font: boldFont,
-        size: 7,
-        color: rgb(1, 1, 1),
-      });
-      x += widths[index];
-    });
-    y -= tableHeaderHeight;
-  };
-
-  drawPageHeader();
-  drawTableHeader();
-
-  report.rows.forEach((row, rowIndex) => {
-    if (y - rowHeight < margin) {
-      page = document.addPage(pageSize);
-      drawPageHeader();
-      drawTableHeader();
+  header();
+  for (const row of report.rows) {
+    // Complete key/value rows avoid truncating evidence identifiers and operator names.
+    for (const column of report.columns) {
+      const value = ["date","received","synced"].includes(column.key) && row[column.key] ? formatDateTime(String(row[column.key])) : row[column.key];
+      const text = normalizePdfText(column.label + ": " + value);
+      const lines = text.match(/.{1,120}/g) ?? [""];
+      for (const line of lines) {
+        if (y < 45) { page = document.addPage([841.89,595.28]); header(); }
+        page.drawText(line, {x:36,y,font,size:9});
+        y -= 13;
+      }
     }
-
-    if (rowIndex % 2 === 1) {
-      page.drawRectangle({
-        x: margin,
-        y: y - rowHeight + 5,
-        width: usableWidth,
-        height: rowHeight,
-        color: rgb(0.97, 0.98, 0.99),
-      });
-    }
-
-    let x = margin + 4;
-    report.columns.forEach((column, columnIndex) => {
-      page.drawText(
-        fitPdfText(
-          row[column.key],
-          Math.max(4, Math.floor(widths[columnIndex] / 4.6)),
-        ),
-        {
-          x,
-          y: y - 9,
-          font: regularFont,
-          size: 6.5,
-          color: rgb(0.12, 0.16, 0.23),
-        },
-      );
-      x += widths[columnIndex];
-    });
-    y -= rowHeight;
-  });
-
+    y -= 14;
+  }
+  document.getPages().forEach((p, index) => p.drawText(`Página ${index + 1} / ${document.getPageCount()}`, {x:32,y:20,font,size:8}));
   return document.save();
 }

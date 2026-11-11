@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OperationalSummaryPanel } from "@/features/dashboard/components/operational-summary";
 import { connection } from "next/server";
 import {
   BellRing,
@@ -23,7 +24,7 @@ import { getAnomalies } from "@/services/anomalies.service";
 import { getDashboardSummary } from "@/services/dashboard.service";
 import { getReadings } from "@/services/readings.service";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection();
   const [summary, readings, anomalies] = await Promise.all([
     getDashboardSummary(),
@@ -39,6 +40,8 @@ export default async function DashboardPage() {
         description="Acompanhe o cadastro de máquinas, as leituras e as inconsistências registradas no banco operacional."
       />
 
+      <Link className="underline" href="/auditoria">Consultar auditoria operacional</Link>
+      <OperationalSummaryPanel params={await searchParams} />
       <section aria-labelledby="indicadores-title">
         <h3 id="indicadores-title" className="sr-only">
           Indicadores

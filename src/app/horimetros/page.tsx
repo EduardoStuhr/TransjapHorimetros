@@ -35,6 +35,7 @@ export default async function ReadingsPage({
 }: ReadingsPageProps) {
   const params = await searchParams;
   const parsedFilters = readingsFilterSchema.safeParse({
+    operatorId: getSearchParam(params, "operatorId"),
     meterUnit: getSearchParam(params, "meterUnit"),
     readingType: getSearchParam(params, "readingType"),
     hasPhotoEvidence: getSearchParam(params, "hasPhotoEvidence"),

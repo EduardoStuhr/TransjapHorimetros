@@ -24,6 +24,46 @@ public sealed class OperationalIntegrationTests(TransjapApiFactory factory) : IC
     }
 
     [Fact]
+    public async Task OperatorCannotReadAdministrativeReadingReview()
+    {
+        await factory.ResetDatabaseAsync();
+        using var admin = factory.CreateClient();
+        using var operatorClient = factory.CreateClientForRole(AppRoles.Operator);
+        var machines = await admin.GetFromJsonAsync<JsonElement>("/api/v1/machines?pageSize=1");
+        var machineId = machines.GetProperty("items")[0].GetProperty("id").GetGuid();
+
+        async Task<Guid> CreateReading(decimal value)
+        {
+            using var response = await admin.PostAsJsonAsync("/api/v1/readings", new
+            {
+                machineId,
+                value,
+                readingType = "INTERMEDIATE",
+                capturedAtDevice = DateTimeOffset.UtcNow,
+                clientEventId = Guid.NewGuid(),
+            });
+            response.EnsureSuccessStatusCode();
+            using var body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            return body.RootElement.GetProperty("id").GetGuid();
+        }
+
+        await CreateReading(100);
+        var readingId = await CreateReading(90);
+        var reviewPath = $"/api/v1/operations/readings/{readingId}/review";
+        using var review = await admin.PostAsJsonAsync(
+            reviewPath,
+            new { approved = false, reason = "Solicitada nova leitura" });
+        Assert.Equal(HttpStatusCode.OK, review.StatusCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await operatorClient.GetAsync(reviewPath)).StatusCode);
+        using var administrativeReview = await admin.GetAsync(reviewPath);
+        Assert.Equal(HttpStatusCode.OK, administrativeReview.StatusCode);
+        using var decision = await JsonDocument.ParseAsync(
+            await administrativeReview.Content.ReadAsStreamAsync());
+        Assert.Equal("Solicitada nova leitura", decision.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
     public async Task SummaryTranslatesAndFiltersOnSqlServer()
     {
         await factory.ResetDatabaseAsync();

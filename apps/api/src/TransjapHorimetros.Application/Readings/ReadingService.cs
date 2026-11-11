@@ -53,7 +53,7 @@ public sealed class ReadingService(
         var items = result.Items.Select(reading => ReadingMappings.ToResponse(
             reading,
             summary: summaries.GetValueOrDefault(reading.Id),
-            includeAdministrativeDetails)).ToArray();
+            includeAdministrativeDetails: includeAdministrativeDetails)).ToArray();
         return PagedResponse<ReadingResponse>.Create(items, page, pageSize, result.TotalItems);
     }
 
@@ -87,7 +87,7 @@ public sealed class ReadingService(
         var items = result.Items.Select(reading => ReadingMappings.ToResponse(
             reading,
             summary: summaries.GetValueOrDefault(reading.Id),
-            includeAdministrativeDetails)).ToArray();
+            includeAdministrativeDetails: includeAdministrativeDetails)).ToArray();
         return PagedResponse<ReadingResponse>.Create(
             items,
             normalized.Page,

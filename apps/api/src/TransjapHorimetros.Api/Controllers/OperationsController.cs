@@ -25,7 +25,7 @@ public sealed class OperationsController(IOperationalService service) : Controll
         service.GetSummaryAsync(query, ct);
 
     [HttpGet("readings/{id:guid}/review")]
-    [Authorize(Policy = Policies.CanRecordReading)]
+    [Authorize(Policy = Policies.CanReviewAnomalies)]
     public async Task<IActionResult> GetReview(Guid id, CancellationToken ct) =>
         new JsonResult(await service.GetReviewAsync(id, ct));
 

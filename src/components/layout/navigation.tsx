@@ -11,15 +11,15 @@ import {
 } from "lucide-react";
 
 export const navigationItems = [
-  { label: "Dashboard", href: "/", icon: ChartNoAxesCombined, roles: ["SUPERVISOR", "MANAGER", "ADMIN"] },
+  { label: "Dashboard", href: "/", icon: ChartNoAxesCombined, roles: ["SUPERVISOR", "ADMINISTRATIVE", "MANAGER", "ADMIN"] },
   { label: "Frota", href: "/frota", icon: HardHat, roles: null },
   { label: "Horímetros", href: "/horimetros", icon: Gauge, roles: null },
   { label: "Registrar leitura", href: "/coleta", icon: ClipboardPlus, roles: null },
   { label: "Sincronização", href: "/sincronizacao", icon: RefreshCw, roles: null },
   { label: "Dispositivos", href: "/dispositivos", icon: TabletSmartphone, roles: ["MANAGER", "ADMIN"] },
   { label: "Obras", href: "/obras", icon: MapPinned, roles: null },
-  { label: "Alertas", href: "/alertas", icon: BellRing, roles: ["SUPERVISOR", "MANAGER", "ADMIN"] },
-  { label: "Relatórios", href: "/relatorios", icon: FileChartColumn, roles: ["SUPERVISOR", "MANAGER", "ADMIN"] },
+  { label: "Alertas", href: "/alertas", icon: BellRing, roles: ["SUPERVISOR", "ADMINISTRATIVE", "MANAGER", "ADMIN"] },
+  { label: "Relatórios", href: "/relatorios", icon: FileChartColumn, roles: ["SUPERVISOR", "ADMINISTRATIVE", "MANAGER", "ADMIN"] },
 ] as const;
 
 export function canAccessNavigationItem(
@@ -29,7 +29,7 @@ export function canAccessNavigationItem(
   return item.roles === null || item.roles.some((role) => roles.includes(role));
 }
 
-const PRIVILEGED_ROLES = new Set(["SUPERVISOR", "MANAGER", "ADMIN"]);
+const PRIVILEGED_ROLES = new Set(["SUPERVISOR", "ADMINISTRATIVE", "MANAGER", "ADMIN"]);
 
 export function isOperatorOnly(roles: readonly string[]) {
   return roles.includes("OPERATOR") && !roles.some((role) => PRIVILEGED_ROLES.has(role));

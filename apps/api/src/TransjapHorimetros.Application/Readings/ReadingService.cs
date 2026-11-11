@@ -49,7 +49,11 @@ public sealed class ReadingService(
         };
         var result = await readingRepository.GetPageAsync(normalizedQuery, cancellationToken);
         var summaries = await SummariesAsync(result.Items.Select(r => r.Id).ToArray(), false, cancellationToken);
-        var items = result.Items.Select(reading => ReadingMappings.ToResponse(reading, summary: summaries.GetValueOrDefault(reading.Id))).ToArray();
+        var includeAdministrativeDetails = CanViewAdministrativeDetails();
+        var items = result.Items.Select(reading => ReadingMappings.ToResponse(
+            reading,
+            summary: summaries.GetValueOrDefault(reading.Id),
+            includeAdministrativeDetails)).ToArray();
         return PagedResponse<ReadingResponse>.Create(items, page, pageSize, result.TotalItems);
     }
 
@@ -58,7 +62,10 @@ public sealed class ReadingService(
         var reading = await readingRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new EntityNotFoundException("Leitura", id);
         var summaries = await SummariesAsync([id], true, cancellationToken);
-        return ReadingMappings.ToResponse(reading, summary: summaries.GetValueOrDefault(id));
+        return ReadingMappings.ToResponse(
+            reading,
+            summary: summaries.GetValueOrDefault(id),
+            includeAdministrativeDetails: CanViewAdministrativeDetails());
     }
 
     public async Task<PagedResponse<ReadingResponse>> GetForMachineAsync(
@@ -76,7 +83,11 @@ public sealed class ReadingService(
             normalized.PageSize,
             cancellationToken);
         var summaries = await SummariesAsync(result.Items.Select(r => r.Id).ToArray(), false, cancellationToken);
-        var items = result.Items.Select(reading => ReadingMappings.ToResponse(reading, summary: summaries.GetValueOrDefault(reading.Id))).ToArray();
+        var includeAdministrativeDetails = CanViewAdministrativeDetails();
+        var items = result.Items.Select(reading => ReadingMappings.ToResponse(
+            reading,
+            summary: summaries.GetValueOrDefault(reading.Id),
+            includeAdministrativeDetails)).ToArray();
         return PagedResponse<ReadingResponse>.Create(
             items,
             normalized.Page,
@@ -316,4 +327,11 @@ public sealed class ReadingService(
     private Task<IReadOnlyDictionary<Guid, ReadingSummary>> SummariesAsync(Guid[] ids, bool detail, CancellationToken ct) =>
         summaryRepository?.GetAsync(ids, detail, ct)
             ?? Task.FromResult<IReadOnlyDictionary<Guid, ReadingSummary>>(new Dictionary<Guid, ReadingSummary>());
+
+    private bool CanViewAdministrativeDetails() =>
+        currentUser?.Roles.Any(role => role is
+            AppRoles.Supervisor or
+            AppRoles.Administrative or
+            AppRoles.Manager or
+            AppRoles.Admin) == true;
 }

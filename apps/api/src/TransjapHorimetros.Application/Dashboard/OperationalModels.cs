@@ -6,12 +6,12 @@ namespace TransjapHorimetros.Application.Dashboard;
 
 public sealed record ReviewRequest(
     bool Approved,
-    [property: Required, StringLength(1000, MinimumLength = 3)] string Reason);
+    [Required, StringLength(1000, MinimumLength = 3)] string Reason);
 
 public sealed record AnomalyReviewRequest(
     TransjapHorimetros.Domain.Enums.AnomalyStatus ExpectedStatus,
     TransjapHorimetros.Domain.Enums.AnomalyStatus Status,
-    [property: Required, StringLength(1000, MinimumLength = 3)] string Reason);
+    [Required, StringLength(1000, MinimumLength = 3)] string Reason);
 
 public sealed record OperationalGroup(string Label, int Count);
 public sealed record StaleMachine(int FleetNumber, string Model, DateTimeOffset? LastReceivedAt);

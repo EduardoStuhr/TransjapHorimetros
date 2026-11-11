@@ -28,12 +28,12 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         if (q.HasAnomaly.HasValue) readings = readings.Where(r => r.Anomalies.Any() == q.HasAnomaly);
         var today = new DateTimeOffset(clock.GetUtcNow().UtcDateTime.Date, TimeSpan.Zero);
         var bySite = await readings.GroupBy(r => r.WorkSite == null ? "Sem obra" : r.WorkSite.Name)
-            .Select(g => new OperationalGroup(g.Key, g.Count())).OrderByDescending(g => g.Count).Take(100).ToListAsync(ct);
+            .OrderByDescending(g => g.Count()).Take(100).Select(g => new OperationalGroup(g.Key, g.Count())).ToListAsync(ct);
         var days = await readings.GroupBy(r => r.CapturedAtDevice.Date)
             .Select(g => new { Day = g.Key, Count = g.Count() }).OrderByDescending(g => g.Day).Take(366).ToListAsync(ct);
         var oldest = await machines.Where(m => m.Status == MachineStatus.Active)
-            .Select(m => new StaleMachine(m.FleetNumber, m.Model,
-                db.HourMeterReadings.Where(r => r.MachineId == m.Id).Max(r => (DateTimeOffset?)r.ReceivedAtServer)))
+            .Select(m => new { m.FleetNumber, m.Model,
+                LastReceivedAt = db.HourMeterReadings.Where(r => r.MachineId == m.Id).Max(r => (DateTimeOffset?)r.ReceivedAtServer) })
             .OrderBy(m => m.LastReceivedAt).ThenBy(m => m.FleetNumber).Take(20).ToListAsync(ct);
         return new OperationalSummary(
             await machines.CountAsync(ct), await machines.CountAsync(m => m.Status == MachineStatus.Active, ct),
@@ -43,7 +43,8 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
             await readings.CountAsync(r => r.Status == ReadingStatus.Suspect, ct),
             await db.Anomalies.CountAsync(a => a.Status == AnomalyStatus.Open && a.ReadingId.HasValue
                 && readings.Any(r => r.Id == a.ReadingId), ct),
-            bySite, days.Select(d => new OperationalGroup(d.Day.ToString("yyyy-MM-dd"), d.Count)).ToArray(), oldest);
+            bySite, days.Select(d => new OperationalGroup(d.Day.ToString("yyyy-MM-dd"), d.Count)).ToArray(),
+            oldest.Select(m => new StaleMachine(m.FleetNumber, m.Model, m.LastReceivedAt)).ToArray());
     }
 
     public async Task ReviewAnomalyAsync(Guid id, AnomalyReviewRequest request, string correlationId, CancellationToken ct)

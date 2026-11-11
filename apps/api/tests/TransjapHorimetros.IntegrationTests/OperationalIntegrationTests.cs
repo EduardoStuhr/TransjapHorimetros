@@ -12,16 +12,6 @@ namespace TransjapHorimetros.IntegrationTests;
 
 public sealed class OperationalIntegrationTests(TransjapApiFactory factory) : IClassFixture<TransjapApiFactory>
 {
-    private sealed class ReviewActor(Guid id) : ICurrentUser
-    {
-        public Guid? UserId => id;
-        public string? Email => "review@tests.local";
-        public string? FullName => "Reviewer";
-        public IReadOnlyList<string> Roles => [AppRoles.Admin];
-        public bool IsAuthenticated => true;
-        public bool IsInRole(string role) => role == AppRoles.Admin;
-    }
-
     [Fact]
     public async Task OperatorCannotReviewOrReadAudit()
     {
@@ -67,18 +57,11 @@ public sealed class OperationalIntegrationTests(TransjapApiFactory factory) : IC
         var suspect = await Create(90);
         var id = suspect.GetProperty("id").GetGuid();
         var url = $"/api/v1/operations/readings/{id}/review";
-        using (var diagnosticScope = factory.Services.CreateScope())
-        {
-            var database = diagnosticScope.ServiceProvider.GetRequiredService<TransjapDbContext>();
-            var actor = new ReviewActor(await database.Users.Select(u => u.Id).FirstAsync());
-            var service = new OperationalService(database, actor, TimeProvider.System);
-            await service.ReviewAsync(id, new ReviewRequest(true, "Conferida a evidência"), "integration", default);
-        }
         var responses = await Task.WhenAll(
             client.PostAsJsonAsync(url, new { approved = true, reason = "Conferida a evidência" }),
             client.PostAsJsonAsync(url, new { approved = false, reason = "Solicitada nova leitura" }));
-        Assert.Single(responses.Where(r => r.IsSuccessStatusCode));
-        Assert.Single(responses.Where(r => r.StatusCode == HttpStatusCode.Conflict));
+        Assert.Single(responses, r => r.IsSuccessStatusCode);
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Conflict);
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
         Assert.Equal(1, await db.ReadingReviews.CountAsync(r => r.ReadingId == id));

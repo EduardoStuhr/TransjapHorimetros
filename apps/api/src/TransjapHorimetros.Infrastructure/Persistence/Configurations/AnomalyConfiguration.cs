@@ -36,7 +36,7 @@ public sealed class AnomalyConfiguration : IEntityTypeConfiguration<Anomaly>
             .HasColumnName("description")
             .HasMaxLength(1000)
             .IsRequired();
-        builder.Property(anomaly => anomaly.Status)
+        builder.Property(anomaly => anomaly.Status).IsConcurrencyToken()
             .HasColumnName("status")
             .HasMaxLength(24)
             .HasConversion(

@@ -10,6 +10,8 @@ namespace TransjapHorimetros.Infrastructure.Persistence;
 public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> options)
     : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
 {
+    public DbSet<ReadingReview> ReadingReviews => Set<ReadingReview>();
+
     public DbSet<Machine> Machines => Set<Machine>();
 
     public DbSet<MachineQrCode> MachineQrCodes => Set<MachineQrCode>();
@@ -119,7 +121,7 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
 
         var invalidEntries = ChangeTracker.Entries()
             .Where(entry =>
-                (entry.Entity is HourMeterReading or AuditLog or PhotoEvidence)
+                (entry.Entity is HourMeterReading or AuditLog or PhotoEvidence or ReadingReview)
                 && entry.State is EntityState.Modified or EntityState.Deleted)
             .ToArray();
 

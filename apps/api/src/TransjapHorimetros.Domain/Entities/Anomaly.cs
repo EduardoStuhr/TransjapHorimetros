@@ -27,6 +27,13 @@ public sealed class Anomaly
         CreatedAt = createdAt.ToUniversalTime();
     }
 
+    public void Review(AnomalyStatus status)
+    {
+        if (Status == AnomalyStatus.Resolved || status == AnomalyStatus.Open || status == Status)
+            throw new InvalidOperationException("Transição de alerta inválida.");
+        Status = status;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid? OcrResultId { get; private set; }

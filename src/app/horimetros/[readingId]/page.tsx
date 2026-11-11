@@ -1,3 +1,5 @@
+import { ReviewPanel } from "@/features/readings/components/review-panel";
+import type { ReadingReview } from "@/services/operations.service";
 import { ReadingOperationalDetails } from "@/features/readings/components/reading-operational-details";
 import { ReadingStatusBadge } from "@/features/readings/components/reading-badges";
 import { PhotoOcrPanel } from "@/features/readings/components/photo-ocr-panel";
@@ -25,7 +27,9 @@ interface ReadingDetailPageProps {
   params: Promise<{ readingId: string }>;
 }
 
-export default async function ReadingDetailPage({ params }: ReadingDetailPageProps) {
+export default async function ReadingDetailPage({
+  params,
+}: ReadingDetailPageProps) {
   await connection();
   const { readingId } = await params;
   let reading: Awaited<ReturnType<typeof getReading>>;
@@ -39,16 +43,23 @@ export default async function ReadingDetailPage({ params }: ReadingDetailPagePro
     throw error;
   }
 
+  const review = await apiFetch<ReadingReview | null>(
+    `/api/v1/operations/readings/${encodeURIComponent(reading.id)}/review`,
+  );
   const evidence = reading.hasPhotoEvidence
     ? await getPhotoEvidence(reading.id)
     : null;
   let ocr: PhotoOcrResult | null = null;
   let ocrLoadError = false;
   if (evidence) {
-    try { ocr = await apiFetch<PhotoOcrResult>(`/api/v1/readings/${encodeURIComponent(reading.id)}/photo/ocr`); }
-    catch (error) {
+    try {
+      ocr = await apiFetch<PhotoOcrResult>(
+        `/api/v1/readings/${encodeURIComponent(reading.id)}/photo/ocr`,
+      );
+    } catch (error) {
       unstable_rethrow(error);
-      if (!(error instanceof ApiError && error.status === 404)) ocrLoadError = true;
+      if (!(error instanceof ApiError && error.status === 404))
+        ocrLoadError = true;
     }
   }
   return (
@@ -64,13 +75,16 @@ export default async function ReadingDetailPage({ params }: ReadingDetailPagePro
         eyebrow="Detalhes da leitura"
         title={`Frota ${reading.machineFleetNumber}`}
         description={`${reading.model} · ${formatDateTime(reading.capturedAtDevice)}`}
-        action={
-          <ReadingStatusBadge status={reading.status} />
-        }
+        action={<ReadingStatusBadge status={reading.status} />}
       />
 
       <div className="space-y-6">
         <ReadingOperationalDetails reading={reading} />
+        <ReviewPanel
+          id={reading.id}
+          review={review}
+          canReview={["PENDING", "SUSPECT"].includes(reading.status)}
+        />
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="border-b">
@@ -81,7 +95,14 @@ export default async function ReadingDetailPage({ params }: ReadingDetailPagePro
           </CardHeader>
           <CardContent>
             <PhotoEvidencePanel readingId={reading.id} evidence={evidence} />
-            {evidence && <PhotoOcrPanel readingId={reading.id} operatorValue={reading.value} result={ocr} loadError={ocrLoadError} />}
+            {evidence && (
+              <PhotoOcrPanel
+                readingId={reading.id}
+                operatorValue={reading.value}
+                result={ocr}
+                loadError={ocrLoadError}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

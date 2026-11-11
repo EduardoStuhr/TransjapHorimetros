@@ -1,3 +1,8 @@
+import { OperationalFilters } from "@/components/shared/operational-filters";
+import {
+  parseOperationalFilters,
+  filterSearch,
+} from "@/lib/operational-filters";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -30,9 +35,20 @@ const reportIcons = {
   anomalies: AlertTriangle,
 } as const;
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await connection();
-  const availability = await getReportAvailability();
+  let filters: ReturnType<typeof parseOperationalFilters>;
+  try {
+    filters = parseOperationalFilters(await searchParams);
+  } catch {
+    return <div role="alert" className="rounded border p-4">Revise o período e os identificadores informados nos filtros. <Link className="underline" href="/relatorios">Limpar filtros</Link></div>;
+  }
+  const query = filterSearch(filters);
+  const availability = await getReportAvailability(filters);
 
   return (
     <div className="space-y-6">
@@ -42,6 +58,7 @@ export default async function ReportsPage() {
         description="Exporte em Excel ou PDF os dados operacionais disponíveis na API."
       />
 
+      <OperationalFilters filters={filters} />
       <div className="grid gap-4 md:grid-cols-2">
         {reportDefinitions.map((report) => {
           const Icon = reportIcons[report.type];
@@ -50,7 +67,10 @@ export default async function ReportsPage() {
           const canExport = itemCount > 0;
 
           return (
-            <Card key={report.type} className="gap-4 border-slate-200 shadow-sm">
+            <Card
+              key={report.type}
+              className="gap-4 border-slate-200 shadow-sm"
+            >
               <CardHeader className="flex-row items-start justify-between gap-4">
                 <div className="flex gap-3">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-[#2c5b9e]">
@@ -72,13 +92,15 @@ export default async function ReportsPage() {
                   {canExport ? (
                     <>
                       <Button asChild variant="outline">
-                        <Link href={`/api/reports/${report.type}/xlsx`}>
+                        <Link
+                          href={`/api/reports/${report.type}/xlsx?${query}`}
+                        >
                           <FileSpreadsheet />
                           Exportar Excel
                         </Link>
                       </Button>
                       <Button asChild variant="outline">
-                        <Link href={`/api/reports/${report.type}/pdf`}>
+                        <Link href={`/api/reports/${report.type}/pdf?${query}`}>
                           <FileDown />
                           Exportar PDF
                         </Link>

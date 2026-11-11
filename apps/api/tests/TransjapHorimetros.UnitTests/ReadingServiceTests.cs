@@ -49,6 +49,40 @@ public sealed class ReadingServiceTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_OperatorDoesNotReceiveAdministrativeDetails()
+    {
+        var machine = new Machine(68, "Pipa Ford", MachineStatus.Active, Now, MeterUnit.Hours);
+        var reading = new HourMeterReading(
+            machine.Id,
+            null,
+            100m,
+            ReadingType.Opening,
+            ReadingStatus.Validated,
+            Now.AddHours(-1),
+            Now.AddMinutes(-59),
+            Now.AddMinutes(-59),
+            Guid.NewGuid(),
+            MeterUnit.Hours,
+            Guid.NewGuid(),
+            "operator@tests.local",
+            "device-1",
+            registeredDeviceId: Guid.NewGuid());
+        typeof(HourMeterReading).GetProperty(nameof(HourMeterReading.Machine))!.SetValue(reading, machine);
+        var service = CreateService(
+            new FakeMachineRepository(machine),
+            new FakeWorkSiteRepository(),
+            new FakeReadingRepository(reading),
+            new FakeUnitOfWork());
+
+        var result = await service.GetByIdAsync(reading.Id, CancellationToken.None);
+
+        Assert.Null(result.CreatedByUserId);
+        Assert.Null(result.CreatedByEmail);
+        Assert.Null(result.DeviceId);
+        Assert.Null(result.RegisteredDeviceId);
+    }
+
+    [Fact]
     public async Task CreateAsync_WhenMachineDoesNotExist_ThrowsNotFound()
     {
         var service = CreateService(

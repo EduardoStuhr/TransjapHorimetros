@@ -8,7 +8,8 @@ internal static class ReadingMappings
         HourMeterReading reading,
         Machine? machineOverride = null,
         WorkSite? workSiteOverride = null,
-        ReadingSummary? summary = null)
+        ReadingSummary? summary = null,
+        bool includeAdministrativeDetails = true)
     {
         var machine = reading.Machine ?? machineOverride
             ?? throw new InvalidOperationException("A máquina relacionada não foi carregada.");
@@ -32,20 +33,20 @@ internal static class ReadingMappings
             reading.UpdatedAt,
             reading.PhotoEvidence is not null,
             reading.MeterUnit,
-            reading.CreatedByUserId,
-            reading.CreatedByEmail,
-            reading.DeviceId,
+            includeAdministrativeDetails ? reading.CreatedByUserId : null,
+            includeAdministrativeDetails ? reading.CreatedByEmail : null,
+            includeAdministrativeDetails ? reading.DeviceId : null,
             reading.PreviousReadingId,
             reading.DifferenceFromPrevious,
-            reading.CorrectionOfReadingId,
-            reading.RegisteredDeviceId)
+            includeAdministrativeDetails ? reading.CorrectionOfReadingId : null,
+            includeAdministrativeDetails ? reading.RegisteredDeviceId : null)
         {
             AnomalyCount = summary?.AnomalyCount ?? 0,
             OpenAnomalyCount = summary?.OpenAnomalyCount ?? 0,
             CorrectionCount = summary?.CorrectionCount ?? 0,
-            Ocr = summary?.Ocr,
-            Anomalies = summary?.Anomalies,
-            Corrections = summary?.Corrections,
+            Ocr = includeAdministrativeDetails ? summary?.Ocr : null,
+            Anomalies = includeAdministrativeDetails ? summary?.Anomalies : null,
+            Corrections = includeAdministrativeDetails ? summary?.Corrections : null,
         };
     }
 }

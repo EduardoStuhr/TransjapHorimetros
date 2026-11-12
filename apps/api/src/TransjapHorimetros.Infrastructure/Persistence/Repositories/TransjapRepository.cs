@@ -444,6 +444,27 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         }
     }
 
+    public Task<T> ExecuteForMachineAsync<T>(Guid machineId, Func<Task<T>> operation, CancellationToken cancellationToken)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return strategy.ExecuteAsync(async () =>
+        {
+            // A retry reconstructs the immutable event and its audit in a fresh transaction.
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var resource = $"transjap-reading-{machineId:D}";
+            await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+                DECLARE @result int;
+                EXEC @result = sys.sp_getapplock @Resource={resource},
+                    @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=10000;
+                IF @result < 0 THROW 51012, 'Reading lock unavailable.', 1;
+                """, cancellationToken);
+            var result = await operation();
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        });
+    }
+
     public void ClearChanges() => dbContext.ChangeTracker.Clear();
 
     private static string? GetUniqueConstraintName(SqlException exception)

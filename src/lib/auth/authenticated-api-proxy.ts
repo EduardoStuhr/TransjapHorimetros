@@ -2,7 +2,10 @@ import { cookies } from "next/headers";
 
 import { ACCESS_TOKEN_COOKIE, getApiBaseUrl } from "@/lib/auth/config";
 
-export async function authenticatedApiFetch(path: string, init: RequestInit = {}) {
+export async function authenticatedApiFetch(
+  path: string,
+  init: RequestInit = {},
+) {
   const accessToken = (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value;
   if (!accessToken) return null;
   return fetch(`${getApiBaseUrl()}${path}`, {
@@ -22,7 +25,11 @@ export function forwardApiResponse(response: Response) {
     status: response.status,
     headers: {
       "Cache-Control": "no-store",
-      "Content-Type": response.headers.get("content-type") ?? "application/json",
+      ...(response.headers.has("retry-after")
+        ? { "Retry-After": response.headers.get("retry-after")! }
+        : {}),
+      "Content-Type":
+        response.headers.get("content-type") ?? "application/json",
     },
   });
 }

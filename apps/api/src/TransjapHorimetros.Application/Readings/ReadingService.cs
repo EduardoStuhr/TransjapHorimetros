@@ -106,17 +106,25 @@ public sealed class ReadingService(
         if (request.ClientEventId == Guid.Empty)
             throw new ApplicationValidationException(nameof(request.ClientEventId), "O ClientEventId é obrigatório.");
 
+        return await unitOfWork.ExecuteForMachineAsync(request.MachineId,
+            () => CreateSerializedAsync(request, correlationId, cancellationToken, deviceSessionToken), cancellationToken);
+    }
+
+    private async Task<CreateReadingResult> CreateSerializedAsync(CreateReadingRequest request, string correlationId,
+        CancellationToken cancellationToken, string? deviceSessionToken)
+    {
+        if (currentUser?.UserId is null || string.IsNullOrWhiteSpace(currentUser.Email))
+            throw new UnauthorizedException("A leitura exige autoria do usuário autenticado.");
+        var registeredDeviceId = registeredDeviceService is null
+            ? null
+            : await registeredDeviceService.ValidateDeviceSessionAsync(deviceSessionToken, cancellationToken);
         // An accepted event is immutable: retries must precede validation of mutable machine/worksite configuration.
         var existing = await readingRepository.GetByClientEventIdAsync(request.ClientEventId, cancellationToken);
         if (existing is not null)
         {
-            if (existing.MachineId != request.MachineId)
-                throw new ConflictException("O ClientEventId já pertence a outra máquina.");
+            EnsureSameEvent(existing, request, registeredDeviceId);
             return new CreateReadingResult(await GetByIdAsync(existing.Id, cancellationToken), true);
         }
-        var registeredDeviceId = registeredDeviceService is null
-            ? null
-            : await registeredDeviceService.ValidateDeviceSessionAsync(deviceSessionToken, cancellationToken);
         Validate(request);
         var machine = await machineRepository.GetByIdAsync(request.MachineId, false, cancellationToken)
             ?? throw new EntityNotFoundException("Máquina", request.MachineId);
@@ -246,8 +254,7 @@ public sealed class ReadingService(
                 cancellationToken);
             if (existing is not null)
             {
-                if (existing.MachineId != request.MachineId)
-                    throw new ConflictException("O ClientEventId já pertence a outra máquina.");
+                EnsureSameEvent(existing, request, registeredDeviceId);
                 return new CreateReadingResult(await GetByIdAsync(existing.Id, cancellationToken), true);
             }
 
@@ -259,6 +266,21 @@ public sealed class ReadingService(
         var summaries = await SummariesAsync([persistedReading.Id], true, cancellationToken);
         return new CreateReadingResult(ReadingMappings.ToResponse(persistedReading, machine, workSite,
             summaries.GetValueOrDefault(persistedReading.Id)), false);
+    }
+
+    private void EnsureSameEvent(HourMeterReading existing, CreateReadingRequest request, Guid? registeredDeviceId)
+    {
+        var deviceId = string.IsNullOrWhiteSpace(request.DeviceId) ? null : request.DeviceId.Trim();
+        if (existing.MachineId != request.MachineId || existing.WorkSiteId != request.WorkSiteId
+            || existing.Value != request.Value || existing.ReadingType != request.ReadingType
+            || existing.CapturedAtDevice != request.CapturedAtDevice.ToUniversalTime()
+            || existing.CorrectionOfReadingId != request.CorrectionOfReadingId
+            || existing.DeviceId != deviceId
+            || (existing.CreatedByUserId.HasValue && existing.CreatedByUserId != currentUser!.UserId)
+            || (existing.RegisteredDeviceId.HasValue && existing.RegisteredDeviceId != registeredDeviceId))
+            throw new ConflictException("O ClientEventId já foi utilizado com outro conteúdo, autor ou dispositivo.");
+        logger.LogInformation("Reading replay accepted. ClientEventId={ClientEventId} ReadingId={ReadingId}",
+            request.ClientEventId, existing.Id);
     }
 
     private static void Validate(CreateReadingRequest request)

@@ -14,7 +14,11 @@ import {
 import { useAuth } from "@/components/auth/auth-provider";
 import { useDeviceIdentity } from "@/features/device-identity/device-identity-provider";
 import { getOfflineStore } from "@/offline/indexed-db-store";
-import { OfflineSyncService, type ConnectivityState, type SyncRunResult } from "@/offline/sync-engine";
+import {
+  OfflineSyncService,
+  type ConnectivityState,
+  type SyncRunResult,
+} from "@/offline/sync-engine";
 import { BrowserSyncTransport } from "@/offline/sync-transport";
 import type {
   CachedMachine,
@@ -58,8 +62,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<QueueSnapshot>(emptySnapshot);
   const [machines, setMachines] = useState<CachedMachine[]>([]);
   const [workSites, setWorkSites] = useState<CachedWorkSite[]>([]);
-  const [referenceDataFetchedAt, setReferenceDataFetchedAt] = useState<string | null>(null);
-  const [connectivity, setConnectivity] = useState<ConnectivityState>("UNKNOWN");
+  const [referenceDataFetchedAt, setReferenceDataFetchedAt] = useState<
+    string | null
+  >(null);
+  const [connectivity, setConnectivity] =
+    useState<ConnectivityState>("UNKNOWN");
   const [isSyncing, setIsSyncing] = useState(false);
   const [authenticationRequired, setAuthenticationRequired] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -67,47 +74,65 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   const refresh = useCallback(async () => {
-    const [nextSnapshot, nextMachines, nextWorkSites, fetchedAt] = await Promise.all([
-      store.getQueueSnapshot(user.id),
-      store.getCachedMachines(),
-      store.getCachedWorkSites(),
-      store.getReferenceDataFetchedAt(),
-    ]);
+    const [nextSnapshot, nextMachines, nextWorkSites, fetchedAt] =
+      await Promise.all([
+        store.getQueueSnapshot(user.id),
+        store.getCachedMachines(),
+        store.getCachedWorkSites(),
+        store.getReferenceDataFetchedAt(),
+      ]);
     setSnapshot(nextSnapshot);
     setMachines(nextMachines);
     setWorkSites(nextWorkSites);
     setReferenceDataFetchedAt(fetchedAt);
   }, [store, user.id]);
 
-  const notify = useCallback((type: "sync_started" | "sync_finished" | "queue_changed") => {
-    channelRef.current?.postMessage({ type, userId: user.id, at: new Date().toISOString() });
-  }, [user.id]);
+  const notify = useCallback(
+    (type: "sync_started" | "sync_finished" | "queue_changed") => {
+      channelRef.current?.postMessage({
+        type,
+        userId: user.id,
+        at: new Date().toISOString(),
+      });
+    },
+    [user.id],
+  );
 
-  const syncNow = useCallback(async (manual = true) => {
-    setIsSyncing(true);
-    notify("sync_started");
-    const engine = new OfflineSyncService(store, new BrowserSyncTransport(getDeviceSession), {
-      onConnectivityChange: setConnectivity,
-      onAuthenticationRequired: () => {
-        setAuthenticationRequired(true);
-        window.dispatchEvent(new Event("transjap:auth-required"));
-      },
-    });
-    try {
-      const result = await engine.sync(user.id, manual);
-      if (!result.skippedBecauseLocked) setLastSyncAt(new Date().toISOString());
-      return result;
-    } finally {
-      setIsSyncing(false);
-      await refresh();
-      notify("sync_finished");
-      notify("queue_changed");
-    }
-  }, [getDeviceSession, notify, refresh, store, user.id]);
+  const syncNow = useCallback(
+    async (manual = true) => {
+      setIsSyncing(true);
+      notify("sync_started");
+      const engine = new OfflineSyncService(
+        store,
+        new BrowserSyncTransport(getDeviceSession),
+        {
+          onConnectivityChange: setConnectivity,
+          onAuthenticationRequired: () => {
+            setAuthenticationRequired(true);
+            window.dispatchEvent(new Event("transjap:auth-required"));
+          },
+        },
+      );
+      try {
+        const result = await engine.sync(user.id, manual);
+        if (!result.skippedBecauseLocked)
+          setLastSyncAt(new Date().toISOString());
+        return result;
+      } finally {
+        setIsSyncing(false);
+        await refresh();
+        notify("sync_finished");
+        notify("queue_changed");
+      }
+    },
+    [getDeviceSession, notify, refresh, store, user.id],
+  );
 
   const refreshReferenceData = useCallback(async () => {
     try {
-      const response = await fetch("/api/offline/reference-data", { cache: "no-store" });
+      const response = await fetch("/api/offline/reference-data", {
+        cache: "no-store",
+      });
       if (response.status === 401) {
         setAuthenticationRequired(true);
         window.dispatchEvent(new Event("transjap:auth-required"));
@@ -117,7 +142,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         if (response.status >= 500) setConnectivity("OFFLINE");
         return;
       }
-      const data = await response.json() as OfflineReferenceDataResponse;
+      const data = (await response.json()) as OfflineReferenceDataResponse;
       await store.replaceReferenceData(data);
       setConnectivity("ONLINE");
       setAuthenticationRequired(false);
@@ -132,9 +157,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (typeof BroadcastChannel === "undefined") return;
     const channel = new BroadcastChannel("transjap-offline-sync");
     channelRef.current = channel;
-    channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
-      if (event.data?.type === "sync_started") setIsSyncing(true);
-      if (event.data?.type === "sync_finished") setIsSyncing(false);
+    channel.onmessage = () => {
+      // Remote tabs can close before broadcasting completion. Queue state lives in IndexedDB.
       void refresh();
     };
     return () => {
@@ -171,12 +195,29 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isSyncing || authenticationRequired) return;
     const nextAttempt = snapshot.events
-      .filter((event) => event.status === "FAILED_RETRYABLE" && event.nextAttemptAt)
+      .filter(
+        (event) => event.status === "FAILED_RETRYABLE" && event.nextAttemptAt,
+      )
       .map((event) => new Date(event.nextAttemptAt!).getTime())
       .filter(Number.isFinite)
       .sort((a, b) => a - b)[0];
-    if (!nextAttempt) return;
-    const delay = Math.min(Math.max(nextAttempt - Date.now(), 1_000), 30 * 60_000);
+    const hasPending = snapshot.events.some(
+      (event) =>
+        event.status === "PENDING" &&
+        (!event.parentReadingClientEventId ||
+          snapshot.events.some(
+            (parent) =>
+              parent.clientEventId === event.parentReadingClientEventId &&
+              parent.status === "SYNCED",
+          )),
+    );
+    const hasInterrupted = snapshot.syncing > 0;
+    if (!nextAttempt && !hasPending && !hasInterrupted) return;
+    const delay = hasPending
+      ? 1_000
+      : nextAttempt
+        ? Math.min(Math.max(nextAttempt - Date.now(), 1_000), 30 * 60_000)
+        : 121_000;
     const timeout = window.setTimeout(() => void syncNow(false), delay);
     return () => window.clearTimeout(timeout);
   }, [authenticationRequired, isSyncing, snapshot.events, syncNow]);
@@ -193,39 +234,43 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       .catch(() => setServiceWorkerReady(false));
   }, []);
 
-  const value = useMemo<SyncContextValue>(() => ({
-    connectivity,
-    isSyncing,
-    authenticationRequired,
-    snapshot,
-    machines,
-    workSites,
-    referenceDataFetchedAt,
-    lastSyncAt,
-    serviceWorkerReady,
-    refresh,
-    syncNow,
-    refreshReferenceData,
-  }), [
-    authenticationRequired,
-    connectivity,
-    isSyncing,
-    lastSyncAt,
-    machines,
-    referenceDataFetchedAt,
-    refresh,
-    refreshReferenceData,
-    snapshot,
-    syncNow,
-    serviceWorkerReady,
-    workSites,
-  ]);
+  const value = useMemo<SyncContextValue>(
+    () => ({
+      connectivity,
+      isSyncing,
+      authenticationRequired,
+      snapshot,
+      machines,
+      workSites,
+      referenceDataFetchedAt,
+      lastSyncAt,
+      serviceWorkerReady,
+      refresh,
+      syncNow,
+      refreshReferenceData,
+    }),
+    [
+      authenticationRequired,
+      connectivity,
+      isSyncing,
+      lastSyncAt,
+      machines,
+      referenceDataFetchedAt,
+      refresh,
+      refreshReferenceData,
+      snapshot,
+      syncNow,
+      serviceWorkerReady,
+      workSites,
+    ],
+  );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
 }
 
 export function useSync() {
   const context = useContext(SyncContext);
-  if (!context) throw new Error("useSync deve ser usado dentro de SyncProvider.");
+  if (!context)
+    throw new Error("useSync deve ser usado dentro de SyncProvider.");
   return context;
 }

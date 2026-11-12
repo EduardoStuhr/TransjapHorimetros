@@ -19,10 +19,16 @@ export async function POST(
   const contentType = request.headers.get("content-type");
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (!contentType?.startsWith("multipart/form-data")) {
-    return Response.json({ detail: "Envie a foto como multipart/form-data." }, { status: 400 });
+    return Response.json(
+      { detail: "Envie a foto como multipart/form-data." },
+      { status: 400 },
+    );
   }
   if (contentLength > maximumMultipartBodyLength) {
-    return Response.json({ detail: "A foto excede o limite permitido." }, { status: 413 });
+    return Response.json(
+      { detail: "A foto excede o limite permitido." },
+      { status: 413 },
+    );
   }
 
   let apiResponse: Response;
@@ -54,7 +60,11 @@ export async function POST(
     status: apiResponse.status,
     headers: {
       "Cache-Control": "no-store",
-      "Content-Type": apiResponse.headers.get("content-type") ?? "application/json",
+      ...(apiResponse.headers.has("retry-after")
+        ? { "Retry-After": apiResponse.headers.get("retry-after")! }
+        : {}),
+      "Content-Type":
+        apiResponse.headers.get("content-type") ?? "application/json",
     },
   });
 }

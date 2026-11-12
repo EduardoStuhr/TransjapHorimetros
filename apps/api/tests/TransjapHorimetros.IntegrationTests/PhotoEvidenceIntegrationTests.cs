@@ -187,7 +187,7 @@ public sealed class PhotoEvidenceIntegrationTests(TransjapApiFactory factory)
         file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         form.Add(file, "file", "proof.jpg");
         form.Add(new StringContent((clientEventId ?? Guid.NewGuid()).ToString()), "clientEventId");
-        form.Add(new StringContent(DateTimeOffset.UtcNow.ToString("O")), "capturedAtDevice");
+        form.Add(new StringContent("2026-10-21T12:00:00Z"), "capturedAtDevice");
         form.Add(new StringContent("integration-test-device"), "deviceId");
         return form;
     }

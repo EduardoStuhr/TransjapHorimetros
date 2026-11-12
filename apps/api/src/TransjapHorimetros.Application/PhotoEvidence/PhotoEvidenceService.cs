@@ -37,23 +37,6 @@ public sealed class PhotoEvidenceService(
             throw new UnauthorizedException("O token autenticado não contém o e-mail do usuário.");
         }
 
-        if (request.ClientEventId.HasValue)
-        {
-            var existingByEvent = await photoEvidenceRepository.GetByClientEventIdAsync(
-                request.ClientEventId.Value,
-                cancellationToken);
-            if (existingByEvent is not null)
-            {
-                if (existingByEvent.ReadingId != readingId)
-                {
-                    throw new ConflictException(
-                        "O ClientEventId já pertence à evidência de outra leitura.");
-                }
-
-                return new UploadPhotoEvidenceResult(ToResponse(existingByEvent), true);
-            }
-        }
-
         var reading = await readingRepository.GetByIdAsync(readingId, cancellationToken)
             ?? throw new EntityNotFoundException("Leitura", readingId);
 
@@ -77,6 +60,20 @@ public sealed class PhotoEvidenceService(
             request.Content,
             request.ContentType,
             cancellationToken);
+
+        if (request.ClientEventId.HasValue)
+        {
+            var previous = await photoEvidenceRepository.GetByClientEventIdAsync(request.ClientEventId.Value, cancellationToken);
+            if (previous is not null)
+            {
+                if (previous.ReadingId != readingId || previous.CreatedByUserId != actorUserId
+                    || !string.Equals(previous.Sha256, file.Sha256, StringComparison.OrdinalIgnoreCase)
+                    || previous.CapturedAtDevice != request.CapturedAtDevice
+                    || previous.DeviceId != NormalizeDeviceId(request.DeviceId))
+                    throw new ConflictException("O ClientEventId já foi utilizado com outra evidência, autor ou conteúdo.");
+                return new UploadPhotoEvidenceResult(ToResponse(previous), true);
+            }
+        }
 
         var existing = await photoEvidenceRepository.GetByReadingIdAsync(
             readingId,
@@ -151,7 +148,6 @@ public sealed class PhotoEvidenceService(
         }
         catch (UniqueConstraintException)
         {
-            await TryDeleteUploadedBlobAsync(objectKey);
             unitOfWork.ClearChanges();
 
             var racedEvidence = request.ClientEventId.HasValue
@@ -163,14 +159,21 @@ public sealed class PhotoEvidenceService(
                 readingId,
                 cancellationToken);
 
+            // A SaveChanges retry can encounter its own already committed row.
+            // Only a different winning object proves this upload can be compensated.
+            if (racedEvidence is not null && racedEvidence.StorageObjectKey != objectKey)
+                await TryDeleteUploadedBlobAsync(objectKey);
+
             if (racedEvidence is not null
                 && racedEvidence.ReadingId == readingId
                 && (string.Equals(
                         racedEvidence.Sha256,
                         file.Sha256,
-                        StringComparison.OrdinalIgnoreCase)
-                    || (request.ClientEventId.HasValue
-                        && racedEvidence.ClientEventId == request.ClientEventId)))
+                        StringComparison.OrdinalIgnoreCase))
+                && (!request.ClientEventId.HasValue || racedEvidence.ClientEventId != request.ClientEventId
+                    || (racedEvidence.CreatedByUserId == actorUserId
+                        && racedEvidence.CapturedAtDevice == request.CapturedAtDevice
+                        && racedEvidence.DeviceId == NormalizeDeviceId(request.DeviceId))))
             {
                 return new UploadPhotoEvidenceResult(ToResponse(racedEvidence), true);
             }
@@ -180,7 +183,10 @@ public sealed class PhotoEvidenceService(
         }
         catch
         {
-            await TryDeleteUploadedBlobAsync(objectKey);
+            // A cancelled/failed commit acknowledgement does not prove rollback.
+            // Keep this object until an operator can reconcile SQL references.
+            logger.LogWarning("Photo commit uncertain; object retained. ReadingId={ReadingId} PhotoEvidenceId={PhotoEvidenceId} CorrelationId={CorrelationId}",
+                readingId, photoEvidenceId, correlationId);
             throw;
         }
 

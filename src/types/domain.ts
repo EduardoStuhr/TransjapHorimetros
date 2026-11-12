@@ -20,18 +20,10 @@ export interface MachineDetails extends Machine {
 }
 
 export type ReadingType =
-  | "OPENING"
-  | "CLOSING"
-  | "INTERMEDIATE"
-  | "MAINTENANCE"
-  | "CORRECTION";
+  "OPENING" | "CLOSING" | "INTERMEDIATE" | "MAINTENANCE" | "CORRECTION";
 
 export type ReadingStatus =
-  | "VALIDATED"
-  | "PENDING"
-  | "SUSPECT"
-  | "CORRECTED"
-  | "REJECTED";
+  "VALIDATED" | "PENDING" | "SUSPECT" | "CORRECTED" | "REJECTED";
 
 export type MeterUnit = "HOURS" | "KM";
 
@@ -79,7 +71,12 @@ export interface ReadingAnomalySummary {
   severity: Anomaly["severity"];
   description: string;
 }
-export interface ReadingCorrectionSummary { id: string; value: number; status: ReadingStatus; createdAt: string }
+export interface ReadingCorrectionSummary {
+  id: string;
+  value: number;
+  status: ReadingStatus;
+  createdAt: string;
+}
 
 export interface WorkSite {
   id: string;
@@ -175,9 +172,21 @@ export interface AuditLog {
 }
 
 export interface PhotoOcrResult {
+  algorithmVersion?: string | null;
+  reviewReason?: string | null;
+  candidates?: Array<{ token: string; value: number; hasUnit: boolean }>;
+  rawText?: string;
+  belowPreviousReading?: boolean | null;
+  previousReadingValue?: number | null;
   id: string;
   photoEvidenceId: string;
-  status: "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "NO_VALUE_DETECTED" | "LOW_CONFIDENCE";
+  status:
+    | "PENDING"
+    | "PROCESSING"
+    | "SUCCEEDED"
+    | "FAILED"
+    | "NO_VALUE_DETECTED"
+    | "LOW_CONFIDENCE";
   detectedValue: number | null;
   confidence: number | null;
   processedAtServer: string | null;

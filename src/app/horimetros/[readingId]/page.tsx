@@ -4,6 +4,7 @@ import { ReadingOperationalDetails } from "@/features/readings/components/readin
 import { ReadingStatusBadge } from "@/features/readings/components/reading-badges";
 import { PhotoOcrPanel } from "@/features/readings/components/photo-ocr-panel";
 import type { PhotoOcrResult } from "@/types/domain";
+import type { AuthUser } from "@/lib/auth/types";
 import { apiFetch } from "@/services/api-client";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -43,12 +44,34 @@ export default async function ReadingDetailPage({
     throw error;
   }
 
-  const review = await apiFetch<ReadingReview | null>(
-    `/api/v1/operations/readings/${encodeURIComponent(reading.id)}/review`,
+  const user = await apiFetch<AuthUser>("/api/v1/auth/me");
+  const canReview = user.roles.some((role) =>
+    ["ADMIN", "MANAGER", "SUPERVISOR", "ADMINISTRATIVE"].includes(role),
   );
-  const evidence = reading.hasPhotoEvidence
-    ? await getPhotoEvidence(reading.id)
+  const review = canReview
+    ? await apiFetch<ReadingReview | null>(
+        `/api/v1/operations/readings/${encodeURIComponent(reading.id)}/review`,
+      )
     : null;
+  let evidence = null;
+  if (reading.hasPhotoEvidence) {
+    try {
+      evidence = await getPhotoEvidence(reading.id);
+    } catch (error) {
+      unstable_rethrow(error);
+      if (!(error instanceof ApiError && error.status === 404)) throw error;
+    }
+  }
+  let history: PhotoOcrResult[] = [];
+  if (evidence && canReview) {
+    try {
+      history = await apiFetch<PhotoOcrResult[]>(
+        `/api/v1/readings/${encodeURIComponent(reading.id)}/photo/ocr/history`,
+      );
+    } catch (error) {
+      unstable_rethrow(error);
+    }
+  }
   let ocr: PhotoOcrResult | null = null;
   let ocrLoadError = false;
   if (evidence) {
@@ -101,6 +124,7 @@ export default async function ReadingDetailPage({
                 operatorValue={reading.value}
                 result={ocr}
                 loadError={ocrLoadError}
+                history={history}
               />
             )}
           </CardContent>

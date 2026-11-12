@@ -29,7 +29,7 @@ public sealed class OcrRulesTests
     [InlineData("HOURS 123456789012345678", MeterUnit.Hours, null)]
     [InlineData("HOURS -123.4", MeterUnit.Hours, null)]
     [InlineData("ABC1234", null, null)]
-    [InlineData("1,234.5", null, null)]
+    [InlineData("1,234.5", null, "1234.5")]
     [InlineData("KM 123456", MeterUnit.Hours, null)]
     public void Extract_Conservatively(string text, MeterUnit? unit, string? expected)
     {

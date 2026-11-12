@@ -40,6 +40,7 @@ public sealed class PhotoEvidenceService(
         var reading = await readingRepository.GetByIdAsync(readingId, cancellationToken)
             ?? throw new EntityNotFoundException("Leitura", readingId);
 
+        EvidenceAccess.EnsureCanRead(reading, currentUser);
         if (reading.RegisteredDeviceId.HasValue)
         {
             if (registeredDeviceService is null)
@@ -194,7 +195,7 @@ public sealed class PhotoEvidenceService(
         {
             try
             {
-                await ocrService.ProcessAsync(readingId, false, correlationId, CancellationToken.None);
+                await ocrService.NotifyPhotoPersistedAsync(readingId, correlationId, CancellationToken.None);
             }
             catch (Exception)
             {
@@ -209,6 +210,9 @@ public sealed class PhotoEvidenceService(
         Guid readingId,
         CancellationToken cancellationToken)
     {
+        var reading = await readingRepository.GetByIdAsync(readingId, cancellationToken)
+            ?? throw new EntityNotFoundException("Leitura", readingId);
+        EvidenceAccess.EnsureCanRead(reading, currentUser);
         var evidence = await photoEvidenceRepository.GetByReadingIdAsync(
             readingId,
             cancellationToken)
@@ -220,6 +224,9 @@ public sealed class PhotoEvidenceService(
         Guid readingId,
         CancellationToken cancellationToken)
     {
+        var reading = await readingRepository.GetByIdAsync(readingId, cancellationToken)
+            ?? throw new EntityNotFoundException("Leitura", readingId);
+        EvidenceAccess.EnsureCanRead(reading, currentUser);
         var evidence = await photoEvidenceRepository.GetByReadingIdAsync(
             readingId,
             cancellationToken)

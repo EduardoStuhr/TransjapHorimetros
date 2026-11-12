@@ -36,7 +36,7 @@ public sealed class PhotoOcrIntegrationTests(TransjapApiFactory factory) : IClas
     [InlineData("success", "SUCCEEDED", null)]
     [InlineData("low", "LOW_CONFIDENCE", AnomalyType.LowOcrConfidence)]
     [InlineData("divergence", "SUCCEEDED", AnomalyType.OcrOperatorDivergence)]
-    [InlineData("no-value", "NO_VALUE_DETECTED", null)]
+    [InlineData("no-value", "NO_VALUE_DETECTED", AnomalyType.LowOcrConfidence)]
     [InlineData("timeout", "FAILED", null)]
     [InlineData("429", "FAILED", null)]
     [InlineData("500", "FAILED", null)]
@@ -49,7 +49,8 @@ public sealed class PhotoOcrIntegrationTests(TransjapApiFactory factory) : IClas
         var readingId = await UploadAsync(client);
         var result = await client.GetFromJsonAsync<JsonElement>(Route(readingId));
         Assert.Equal(status, result.GetProperty("status").GetString());
-        Assert.False(result.TryGetProperty("rawText", out _));
+        if (status == "FAILED") Assert.False(result.TryGetProperty("rawText", out _));
+        else Assert.True(result.TryGetProperty("rawText", out _));
         Assert.False(result.TryGetProperty("key", out _));
         var reading = await client.GetFromJsonAsync<JsonElement>($"/api/v1/readings/{readingId}");
         Assert.Equal(100m, reading.GetProperty("value").GetDecimal());

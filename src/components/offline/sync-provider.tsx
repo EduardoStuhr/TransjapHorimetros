@@ -220,7 +220,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         : 121_000;
     const timeout = window.setTimeout(() => void syncNow(false), delay);
     return () => window.clearTimeout(timeout);
-  }, [authenticationRequired, isSyncing, snapshot.events, syncNow]);
+  }, [authenticationRequired, isSyncing, snapshot.events, snapshot.syncing, syncNow]);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;

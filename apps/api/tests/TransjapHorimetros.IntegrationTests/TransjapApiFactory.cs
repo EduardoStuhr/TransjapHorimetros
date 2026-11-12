@@ -41,6 +41,9 @@ public class TransjapApiFactory : WebApplicationFactory<Program>
             _originalAppConnectionString);
     }
 
+    protected virtual bool BackgroundOcr => false;
+    protected virtual int OcrTimeoutSeconds => 1;
+
     protected override IHost CreateHost(IHostBuilder builder)
     {
         // Minimal hosting reads these settings before ConfigureWebHost callbacks are replayed.
@@ -56,8 +59,10 @@ public class TransjapApiFactory : WebApplicationFactory<Program>
                 ["Authentication:Jwt:Issuer"] = "TransjapHorimetrosTests",
                 ["Authentication:Jwt:Audience"] = "TransjapHorimetrosTestsClient",
                 ["Ocr:Provider"] = "Fake",
+                ["Ocr:BackgroundProcessingEnabled"] = BackgroundOcr.ToString(),
+                ["Ocr:PollIntervalSeconds"] = "1",
                 ["Ocr:ReprocessCooldownSeconds"] = "1",
-                ["Ocr:TimeoutSeconds"] = "1",
+                ["Ocr:TimeoutSeconds"] = OcrTimeoutSeconds.ToString(),
                 ["Ocr:MaximumRetries"] = "0",
                 ["RateLimiting:PermitLimit"] = "10000",
                 ["RateLimiting:AuthLogin:PermitLimit"] = "10000",

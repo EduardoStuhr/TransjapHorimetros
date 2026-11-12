@@ -100,7 +100,7 @@ public sealed class TransjapDbContext(DbContextOptions<TransjapDbContext> option
         {
             var immutableNames = new[] { nameof(PhotoOcrResult.Id), nameof(PhotoOcrResult.PhotoEvidenceId),
                 nameof(PhotoOcrResult.Provider), nameof(PhotoOcrResult.CreatedAt), nameof(PhotoOcrResult.IsInitial),
-                nameof(PhotoOcrResult.ActorUserId), nameof(PhotoOcrResult.CorrelationId) };
+                nameof(PhotoOcrResult.ActorUserId), nameof(PhotoOcrResult.CorrelationId), nameof(PhotoOcrResult.RequestId) };
             if (entry.State == EntityState.Deleted || (entry.State == EntityState.Modified
                 && (entry.Property(r => r.Status).OriginalValue != Domain.Enums.PhotoOcrStatus.Processing
                     || immutableNames.Any(name => entry.Property(name).IsModified))))

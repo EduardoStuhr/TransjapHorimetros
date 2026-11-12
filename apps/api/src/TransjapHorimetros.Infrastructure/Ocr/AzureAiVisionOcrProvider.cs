@@ -28,7 +28,14 @@ public sealed class AzureAiVisionOcrProvider(HttpClient client, OcrOptions optio
         }
         // The caller owns the original stream. Buffer only the bounded photo, never a public URL.
         using var buffer = new MemoryStream();
-        await content.CopyToAsync(buffer, cancellationToken);
+        var uploadChunk = new byte[8192];
+        int count;
+        while ((count = await content.ReadAsync(uploadChunk, cancellationToken)) > 0)
+        {
+            if (buffer.Length + count > 10 * 1024 * 1024)
+                throw new OcrProviderException("OCR_IMAGE_TOO_LARGE");
+            await buffer.WriteAsync(uploadChunk.AsMemory(0, count), cancellationToken);
+        }
         request.Content = new ByteArrayContent(buffer.ToArray());
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         HttpResponseMessage response;

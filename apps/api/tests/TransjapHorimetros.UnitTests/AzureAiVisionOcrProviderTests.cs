@@ -63,6 +63,21 @@ public sealed class AzureAiVisionOcrProviderTests
             .AnalyzeAsync(new MemoryStream(), "image/png", cts.Token));
     }
 
+    [Fact]
+    public async Task Analyze_RejectsOversizedStreamBeforeSendingAnyHttpRequest()
+    {
+        var called = false;
+        var provider = Provider(new StubHandler(_ =>
+        {
+            called = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }));
+        using var content = new MemoryStream(new byte[10 * 1024 * 1024 + 1]);
+        var error = await Assert.ThrowsAsync<OcrProviderException>(() => provider.AnalyzeAsync(content, "image/jpeg", default));
+        Assert.Equal("OCR_IMAGE_TOO_LARGE", error.Code);
+        Assert.False(called);
+    }
+
     private static AzureAiVisionOcrProvider Provider(HttpMessageHandler handler) => new(new HttpClient(handler),
         new OcrOptions { Azure = new() { Endpoint = "https://vision.tests.local", Key = "test-key" } });
     private sealed class StubHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler

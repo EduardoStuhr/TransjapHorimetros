@@ -16,7 +16,7 @@ public sealed class PhotoOcrServiceTests
     [InlineData("success", PhotoOcrStatus.Succeeded, null)]
     [InlineData("low", PhotoOcrStatus.LowConfidence, AnomalyType.LowOcrConfidence)]
     [InlineData("divergence", PhotoOcrStatus.Succeeded, AnomalyType.OcrOperatorDivergence)]
-    [InlineData("empty", PhotoOcrStatus.NoValueDetected, null)]
+    [InlineData("empty", PhotoOcrStatus.NoValueDetected, AnomalyType.LowOcrConfidence)]
     [InlineData("429", PhotoOcrStatus.Failed, null)]
     [InlineData("500", PhotoOcrStatus.Failed, null)]
     [InlineData("invalid", PhotoOcrStatus.Failed, null)]

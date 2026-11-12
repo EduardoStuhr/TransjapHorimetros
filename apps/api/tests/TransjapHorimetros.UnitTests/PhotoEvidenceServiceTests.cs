@@ -233,6 +233,8 @@ public sealed class PhotoEvidenceServiceTests
             DateTimeOffset.UtcNow,
             Guid.NewGuid(),
             registeredDeviceId: registeredDeviceId);
+        var actor = new CurrentUserFake();
+        typeof(HourMeterReading).GetProperty(nameof(HourMeterReading.CreatedByUserId))!.SetValue(reading, actor.UserId);
         var readingRepository = new ReadingRepositoryFake(reading);
         var evidenceRepository = new PhotoEvidenceRepositoryFake();
         var storage = new PhotoStorageFake();
@@ -244,7 +246,7 @@ public sealed class PhotoEvidenceServiceTests
             storage,
             new AuditLogRepositoryFake(),
             unitOfWork,
-            new CurrentUserFake(),
+            actor,
             new PhotoFileValidator(options),
             TimeProvider.System,
             NullLogger<PhotoEvidenceService>.Instance,

@@ -53,6 +53,8 @@ public static class DependencyInjection
         var ocrOptions = configuration.GetSection("Ocr").Get<OcrOptions>() ?? new OcrOptions();
         ocrOptions.Validate();
         services.AddSingleton(ocrOptions);
+        services.AddSingleton(new OcrProcessingGate(ocrOptions.MaximumConcurrentProcessing));
+        if (ocrOptions.BackgroundProcessingEnabled) services.AddHostedService<PhotoOcrWorker>();
         services.AddScoped<IPhotoOcrRepository, PhotoOcrRepository>();
         services.AddScoped<IPhotoOcrService, PhotoOcrService>();
         services.AddSingleton<IMeterReadingExtractor, MeterReadingExtractor>();

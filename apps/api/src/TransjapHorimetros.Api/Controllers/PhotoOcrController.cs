@@ -19,6 +19,8 @@ public sealed class PhotoOcrController(IPhotoOcrService ocr) : ControllerBase
 
     [HttpPost("reprocess")]
     [Authorize(Policy = Policies.CanReviewAnomalies)]
-    public Task<PhotoOcrResponse> Reprocess(Guid readingId, CancellationToken ct) =>
-        ocr.ProcessAsync(readingId, true, HttpContext.TraceIdentifier, ct);
+    public Task<PhotoOcrResponse> Reprocess(Guid readingId, CancellationToken ct,
+        [FromHeader(Name = "Idempotency-Key")] Guid? requestId = null) => requestId.HasValue
+        ? ocr.ReprocessAsync(readingId, requestId.Value, HttpContext.TraceIdentifier, ct)
+        : ocr.ProcessAsync(readingId, true, HttpContext.TraceIdentifier, ct);
 }

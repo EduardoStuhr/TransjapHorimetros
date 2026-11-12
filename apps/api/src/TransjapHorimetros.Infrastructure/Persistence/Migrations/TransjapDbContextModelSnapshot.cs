@@ -671,6 +671,17 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AlgorithmVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<bool?>("BelowPreviousReading")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("CandidatesJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
                     b.Property<decimal?>("Confidence")
                         .HasPrecision(9, 8)
                         .HasColumnType("decimal(9,8)");
@@ -708,6 +719,10 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PhotoEvidenceId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal?>("PreviousReadingValue")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("decimal(12,2)");
+
                     b.Property<DateTime?>("ProcessedAtServer")
                         .HasColumnType("datetime2(7)");
 
@@ -727,7 +742,15 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReviewReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("Status")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
@@ -740,6 +763,11 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                         .HasFilter("[IsInitial] = 1");
 
                     b.HasIndex("ProcessedAtServer");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_photo_ocr_request")
+                        .HasFilter("[RequestId] IS NOT NULL");
 
                     b.HasIndex("Status");
 

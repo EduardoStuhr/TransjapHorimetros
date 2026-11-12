@@ -15,6 +15,12 @@ public sealed class PhotoOcrResultConfiguration : IEntityTypeConfiguration<Photo
         b.Property(r => r.Id).ValueGeneratedNever();
         b.Property(r => r.Provider).HasMaxLength(32);
         b.Property(r => r.ProviderModel).HasMaxLength(100);
+        b.Property(r => r.AlgorithmVersion).HasMaxLength(64);
+        b.Property(r => r.ReviewReason).HasMaxLength(64);
+        b.Property(r => r.CandidatesJson).HasMaxLength(4000);
+        b.Property(r => r.PreviousReadingValue).HasPrecision(12, 2);
+        b.HasIndex(r => r.RequestId).IsUnique().HasFilter("[RequestId] IS NOT NULL")
+            .HasDatabaseName("ux_photo_ocr_request");
         b.Property(r => r.RawText).HasMaxLength(4000);
         b.Property(r => r.DetectedValue).HasPrecision(12, 2);
         b.Property(r => r.Confidence).HasPrecision(9, 8);
@@ -23,7 +29,7 @@ public sealed class PhotoOcrResultConfiguration : IEntityTypeConfiguration<Photo
         b.Property(r => r.ErrorCode).HasMaxLength(64);
         b.Property(r => r.ErrorMessage).HasMaxLength(300);
         b.Property(r => r.CorrelationId).HasMaxLength(100);
-        b.Property(r => r.Status).HasMaxLength(32).HasConversion(
+        b.Property(r => r.Status).IsConcurrencyToken().HasMaxLength(32).HasConversion(
             s => s.ToString(), s => Enum.Parse<PhotoOcrStatus>(s));
         b.HasOne<PhotoEvidence>().WithMany().HasForeignKey(r => r.PhotoEvidenceId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(r => new { r.PhotoEvidenceId, r.CreatedAt });

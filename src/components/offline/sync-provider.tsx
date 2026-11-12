@@ -157,9 +157,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (typeof BroadcastChannel === "undefined") return;
     const channel = new BroadcastChannel("transjap-offline-sync");
     channelRef.current = channel;
-    channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
-      if (event.data?.type === "sync_started") setIsSyncing(true);
-      if (event.data?.type === "sync_finished") setIsSyncing(false);
+    channel.onmessage = () => {
+      // Remote tabs can close before broadcasting completion. Queue state lives in IndexedDB.
       void refresh();
     };
     return () => {
@@ -212,10 +211,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
               parent.status === "SYNCED",
           )),
     );
-    if (!nextAttempt && !hasPending) return;
+    const hasInterrupted = snapshot.syncing > 0;
+    if (!nextAttempt && !hasPending && !hasInterrupted) return;
     const delay = hasPending
       ? 1_000
-      : Math.min(Math.max(nextAttempt - Date.now(), 1_000), 30 * 60_000);
+      : nextAttempt
+        ? Math.min(Math.max(nextAttempt - Date.now(), 1_000), 30 * 60_000)
+        : 121_000;
     const timeout = window.setTimeout(() => void syncNow(false), delay);
     return () => window.clearTimeout(timeout);
   }, [authenticationRequired, isSyncing, snapshot.events, syncNow]);

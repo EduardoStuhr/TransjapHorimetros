@@ -60,7 +60,22 @@ Displays mecânicos, reflexos, poeira, perspectiva e baixa iluminação continua
 
 Testes novos cobrem formatos, ambiguidade, limite de candidatos, confiança ausente, contexto de unidades, cancelamento de slot, autorização de fotos, detalhes administrativos, worker assíncrono, recuperação de claims, chave reutilizada concorrentemente entre evidências, falhas recorrentes e reprocessamento idempotente sem reabrir alertas resolvidos. As suítes anteriores permanecem como regressão.
 
-A primeira execução [43277918404](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43277918404) aprovou 257 testes unitários .NET, 219 testes SQL e 108 frontend, além de lint e builds. A revisão final adiciona limites de resolução e de stream, com teste de preservação da evidência e de ausência de chamada HTTP para arquivo excessivo. A execução correspondente ao HEAD do PR #23 confirma essa revisão. SQL Server real descartável é executado pela CI. O ambiente local não possui SQL Server. Não foram utilizados dados ou fotografias reais de produção.
+A execução [43279524509](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43279524509) aprovou a implementação no commit ddf437a5a9671e205757777485a97efa06cedd5b.
+
+| Verificação | Resultado |
+| --- | --- |
+| Build Release backend | Aprovado, zero avisos e zero erros |
+| Testes unitários .NET | 258 aprovados, zero falhas e zero ignorados |
+| Integração SQL Server descartável | 222 aprovados, zero falhas e zero ignorados |
+| Frontend | 108 aprovados em 13 arquivos |
+| Lint e build de produção | Aprovados |
+| Total | 588 testes aprovados |
+
+O SQL real confirmou classificação e candidatos, confiança ausente, normalização brasileira, preservação da leitura e foto, limites de resolução sem chamada ao motor, autorização por autoria, texto administrativo restrito, recuperação auditada, upload desacoplado, chave idempotente, conflito concorrente entre evidências e alerta único após falha recorrente. Os testes da interface verificam o HTML renderizado dos estados e a restrição de detalhes por papel. Não constituem validação visual em aparelho físico.
+
+O script EF incremental foi gerado e revisado. Acrescenta apenas seis colunas opcionais, índice filtrado e registro de migration. Não contém UPDATE, DELETE ou DROP no caminho Up. O modelo sem alterações pendentes foi verificado na suíte. SQL Server real descartável foi executado pela CI e o ambiente local não dispõe de SQL Server. Não foram utilizados dados ou fotografias reais de produção.
+
+A Fase 13 está pronta para revisão do PR #23 e homologação controlada após aprovação. A precisão visual em fotografias reais será avaliada na Fase 16.
 
 A implantação requer autorização para a migration incremental antes de publicar a API nova. Gerar o script EF entre AddReadingReviews e AddOcrQualityMetadata, revisar, conferir destino, PITR e contagens, aplicar sob autorização e validar o histórico. O script Up acrescenta campos e índice, sem modificar leituras ou fotografias. Rollback de código pode manter as colunas opcionais. Down remove os metadados novos e exige recuperação/backup desses dados antes de ser considerado.
 

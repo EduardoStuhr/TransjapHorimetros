@@ -208,6 +208,49 @@ public sealed class ReliabilityIntegrationTests(TransjapApiFactory factory) : IC
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentUploadsPreserveOneReferencedObjectAndAudit(bool differentContent)
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        var created = await client.PostAsJsonAsync("/api/v1/readings", await Request(client));
+        created.EnsureSuccessStatusCode();
+        var readingId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var eventId = Guid.NewGuid();
+        MultipartFormDataContent Form(bool alternate)
+        {
+            byte[] image = [0xff,0xd8,0xff,0xc0,0,0x11,8,0,1,0,2,3,1,0x11,0,2,0x11,0,3,0x11,0,0xff,0xd9];
+            if (alternate) image[10] = 3;
+            var form = new MultipartFormDataContent();
+            var file = new ByteArrayContent(image);
+            file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            form.Add(file, "file", "test.jpg");
+            form.Add(new StringContent(eventId.ToString()), "clientEventId");
+            form.Add(new StringContent("2026-10-21T12:00:00Z"), "capturedAtDevice");
+            return form;
+        }
+        using var first = Form(false);
+        using var second = Form(differentContent);
+        var responses = await Task.WhenAll(
+            client.PostAsync($"/api/v1/readings/{readingId}/photo", first),
+            client.PostAsync($"/api/v1/readings/{readingId}/photo", second));
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Created);
+        if (differentContent) Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Conflict);
+        else Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        var photo = await db.PhotoEvidences.SingleAsync(p => p.ReadingId == readingId);
+        Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.Action == "PHOTO_EVIDENCE_CREATED"));
+        var storage = scope.ServiceProvider.GetRequiredService<TransjapHorimetros.Application.Abstractions.IPhotoStorage>();
+        var content = await storage.OpenReadAsync(photo.StorageObjectKey, default);
+        await using var stream = content.Content;
+        var hash = await System.Security.Cryptography.SHA256.HashDataAsync(stream);
+        Assert.Equal(photo.Sha256.ToUpperInvariant(), Convert.ToHexString(hash));
+        Assert.Equal(100m, (await db.HourMeterReadings.SingleAsync()).Value);
+    }
+
     private static async Task<Dictionary<string, object>> Request(HttpClient client)
     {
         var machine = await client.GetFromJsonAsync<JsonElement>("/api/v1/machines/by-fleet/68");

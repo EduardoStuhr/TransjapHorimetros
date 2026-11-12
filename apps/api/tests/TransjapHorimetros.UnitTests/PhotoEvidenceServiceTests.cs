@@ -27,7 +27,7 @@ public sealed class PhotoEvidenceServiceTests
     }
 
     [Fact]
-    public async Task UploadAsync_SameClientEventId_ReturnsExistingBeforeReadingFileAgain()
+    public async Task UploadAsync_SameClientEventId_ValidatesFileBeforeReturningExisting()
     {
         var context = CreateContext();
         var clientEventId = Guid.NewGuid();
@@ -36,10 +36,10 @@ public sealed class PhotoEvidenceServiceTests
         var second = await context.Service.UploadAsync(
             context.Reading.Id,
             new UploadPhotoEvidenceRequest(
-                new MemoryStream(),
-                "ignored.jpg",
+                new MemoryStream(PhotoFileValidatorTests.CreateJpeg()),
+                "retry.jpg",
                 "image/jpeg",
-                null,
+                first.Evidence.CapturedAtDevice,
                 "device-1",
                 clientEventId),
             "test-correlation",
@@ -155,6 +155,30 @@ public sealed class PhotoEvidenceServiceTests
             CancellationToken.None,
             deviceSessionToken: null);
         Assert.False(result.IsExisting);
+        Assert.Equal(1, context.Storage.UploadCount);
+    }
+
+    [Fact]
+    public async Task Upload_CommitAcknowledgementLost_RetainsObject()
+    {
+        var context = CreateContext();
+        context.UnitOfWork.OnSave = () => throw new TimeoutException("commit acknowledgement lost");
+        await Assert.ThrowsAsync<TimeoutException>(() => UploadAsync(context, Guid.NewGuid()));
+        Assert.Equal(1, context.Storage.UploadCount);
+        Assert.Equal(0, context.Storage.DeleteCount);
+    }
+
+    [Fact]
+    public async Task Upload_SameEventDifferentBytes_ReturnsConflict()
+    {
+        var context = CreateContext();
+        var eventId = Guid.NewGuid();
+        var first = await UploadAsync(context, eventId);
+        var content = PhotoFileValidatorTests.CreateJpeg();
+        content[10] = 3;
+        await Assert.ThrowsAsync<ConflictException>(() => context.Service.UploadAsync(context.Reading.Id,
+            new UploadPhotoEvidenceRequest(new MemoryStream(content), "proof.jpg", "image/jpeg",
+                first.Evidence.CapturedAtDevice, "device-1", eventId), "retry", default));
         Assert.Equal(1, context.Storage.UploadCount);
     }
 

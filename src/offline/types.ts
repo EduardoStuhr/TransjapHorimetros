@@ -24,11 +24,7 @@ export interface StoredDeviceIdentity {
 
 export type OfflineEventType = "READING_CREATED" | "PHOTO_UPLOADED";
 export type OfflineEventStatus =
-  | "PENDING"
-  | "SYNCING"
-  | "SYNCED"
-  | "FAILED_RETRYABLE"
-  | "FAILED_PERMANENT";
+  "PENDING" | "SYNCING" | "SYNCED" | "FAILED_RETRYABLE" | "FAILED_PERMANENT";
 
 export interface OfflineReadingPayload {
   machineId: string;
@@ -55,7 +51,9 @@ export interface OfflinePhotoPayload {
   deviceId: string;
 }
 
-export interface OfflineEvent<TPayload = OfflineReadingPayload | OfflinePhotoPayload> {
+export interface OfflineEvent<
+  TPayload = OfflineReadingPayload | OfflinePhotoPayload,
+> {
   localEventId: string;
   clientEventId: string;
   eventType: OfflineEventType;
@@ -67,6 +65,7 @@ export interface OfflineEvent<TPayload = OfflineReadingPayload | OfflinePhotoPay
   lastAttemptAt: string | null;
   firstSyncAttemptAtLocal: string | null;
   nextAttemptAt: string | null;
+  retryNotBefore?: string | null;
   lastError: string | null;
   syncedAt: string | null;
   serverReadingId: string | null;
@@ -167,16 +166,39 @@ export interface CleanupOptions {
 }
 
 export interface OfflineStore {
+  acquireSyncLease(
+    owner: string,
+    now: number,
+    durationMs: number,
+  ): Promise<boolean>;
+  releaseSyncLease(owner: string): Promise<void>;
   enqueueEvent(event: OfflineEvent): Promise<void>;
-  enqueueReadingWithPhoto(input: EnqueueReadingInput): Promise<EnqueueReadingResult>;
+  enqueueReadingWithPhoto(
+    input: EnqueueReadingInput,
+  ): Promise<EnqueueReadingResult>;
   getEvent(localEventId: string): Promise<OfflineEvent | undefined>;
-  getEventByClientEventId(clientEventId: string): Promise<OfflineEvent | undefined>;
+  getEventByClientEventId(
+    clientEventId: string,
+  ): Promise<OfflineEvent | undefined>;
   getEventsForUser(userId: string): Promise<OfflineEvent[]>;
-  getPendingEvents(userId: string, now?: Date, includeBackoff?: boolean): Promise<OfflineEvent[]>;
+  getPendingEvents(
+    userId: string,
+    now?: Date,
+    includeBackoff?: boolean,
+  ): Promise<OfflineEvent[]>;
   getQueueSnapshot(userId: string): Promise<QueueSnapshot>;
   markSyncing(localEventId: string, attemptedAt: string): Promise<void>;
-  markSynced(localEventId: string, syncedAt: string, serverReadingId?: string): Promise<void>;
-  markRetryableFailure(localEventId: string, error: string, nextAttemptAt: string): Promise<void>;
+  markSynced(
+    localEventId: string,
+    syncedAt: string,
+    serverReadingId?: string,
+  ): Promise<void>;
+  markRetryableFailure(
+    localEventId: string,
+    error: string,
+    nextAttemptAt: string,
+    retryNotBefore?: string,
+  ): Promise<void>;
   markPermanentFailure(localEventId: string, error: string): Promise<void>;
   resetStaleSyncing(userId: string): Promise<void>;
   retryEvent(localEventId: string): Promise<void>;

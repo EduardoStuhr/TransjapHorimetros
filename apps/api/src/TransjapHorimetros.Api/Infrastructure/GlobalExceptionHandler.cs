@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using TransjapHorimetros.Application.Exceptions;
@@ -43,6 +44,14 @@ public sealed class GlobalExceptionHandler(
                 StatusCodes.Status409Conflict,
                 "Conflict",
                 exception.Message),
+            SqlException { Number: -2 or 1205 or 51012 } or IOException or TimeoutException => (
+                StatusCodes.Status503ServiceUnavailable,
+                "Service unavailable",
+                "Serviço temporariamente indisponível. Preserve o evento e tente novamente."),
+            OperationCanceledException => (
+                httpContext.RequestAborted.IsCancellationRequested ? 499 : StatusCodes.Status503ServiceUnavailable,
+                "Request interrupted",
+                "Operação interrompida. Consulte o evento antes de repetir."),
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "Unexpected error",
@@ -61,6 +70,8 @@ public sealed class GlobalExceptionHandler(
                 exception.Message);
         }
 
+        if (status == StatusCodes.Status503ServiceUnavailable)
+            httpContext.Response.Headers.RetryAfter = "5";
         httpContext.Response.StatusCode = status;
         ProblemDetails problemDetails = exception is ApplicationValidationException validationException
             ? new HttpValidationProblemDetails(validationException.Errors)

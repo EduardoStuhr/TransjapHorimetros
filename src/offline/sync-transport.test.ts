@@ -1,8 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { deviceAuthorizationError, DeviceIdentityError } from "@/features/device-identity/device-identity-error";
-import { BrowserSyncTransport, SyncTransportError } from "@/offline/sync-transport";
-import type { OfflinePhotoEvent, OfflineReadingEvent, StoredPhotoBlob } from "@/offline/types";
+import {
+  deviceAuthorizationError,
+  DeviceIdentityError,
+} from "@/features/device-identity/device-identity-error";
+import {
+  BrowserSyncTransport,
+  SyncTransportError,
+} from "@/offline/sync-transport";
+import type {
+  OfflinePhotoEvent,
+  OfflineReadingEvent,
+  StoredPhotoBlob,
+} from "@/offline/types";
 
 describe("BrowserSyncTransport", () => {
   const readingEvent: OfflineReadingEvent = {
@@ -87,29 +97,38 @@ describe("BrowserSyncTransport", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const transport = new BrowserSyncTransport(async () => "device-session-token");
+    const transport = new BrowserSyncTransport(
+      async () => "device-session-token",
+    );
     const result = await transport.createReading(readingEvent);
 
     expect(result.status).toBe(201);
     expect(result.resourceId).toBe("server-reading-999");
-    expect(fetchMock).toHaveBeenCalledWith("/api/readings", expect.objectContaining({
-      method: "POST",
-      body: JSON.stringify({
-        machineId: "m-1",
-        workSiteId: "w-1",
-        value: 250.5,
-        readingType: "INTERMEDIATE",
-        capturedAtDevice: "2026-10-19T09:55:00.000Z",
-        deviceId: "dev-abc",
-        clientEventId: "client-event-123",
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/readings",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          machineId: "m-1",
+          workSiteId: "w-1",
+          value: 250.5,
+          readingType: "INTERMEDIATE",
+          capturedAtDevice: "2026-10-19T09:55:00.000Z",
+          deviceId: "dev-abc",
+          clientEventId: "client-event-123",
+        }),
+        headers: expect.objectContaining({
+          "X-Device-Session": "device-session-token",
+        }),
       }),
-      headers: expect.objectContaining({ "X-Device-Session": "device-session-token" }),
-    }));
+    );
   });
 
   it("nao envia a identidade registrada declarada pela fila sem prova", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const transport = new BrowserSyncTransport(async () => { throw new Error("Dispositivo revogado"); });
+    const transport = new BrowserSyncTransport(async () => {
+      throw new Error("Dispositivo revogado");
+    });
     await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
       status: 403,
       message: "Dispositivo revogado",
@@ -120,7 +139,9 @@ describe("BrowserSyncTransport", () => {
   it("classifica identidade local quebrada como falha permanente sem enviar requisicao", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const transport = new BrowserSyncTransport(async () => {
-      throw new DeviceIdentityError("A identidade local e invalida. A fila foi preservada.");
+      throw new DeviceIdentityError(
+        "A identidade local e invalida. A fila foi preservada.",
+      );
     });
 
     await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
@@ -136,27 +157,41 @@ describe("BrowserSyncTransport", () => {
       throw deviceAuthorizationError("PENDING");
     });
 
-    await expect(transport.createReading(readingEvent)).rejects.toMatchObject({ status: 425 });
-    await expect(transport.uploadPhoto(photoEvent, "reading-1", storedBlob))
-      .rejects.toMatchObject({ status: 425 });
+    await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
+      status: 425,
+    });
+    await expect(
+      transport.uploadPhoto(photoEvent, "reading-1", storedBlob),
+    ).rejects.toMatchObject({ status: 425 });
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it("POST /api/readings/:id/photo envia FormData com campos de rastreabilidade e X-Device-Session", async () => {
     let capturedBody: FormData | null = null;
     let capturedHeaders: HeadersInit | undefined;
-    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      capturedBody = init.body as FormData;
-      capturedHeaders = init.headers;
-      return new Response(JSON.stringify({ readingId: "server-reading-999" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async (_url: string, init: RequestInit) => {
+        capturedBody = init.body as FormData;
+        capturedHeaders = init.headers;
+        return new Response(
+          JSON.stringify({ readingId: "server-reading-999" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       });
-    });
     vi.stubGlobal("fetch", fetchMock);
 
-    const transport = new BrowserSyncTransport(async () => "photo-session-token");
-    const result = await transport.uploadPhoto(photoEvent, "server-reading-999", storedBlob);
+    const transport = new BrowserSyncTransport(
+      async () => "photo-session-token",
+    );
+    const result = await transport.uploadPhoto(
+      photoEvent,
+      "server-reading-999",
+      storedBlob,
+    );
 
     expect(result.status).toBe(200);
     expect(result.resourceId).toBe("server-reading-999");
@@ -166,15 +201,21 @@ describe("BrowserSyncTransport", () => {
     expect(formData.get("deviceId")).toBe("dev-abc");
     expect(formData.get("clientEventId")).toBe("client-photo-456");
     expect(formData.get("file")).toBeDefined();
-    expect(capturedHeaders).toEqual(expect.objectContaining({
-      "X-Device-Session": "photo-session-token",
-    }));
+    expect(capturedHeaders).toEqual(
+      expect.objectContaining({
+        "X-Device-Session": "photo-session-token",
+      }),
+    );
   });
 
   it("uploadPhoto falha com 403 se dispositivo foi revogado sem enviar requisicao", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const transport = new BrowserSyncTransport(async () => { throw new Error("Dispositivo revogado"); });
-    await expect(transport.uploadPhoto(photoEvent, "server-reading-999", storedBlob)).rejects.toMatchObject({
+    const transport = new BrowserSyncTransport(async () => {
+      throw new Error("Dispositivo revogado");
+    });
+    await expect(
+      transport.uploadPhoto(photoEvent, "server-reading-999", storedBlob),
+    ).rejects.toMatchObject({
       status: 403,
       message: "Dispositivo revogado",
     });
@@ -186,7 +227,8 @@ describe("BrowserSyncTransport", () => {
       Promise.resolve(
         new Response(
           JSON.stringify({
-            detail: "Falha na conexão connection string: Server=prod;Password=secret123 com Bearer eyJhbGciOi...",
+            detail:
+              "Falha na conexão connection string: Server=prod;Password=secret123 com Bearer eyJhbGciOi...",
           }),
           { status: 500, headers: { "Content-Type": "application/json" } },
         ),
@@ -204,14 +246,43 @@ describe("BrowserSyncTransport", () => {
   });
 
   it("trata erro de rede sem HTTP status gerando SyncTransportError(status=null)", async () => {
-    const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new TypeError("Failed to fetch"));
     vi.stubGlobal("fetch", fetchMock);
 
     const transport = new BrowserSyncTransport();
-    await expect(transport.createReading(readingEvent)).rejects.toThrow(SyncTransportError);
+    await expect(transport.createReading(readingEvent)).rejects.toThrow(
+      SyncTransportError,
+    );
     await expect(transport.createReading(readingEvent)).rejects.toMatchObject({
       status: null,
       message: "Sem comunicação com o servidor. A tentativa será repetida.",
     });
+  });
+});
+
+describe("Retry-After da API", () => {
+  it("preserva a espera mínima de uma resposta 429", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response('{"detail":"limite"}', {
+          status: 429,
+          headers: { "Retry-After": "120" },
+        }),
+      ),
+    );
+    try {
+      const transport = new BrowserSyncTransport();
+      await expect(
+        transport.createReading({
+          payload: {},
+          clientEventId: "event",
+        } as OfflineReadingEvent),
+      ).rejects.toMatchObject({ status: 429, retryAfterMs: 120000 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

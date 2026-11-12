@@ -36,22 +36,29 @@ interface MetadataRecord<T = unknown> {
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("Falha ao acessar o armazenamento offline."));
+    request.onerror = () =>
+      reject(
+        request.error ?? new Error("Falha ao acessar o armazenamento offline."),
+      );
   });
 }
 
 function transactionDone(transaction: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error("Falha na transação offline."));
-    transaction.onabort = () => reject(transaction.error ?? new Error("Transação offline cancelada."));
+    transaction.onerror = () =>
+      reject(transaction.error ?? new Error("Falha na transação offline."));
+    transaction.onabort = () =>
+      reject(transaction.error ?? new Error("Transação offline cancelada."));
   });
 }
 
 function sortEvents(events: OfflineEvent[]) {
-  return events.sort((left, right) =>
-    left.createdAtLocal.localeCompare(right.createdAtLocal)
-      || left.localEventId.localeCompare(right.localEventId));
+  return events.sort(
+    (left, right) =>
+      left.createdAtLocal.localeCompare(right.createdAtLocal) ||
+      left.localEventId.localeCompare(right.localEventId),
+  );
 }
 
 function newBaseEvent(
@@ -107,8 +114,12 @@ export class IndexedDbOfflineStore implements OfflineStore {
       request.onupgradeneeded = () => {
         const database = request.result;
         if (!database.objectStoreNames.contains(stores.events)) {
-          const eventStore = database.createObjectStore(stores.events, { keyPath: "localEventId" });
-          eventStore.createIndex("clientEventId", "clientEventId", { unique: true });
+          const eventStore = database.createObjectStore(stores.events, {
+            keyPath: "localEventId",
+          });
+          eventStore.createIndex("clientEventId", "clientEventId", {
+            unique: true,
+          });
           eventStore.createIndex("userId", "userId");
           eventStore.createIndex("status", "status");
           eventStore.createIndex("createdAtLocal", "createdAtLocal");
@@ -135,9 +146,17 @@ export class IndexedDbOfflineStore implements OfflineStore {
       };
       request.onerror = () => {
         this.databasePromise = null;
-        reject(request.error ?? new Error("Não foi possível abrir o armazenamento offline."));
+        reject(
+          request.error ??
+            new Error("Não foi possível abrir o armazenamento offline."),
+        );
       };
-      request.onblocked = () => reject(new Error("Feche outras abas para atualizar o armazenamento offline."));
+      request.onblocked = () =>
+        reject(
+          new Error(
+            "Feche outras abas para atualizar o armazenamento offline.",
+          ),
+        );
     });
 
     return this.databasePromise;
@@ -155,7 +174,9 @@ export class IndexedDbOfflineStore implements OfflineStore {
     await transactionDone(transaction);
   }
 
-  async enqueueReadingWithPhoto(input: EnqueueReadingInput): Promise<EnqueueReadingResult> {
+  async enqueueReadingWithPhoto(
+    input: EnqueueReadingInput,
+  ): Promise<EnqueueReadingResult> {
     const createdAtLocal = new Date().toISOString();
     const readingClientEventId = crypto.randomUUID();
     const photoClientEventId = crypto.randomUUID();
@@ -164,12 +185,24 @@ export class IndexedDbOfflineStore implements OfflineStore {
     const blobKey = `photo:${photoLocalEventId}`;
 
     const readingEvent: OfflineReadingEvent = {
-      ...newBaseEvent(input, "READING_CREATED", readingClientEventId, readingLocalEventId, createdAtLocal),
+      ...newBaseEvent(
+        input,
+        "READING_CREATED",
+        readingClientEventId,
+        readingLocalEventId,
+        createdAtLocal,
+      ),
       eventType: "READING_CREATED",
       payload: input.reading,
     };
     const photoEvent: OfflinePhotoEvent = {
-      ...newBaseEvent(input, "PHOTO_UPLOADED", photoClientEventId, photoLocalEventId, createdAtLocal),
+      ...newBaseEvent(
+        input,
+        "PHOTO_UPLOADED",
+        photoClientEventId,
+        photoLocalEventId,
+        createdAtLocal,
+      ),
       eventType: "PHOTO_UPLOADED",
       parentReadingClientEventId: readingClientEventId,
       payload: {
@@ -194,7 +227,10 @@ export class IndexedDbOfflineStore implements OfflineStore {
     };
 
     const database = await this.open();
-    const transaction = database.transaction([stores.events, stores.photos], "readwrite");
+    const transaction = database.transaction(
+      [stores.events, stores.photos],
+      "readwrite",
+    );
     transaction.objectStore(stores.events).add(readingEvent);
     transaction.objectStore(stores.photos).add(storedPhoto);
     transaction.objectStore(stores.events).add(photoEvent);
@@ -205,14 +241,19 @@ export class IndexedDbOfflineStore implements OfflineStore {
   async getEvent(localEventId: string) {
     const database = await this.open();
     const transaction = database.transaction(stores.events, "readonly");
-    return requestResult<OfflineEvent | undefined>(transaction.objectStore(stores.events).get(localEventId));
+    return requestResult<OfflineEvent | undefined>(
+      transaction.objectStore(stores.events).get(localEventId),
+    );
   }
 
   async getEventByClientEventId(clientEventId: string) {
     const database = await this.open();
     const transaction = database.transaction(stores.events, "readonly");
     return requestResult<OfflineEvent | undefined>(
-      transaction.objectStore(stores.events).index("clientEventId").get(clientEventId),
+      transaction
+        .objectStore(stores.events)
+        .index("clientEventId")
+        .get(clientEventId),
     );
   }
 
@@ -225,35 +266,99 @@ export class IndexedDbOfflineStore implements OfflineStore {
     return sortEvents(events);
   }
 
-  async getPendingEvents(userId: string, now = new Date(), includeBackoff = false) {
+  async acquireSyncLease(owner: string, now: number, durationMs: number) {
+    const database = await this.open();
+    const transaction = database.transaction(stores.metadata, "readwrite");
+    const metadata = transaction.objectStore(stores.metadata);
+    const lease = await requestResult<
+      MetadataRecord<{ owner: string; expiresAt: number }> | undefined
+    >(metadata.get("sync-lease"));
+    const acquired =
+      !lease || lease.value.owner === owner || lease.value.expiresAt <= now;
+    if (acquired)
+      metadata.put({
+        key: "sync-lease",
+        value: { owner, expiresAt: now + durationMs },
+      });
+    await transactionDone(transaction);
+    return acquired;
+  }
+
+  async releaseSyncLease(owner: string) {
+    const database = await this.open();
+    const transaction = database.transaction(stores.metadata, "readwrite");
+    const metadata = transaction.objectStore(stores.metadata);
+    const lease = await requestResult<
+      MetadataRecord<{ owner: string }> | undefined
+    >(metadata.get("sync-lease"));
+    if (lease?.value.owner === owner) metadata.delete("sync-lease");
+    await transactionDone(transaction);
+  }
+
+  async getPendingEvents(
+    userId: string,
+    now = new Date(),
+    includeBackoff = false,
+  ) {
     const events = await this.getEventsForUser(userId);
     const timestamp = now.getTime();
     return events.filter((event) => {
+      if (
+        event.retryNotBefore &&
+        new Date(event.retryNotBefore).getTime() > timestamp
+      )
+        return false;
       if (event.status === "PENDING") return true;
       if (event.status !== "FAILED_RETRYABLE") return false;
-      return includeBackoff || !event.nextAttemptAt || new Date(event.nextAttemptAt).getTime() <= timestamp;
+      return (
+        includeBackoff ||
+        !event.nextAttemptAt ||
+        new Date(event.nextAttemptAt).getTime() <= timestamp
+      );
     });
   }
 
   async getQueueSnapshot(userId: string): Promise<QueueSnapshot> {
     const database = await this.open();
     const transaction = database.transaction(stores.events, "readonly");
-    const allEvents = sortEvents(await requestResult<OfflineEvent[]>(transaction.objectStore(stores.events).getAll()));
+    const allEvents = sortEvents(
+      await requestResult<OfflineEvent[]>(
+        transaction.objectStore(stores.events).getAll(),
+      ),
+    );
     const events = allEvents.filter((event) => event.userId === userId);
-    const byClientEventId = new Map(events.map((event) => [event.clientEventId, event]));
+    const byClientEventId = new Map(
+      events.map((event) => [event.clientEventId, event]),
+    );
     const blockedByDependency = events.filter((event) => {
-      if (event.eventType !== "PHOTO_UPLOADED" || !event.parentReadingClientEventId) return false;
-      return byClientEventId.get(event.parentReadingClientEventId)?.status !== "SYNCED";
+      if (
+        event.eventType !== "PHOTO_UPLOADED" ||
+        !event.parentReadingClientEventId
+      )
+        return false;
+      return (
+        byClientEventId.get(event.parentReadingClientEventId)?.status !==
+        "SYNCED"
+      );
     }).length;
-    const activeStatuses = new Set(["PENDING", "SYNCING", "FAILED_RETRYABLE", "FAILED_PERMANENT"]);
+    const activeStatuses = new Set([
+      "PENDING",
+      "SYNCING",
+      "FAILED_RETRYABLE",
+      "FAILED_PERMANENT",
+    ]);
 
     return {
       events,
       pending: events.filter((event) => event.status === "PENDING").length,
       syncing: events.filter((event) => event.status === "SYNCING").length,
       synced: events.filter((event) => event.status === "SYNCED").length,
-      retryableFailures: events.filter((event) => event.status === "FAILED_RETRYABLE").length,
-      permanentFailures: events.filter((event) => event.status === "FAILED_PERMANENT").length,
+      retryableFailures: events.filter(
+        (event) => event.status === "FAILED_RETRYABLE",
+      ).length,
+      permanentFailures: events.filter(
+        (event) => event.status === "FAILED_PERMANENT",
+      ).length,
       blockedByDependency,
       otherUserPending: allEvents.filter(
         (event) => event.userId !== userId && activeStatuses.has(event.status),
@@ -261,11 +366,16 @@ export class IndexedDbOfflineStore implements OfflineStore {
     };
   }
 
-  private async updateEvent(localEventId: string, updater: (event: OfflineEvent) => void) {
+  private async updateEvent(
+    localEventId: string,
+    updater: (event: OfflineEvent) => void,
+  ) {
     const database = await this.open();
     const transaction = database.transaction(stores.events, "readwrite");
     const eventStore = transaction.objectStore(stores.events);
-    const event = await requestResult<OfflineEvent | undefined>(eventStore.get(localEventId));
+    const event = await requestResult<OfflineEvent | undefined>(
+      eventStore.get(localEventId),
+    );
     if (!event) {
       transaction.abort();
       throw new Error("Evento offline não encontrado.");
@@ -294,12 +404,18 @@ export class IndexedDbOfflineStore implements OfflineStore {
     });
   }
 
-  markRetryableFailure(localEventId: string, error: string, nextAttemptAt: string) {
+  markRetryableFailure(
+    localEventId: string,
+    error: string,
+    nextAttemptAt: string,
+    retryNotBefore?: string,
+  ) {
     return this.updateEvent(localEventId, (event) => {
       event.status = "FAILED_RETRYABLE";
       event.retryCount += 1;
       event.lastError = error;
       event.nextAttemptAt = nextAttemptAt;
+      event.retryNotBefore = retryNotBefore ?? null;
     });
   }
 
@@ -315,6 +431,8 @@ export class IndexedDbOfflineStore implements OfflineStore {
   retryEvent(localEventId: string) {
     return this.updateEvent(localEventId, (event) => {
       if (event.status !== "FAILED_RETRYABLE") return;
+      if (event.retryNotBefore && Date.parse(event.retryNotBefore) > Date.now())
+        return;
       event.status = "PENDING";
       event.nextAttemptAt = null;
       event.lastError = null;
@@ -323,12 +441,18 @@ export class IndexedDbOfflineStore implements OfflineStore {
 
   async resetStaleSyncing(userId: string) {
     const events = await this.getEventsForUser(userId);
-    await Promise.all(events.filter((event) => event.status === "SYNCING").map((event) =>
-      this.updateEvent(event.localEventId, (stored) => {
-        stored.status = "FAILED_RETRYABLE";
-        stored.lastError = "A sincronização anterior foi interrompida e será retomada.";
-        stored.nextAttemptAt = null;
-      })));
+    await Promise.all(
+      events
+        .filter((event) => event.status === "SYNCING")
+        .map((event) =>
+          this.updateEvent(event.localEventId, (stored) => {
+            stored.status = "FAILED_RETRYABLE";
+            stored.lastError =
+              "A sincronização anterior foi interrompida e será retomada.";
+            stored.nextAttemptAt = null;
+          }),
+        ),
+    );
   }
 
   async storePhotoBlob(photo: StoredPhotoBlob) {
@@ -341,7 +465,9 @@ export class IndexedDbOfflineStore implements OfflineStore {
   async getPhotoBlob(blobKey: string) {
     const database = await this.open();
     const transaction = database.transaction(stores.photos, "readonly");
-    return requestResult<StoredPhotoBlob | undefined>(transaction.objectStore(stores.photos).get(blobKey));
+    return requestResult<StoredPhotoBlob | undefined>(
+      transaction.objectStore(stores.photos).get(blobKey),
+    );
   }
 
   async deletePhotoBlobWhenSafe(blobKey: string) {
@@ -356,7 +482,10 @@ export class IndexedDbOfflineStore implements OfflineStore {
     const blobCutoff = now.getTime() - options.blobRetentionMs;
     const eventCutoff = now.getTime() - options.eventRetentionMs;
     const database = await this.open();
-    const transaction = database.transaction([stores.events, stores.photos], "readwrite");
+    const transaction = database.transaction(
+      [stores.events, stores.photos],
+      "readwrite",
+    );
     const eventStore = transaction.objectStore(stores.events);
     const photoStore = transaction.objectStore(stores.photos);
     const events = await requestResult<OfflineEvent[]>(eventStore.getAll());
@@ -368,7 +497,13 @@ export class IndexedDbOfflineStore implements OfflineStore {
         const payload = event.payload as OfflinePhotoEvent["payload"];
         photoStore.delete(payload.blobKey);
       }
-      if (syncedAt <= eventCutoff) eventStore.delete(event.localEventId);
+      const pendingDependent = events.some(
+        (child) =>
+          child.parentReadingClientEventId === event.clientEventId &&
+          child.status !== "SYNCED",
+      );
+      if (syncedAt <= eventCutoff && !pendingDependent)
+        eventStore.delete(event.localEventId);
     }
 
     await transactionDone(transaction);
@@ -377,7 +512,10 @@ export class IndexedDbOfflineStore implements OfflineStore {
   async replaceReferenceData(data: OfflineReferenceDataResponse) {
     const fetchedAt = new Date().toISOString();
     const database = await this.open();
-    const transaction = database.transaction([stores.machines, stores.worksites, stores.metadata], "readwrite");
+    const transaction = database.transaction(
+      [stores.machines, stores.worksites, stores.metadata],
+      "readwrite",
+    );
     const machineStore = transaction.objectStore(stores.machines);
     const worksiteStore = transaction.objectStore(stores.worksites);
     machineStore.clear();
@@ -407,31 +545,43 @@ export class IndexedDbOfflineStore implements OfflineStore {
       };
       worksiteStore.put(cached);
     }
-    transaction.objectStore(stores.metadata).put({ key: "reference-data-fetched-at", value: fetchedAt });
+    transaction
+      .objectStore(stores.metadata)
+      .put({ key: "reference-data-fetched-at", value: fetchedAt });
     await transactionDone(transaction);
   }
 
   async getCachedMachines() {
     const database = await this.open();
     const transaction = database.transaction(stores.machines, "readonly");
-    const machines = await requestResult<CachedMachine[]>(transaction.objectStore(stores.machines).getAll());
+    const machines = await requestResult<CachedMachine[]>(
+      transaction.objectStore(stores.machines).getAll(),
+    );
     return machines.sort((left, right) => left.fleetNumber - right.fleetNumber);
   }
 
   async getCachedWorkSites() {
     const database = await this.open();
     const transaction = database.transaction(stores.worksites, "readonly");
-    const workSites = await requestResult<CachedWorkSite[]>(transaction.objectStore(stores.worksites).getAll());
-    return workSites.sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+    const workSites = await requestResult<CachedWorkSite[]>(
+      transaction.objectStore(stores.worksites).getAll(),
+    );
+    return workSites.sort((left, right) =>
+      left.name.localeCompare(right.name, "pt-BR"),
+    );
   }
 
   async resolveCachedMachine(value: string) {
     const normalized = value.trim();
     const machines = await this.getCachedMachines();
-    const qrMatch = machines.find((machine) => machine.activeQrToken === normalized);
+    const qrMatch = machines.find(
+      (machine) => machine.activeQrToken === normalized,
+    );
     if (qrMatch) return qrMatch;
     const fleetNumber = parseFleetNumber(normalized);
-    return fleetNumber ? machines.find((machine) => machine.fleetNumber === fleetNumber) : undefined;
+    return fleetNumber
+      ? machines.find((machine) => machine.fleetNumber === fleetNumber)
+      : undefined;
   }
 
   async getReferenceDataFetchedAt() {
@@ -449,14 +599,19 @@ export class IndexedDbOfflineStore implements OfflineStore {
   async getDeviceIdentity() {
     const database = await this.open();
     const transaction = database.transaction(stores.deviceIdentity, "readonly");
-    return (await requestResult<StoredDeviceIdentity | undefined>(
-      transaction.objectStore(stores.deviceIdentity).get("current"),
-    )) ?? null;
+    return (
+      (await requestResult<StoredDeviceIdentity | undefined>(
+        transaction.objectStore(stores.deviceIdentity).get("current"),
+      )) ?? null
+    );
   }
 
   async saveDeviceIdentity(identity: StoredDeviceIdentity) {
     const database = await this.open();
-    const transaction = database.transaction(stores.deviceIdentity, "readwrite");
+    const transaction = database.transaction(
+      stores.deviceIdentity,
+      "readwrite",
+    );
     transaction.objectStore(stores.deviceIdentity).put(identity);
     await transactionDone(transaction);
   }

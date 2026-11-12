@@ -76,7 +76,9 @@ public sealed class CompleteReadingModelIntegrationTests(TransjapApiFactory fact
         Assert.Equal(0.25m, second.GetProperty("differenceFromPrevious").GetDecimal());
         Assert.Equal(second.GetProperty("receivedAtServer").GetDateTimeOffset(), second.GetProperty("syncedAt").GetDateTimeOffset());
         await SetUnit(machineId, null);
-        using var replay = await client.PostAsJsonAsync("/api/v1/readings", Request(machineId, 200, now, secondEvent));
+        using var divergent = await client.PostAsJsonAsync("/api/v1/readings", Request(machineId, 200, now, secondEvent));
+        Assert.Equal(HttpStatusCode.Conflict, divergent.StatusCode);
+        using var replay = await client.PostAsJsonAsync("/api/v1/readings", Request(machineId, 100.5m, now.AddMinutes(-1), secondEvent));
         Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
         var body = await replay.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(second.GetProperty("id").GetGuid(), body.GetProperty("id").GetGuid());

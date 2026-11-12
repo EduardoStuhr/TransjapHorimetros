@@ -4,8 +4,18 @@ import { deviceAuthorizationError } from "@/features/device-identity/device-iden
 import { sha256Hex } from "@/offline/crypto";
 import { IndexedDbOfflineStore } from "@/offline/indexed-db-store";
 import { OfflineSyncService } from "@/offline/sync-engine";
-import { BrowserSyncTransport, SyncTransportError, type SyncResponse, type SyncTransport } from "@/offline/sync-transport";
-import type { EnqueueReadingInput, OfflinePhotoEvent, OfflineReadingEvent, StoredPhotoBlob } from "@/offline/types";
+import {
+  BrowserSyncTransport,
+  SyncTransportError,
+  type SyncResponse,
+  type SyncTransport,
+} from "@/offline/sync-transport";
+import type {
+  EnqueueReadingInput,
+  OfflinePhotoEvent,
+  OfflineReadingEvent,
+  StoredPhotoBlob,
+} from "@/offline/types";
 
 const databases: Array<{ name: string; store: IndexedDbOfflineStore }> = [];
 
@@ -17,7 +27,9 @@ function createStore() {
 }
 
 async function input(userId = "user-1"): Promise<EnqueueReadingInput> {
-  const photo = new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], { type: "image/jpeg" });
+  const photo = new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], {
+    type: "image/jpeg",
+  });
   return {
     reading: {
       machineId: crypto.randomUUID(),
@@ -38,12 +50,17 @@ async function input(userId = "user-1"): Promise<EnqueueReadingInput> {
 class FakeTransport implements SyncTransport {
   calls: string[] = [];
   readingIds: string[] = [];
-  reading: (event: OfflineReadingEvent) => Promise<SyncResponse> = async () => ({
-    status: 201,
-    resourceId: crypto.randomUUID(),
-    body: null,
-  });
-  photo: (event: OfflinePhotoEvent, readingId: string, photo: StoredPhotoBlob) => Promise<SyncResponse> = async () => ({
+  reading: (event: OfflineReadingEvent) => Promise<SyncResponse> =
+    async () => ({
+      status: 201,
+      resourceId: crypto.randomUUID(),
+      body: null,
+    });
+  photo: (
+    event: OfflinePhotoEvent,
+    readingId: string,
+    photo: StoredPhotoBlob,
+  ) => Promise<SyncResponse> = async () => ({
     status: 201,
     resourceId: crypto.randomUUID(),
     body: null,
@@ -54,7 +71,11 @@ class FakeTransport implements SyncTransport {
     return this.reading(event);
   }
 
-  async uploadPhoto(event: OfflinePhotoEvent, readingId: string, photo: StoredPhotoBlob) {
+  async uploadPhoto(
+    event: OfflinePhotoEvent,
+    readingId: string,
+    photo: StoredPhotoBlob,
+  ) {
     this.calls.push(`photo:${event.clientEventId}`);
     this.readingIds.push(readingId);
     return this.photo(event, readingId, photo);
@@ -79,17 +100,31 @@ describe("OfflineSyncService", () => {
     async (status) => {
       const store = createStore();
       const queued = await store.enqueueReadingWithPhoto(await input());
-      const transport = new BrowserSyncTransport(async () => { throw deviceAuthorizationError(status); });
-      const result = await new OfflineSyncService(store, transport).sync("user-1");
+      const transport = new BrowserSyncTransport(async () => {
+        throw deviceAuthorizationError(status);
+      });
+      const result = await new OfflineSyncService(store, transport).sync(
+        "user-1",
+      );
       expect(result.retryableFailures).toBe(1);
       expect(result.permanentFailures).toBe(0);
-      expect((await store.getEvent(queued.readingEvent.localEventId))?.status).toBe("FAILED_RETRYABLE");
-      expect((await store.getEvent(queued.photoEvent.localEventId))?.status).toBe("PENDING");
-      expect(await store.getPhotoBlob(queued.photoEvent.payload.blobKey)).toBeDefined();
-      const approved = await new OfflineSyncService(store, new FakeTransport()).sync("user-1", true);
+      expect(
+        (await store.getEvent(queued.readingEvent.localEventId))?.status,
+      ).toBe("FAILED_RETRYABLE");
+      expect(
+        (await store.getEvent(queued.photoEvent.localEventId))?.status,
+      ).toBe("PENDING");
+      expect(
+        await store.getPhotoBlob(queued.photoEvent.payload.blobKey),
+      ).toBeDefined();
+      const approved = await new OfflineSyncService(
+        store,
+        new FakeTransport(),
+      ).sync("user-1", true);
       expect(approved.synced).toBe(2);
-      expect((await store.getEvent(queued.readingEvent.localEventId))?.clientEventId)
-        .toBe(queued.readingEvent.clientEventId);
+      expect(
+        (await store.getEvent(queued.readingEvent.localEventId))?.clientEventId,
+      ).toBe(queued.readingEvent.clientEventId);
     },
   );
 
@@ -98,7 +133,11 @@ describe("OfflineSyncService", () => {
     await store.enqueueReadingWithPhoto(await input());
     const transport = new FakeTransport();
     const readingId = crypto.randomUUID();
-    transport.reading = async () => ({ status: 201, resourceId: readingId, body: { id: readingId } });
+    transport.reading = async () => ({
+      status: 201,
+      resourceId: readingId,
+      body: { id: readingId },
+    });
     const engine = new OfflineSyncService(store, transport);
 
     const result = await engine.sync("user-1");
@@ -109,58 +148,99 @@ describe("OfflineSyncService", () => {
     expect(transport.calls[1]).toMatch(/^photo:/);
     expect(transport.readingIds).toEqual([readingId]);
     expect(events.every((event) => event.status === "SYNCED")).toBe(true);
-    expect(events.every((event) => event.serverReadingId === readingId)).toBe(true);
+    expect(events.every((event) => event.serverReadingId === readingId)).toBe(
+      true,
+    );
   });
 
-  it.each([200, 201])("aceita HTTP %i como sucesso idempotente", async (status) => {
-    const store = createStore();
-    await store.enqueueReadingWithPhoto(await input());
-    const transport = new FakeTransport();
-    transport.reading = async () => ({ status, resourceId: "reading-1", body: { id: "reading-1" } });
-    transport.photo = async () => ({ status, resourceId: "photo-1", body: { id: "photo-1" } });
-    const result = await new OfflineSyncService(store, transport).sync("user-1");
-    expect(result.synced).toBe(2);
-  });
+  it.each([200, 201])(
+    "aceita HTTP %i como sucesso idempotente",
+    async (status) => {
+      const store = createStore();
+      await store.enqueueReadingWithPhoto(await input());
+      const transport = new FakeTransport();
+      transport.reading = async () => ({
+        status,
+        resourceId: "reading-1",
+        body: { id: "reading-1" },
+      });
+      transport.photo = async () => ({
+        status,
+        resourceId: "photo-1",
+        body: { id: "photo-1" },
+      });
+      const result = await new OfflineSyncService(store, transport).sync(
+        "user-1",
+      );
+      expect(result.synced).toBe(2);
+    },
+  );
 
-  it.each([400, 403, 404, 422])("classifica HTTP %i como permanente sem apagar o evento", async (status) => {
-    const store = createStore();
-    const queued = await store.enqueueReadingWithPhoto(await input());
-    const transport = new FakeTransport();
-    transport.reading = async () => { throw new SyncTransportError(`erro ${status}`, status); };
-    const result = await new OfflineSyncService(store, transport).sync("user-1");
-    expect(result.permanentFailures).toBe(1);
-    expect((await store.getEvent(queued.readingEvent.localEventId))?.status).toBe("FAILED_PERMANENT");
-    expect(await store.getPhotoBlob(queued.photoEvent.payload.blobKey)).toBeDefined();
-  });
+  it.each([400, 403, 404, 422])(
+    "classifica HTTP %i como permanente sem apagar o evento",
+    async (status) => {
+      const store = createStore();
+      const queued = await store.enqueueReadingWithPhoto(await input());
+      const transport = new FakeTransport();
+      transport.reading = async () => {
+        throw new SyncTransportError(`erro ${status}`, status);
+      };
+      const result = await new OfflineSyncService(store, transport).sync(
+        "user-1",
+      );
+      expect(result.permanentFailures).toBe(1);
+      expect(
+        (await store.getEvent(queued.readingEvent.localEventId))?.status,
+      ).toBe("FAILED_PERMANENT");
+      expect(
+        await store.getPhotoBlob(queued.photoEvent.payload.blobKey),
+      ).toBeDefined();
+    },
+  );
 
-  it.each([408, 429, 500, 502, 503, 504, null])("classifica %s como retryable e preserva ClientEventId no retry", async (status) => {
-    const store = createStore();
-    const queued = await store.enqueueReadingWithPhoto(await input());
-    const transport = new FakeTransport();
-    let attempts = 0;
-    transport.reading = async () => {
-      attempts += 1;
-      if (attempts === 1) throw new SyncTransportError("temporário", status);
-      return { status: 200, resourceId: "reading-1", body: { id: "reading-1" } };
-    };
-    const engine = new OfflineSyncService(store, transport);
-    await engine.sync("user-1");
-    expect((await store.getEvent(queued.readingEvent.localEventId))?.status).toBe("FAILED_RETRYABLE");
-    await engine.sync("user-1", true);
-    const readingCalls = transport.calls.filter((call) => call.startsWith("reading:"));
-    expect(readingCalls).toEqual([
-      `reading:${queued.readingEvent.clientEventId}`,
-      `reading:${queued.readingEvent.clientEventId}`,
-    ]);
-  });
+  it.each([408, 429, 500, 502, 503, 504, null])(
+    "classifica %s como retryable e preserva ClientEventId no retry",
+    async (status) => {
+      const store = createStore();
+      const queued = await store.enqueueReadingWithPhoto(await input());
+      const transport = new FakeTransport();
+      let attempts = 0;
+      transport.reading = async () => {
+        attempts += 1;
+        if (attempts === 1) throw new SyncTransportError("temporário", status);
+        return {
+          status: 200,
+          resourceId: "reading-1",
+          body: { id: "reading-1" },
+        };
+      };
+      const engine = new OfflineSyncService(store, transport);
+      await engine.sync("user-1");
+      expect(
+        (await store.getEvent(queued.readingEvent.localEventId))?.status,
+      ).toBe("FAILED_RETRYABLE");
+      await engine.sync("user-1", true);
+      const readingCalls = transport.calls.filter((call) =>
+        call.startsWith("reading:"),
+      );
+      expect(readingCalls).toEqual([
+        `reading:${queued.readingEvent.clientEventId}`,
+        `reading:${queued.readingEvent.clientEventId}`,
+      ]);
+    },
+  );
 
   it("pausa em 401, preserva fila e não envia eventos de outro usuário", async () => {
     const store = createStore();
     const own = await store.enqueueReadingWithPhoto(await input("user-1"));
     await store.enqueueReadingWithPhoto(await input("user-2"));
     const transport = new FakeTransport();
-    transport.reading = async () => { throw new SyncTransportError("expired", 401); };
-    const result = await new OfflineSyncService(store, transport).sync("user-1");
+    transport.reading = async () => {
+      throw new SyncTransportError("expired", 401);
+    };
+    const result = await new OfflineSyncService(store, transport).sync(
+      "user-1",
+    );
     const snapshot = await store.getQueueSnapshot("user-1");
     expect(result.authenticationRequired).toBe(true);
     expect(result.processed).toBe(1);
@@ -172,9 +252,14 @@ describe("OfflineSyncService", () => {
     const store = createStore();
     const queued = await store.enqueueReadingWithPhoto(await input());
     const transport = new FakeTransport();
-    transport.reading = async () => { throw new SyncTransportError("temporário", 500); };
+    transport.reading = async () => {
+      throw new SyncTransportError("temporário", 500);
+    };
     const now = new Date("2026-10-19T12:00:00Z");
-    await new OfflineSyncService(store, transport, { now: () => now }).sync("user-1");
+    await new OfflineSyncService(store, transport, {
+      now: () => now,
+      random: () => 0,
+    }).sync("user-1");
     const failed = await store.getEvent(queued.readingEvent.localEventId);
     expect(failed?.retryCount).toBe(1);
     expect(failed?.nextAttemptAt).toBe("2026-10-19T12:00:05.000Z");
@@ -189,17 +274,31 @@ describe("OfflineSyncService", () => {
       if (event.clientEventId === first.readingEvent.clientEventId) {
         throw new SyncTransportError("inválida", 422);
       }
-      return { status: 201, resourceId: "reading-b", body: { id: "reading-b" } };
+      return {
+        status: 201,
+        resourceId: "reading-b",
+        body: { id: "reading-b" },
+      };
     };
-    const result = await new OfflineSyncService(store, transport).sync("user-1");
+    const result = await new OfflineSyncService(store, transport).sync(
+      "user-1",
+    );
     expect(result.permanentFailures).toBe(1);
-    expect((await store.getEvent(first.readingEvent.localEventId))?.status).toBe("FAILED_PERMANENT");
-    expect((await store.getEvent(first.photoEvent.localEventId))?.status).toBe("PENDING");
-    expect((await store.getEvent(second.readingEvent.localEventId))?.status).toBe("SYNCED");
-    expect((await store.getEvent(second.photoEvent.localEventId))?.status).toBe("SYNCED");
+    expect(
+      (await store.getEvent(first.readingEvent.localEventId))?.status,
+    ).toBe("FAILED_PERMANENT");
+    expect((await store.getEvent(first.photoEvent.localEventId))?.status).toBe(
+      "PENDING",
+    );
+    expect(
+      (await store.getEvent(second.readingEvent.localEventId))?.status,
+    ).toBe("SYNCED");
+    expect((await store.getEvent(second.photoEvent.localEventId))?.status).toBe(
+      "SYNCED",
+    );
   });
 
-  it("trata 409 com recurso como sucesso e conflito real como permanente", async () => {
+  it("preserva 409 para intervenção mesmo quando há identificador de recurso", async () => {
     const store = createStore();
     const first = await store.enqueueReadingWithPhoto(await input());
     const transport = new FakeTransport();
@@ -209,14 +308,24 @@ describe("OfflineSyncService", () => {
       }
       throw new SyncTransportError("conflito real", 409);
     };
-    const result = await new OfflineSyncService(store, transport).sync("user-1");
-    expect(result.synced).toBeGreaterThanOrEqual(1);
-    expect((await store.getEvent(first.readingEvent.localEventId))?.serverReadingId).toBe("reading-existing");
+    const result = await new OfflineSyncService(store, transport).sync(
+      "user-1",
+    );
+    expect(result.synced).toBe(0);
+    expect(result.permanentFailures).toBe(1);
+    expect(
+      (await store.getEvent(first.readingEvent.localEventId))?.serverReadingId,
+    ).toBeNull();
 
     const second = await store.enqueueReadingWithPhoto(await input());
-    const result2 = await new OfflineSyncService(store, transport).sync("user-1", true);
+    const result2 = await new OfflineSyncService(store, transport).sync(
+      "user-1",
+      true,
+    );
     expect(result2.permanentFailures).toBeGreaterThanOrEqual(1);
-    expect((await store.getEvent(second.readingEvent.localEventId))?.status).toBe("FAILED_PERMANENT");
+    expect(
+      (await store.getEvent(second.readingEvent.localEventId))?.status,
+    ).toBe("FAILED_PERMANENT");
   });
 
   it("valida o ciclo completo de 16 etapas offline: captura, persistência, reload, sync sequencial e retenção", async () => {
@@ -230,20 +339,31 @@ describe("OfflineSyncService", () => {
     await store.replaceReferenceData({
       schemaVersion: 1,
       generatedAt: "2026-10-19T08:00:00Z",
-      machines: [{
-        id: machineId,
-        fleetNumber: 105,
-        model: "Retroescavadeira",
-        meterUnit: "HOURS",
-        status: "ACTIVE",
-        activeQrToken: "QR-105",
-        updatedAt: "2026-10-19T08:00:00Z",
-      }],
-      workSites: [{ id: workSiteId, name: "Obra Transjap", active: true, updatedAt: "2026-10-19T08:00:00Z" }],
+      machines: [
+        {
+          id: machineId,
+          fleetNumber: 105,
+          model: "Retroescavadeira",
+          meterUnit: "HOURS",
+          status: "ACTIVE",
+          activeQrToken: "QR-105",
+          updatedAt: "2026-10-19T08:00:00Z",
+        },
+      ],
+      workSites: [
+        {
+          id: workSiteId,
+          name: "Obra Transjap",
+          active: true,
+          updatedAt: "2026-10-19T08:00:00Z",
+        },
+      ],
     });
 
     // 3. Internet cai / 4. Operador cria leitura offline / 5. Foto salva no IndexedDB
-    const photoBlob = new Blob([new Uint8Array([10, 20, 30, 40])], { type: "image/jpeg" });
+    const photoBlob = new Blob([new Uint8Array([10, 20, 30, 40])], {
+      type: "image/jpeg",
+    });
     const enqueued = await store.enqueueReadingWithPhoto({
       reading: {
         machineId,
@@ -268,13 +388,21 @@ describe("OfflineSyncService", () => {
 
     // 7. Browser/app é recarregado (fechar e reabrir store no mesmo banco)
     store.close();
-    const reopenedStore = new IndexedDbOfflineStore(databases[databases.length - 1].name);
+    const reopenedStore = new IndexedDbOfflineStore(
+      databases[databases.length - 1].name,
+    );
 
     // 8. Fila continua existindo íntegra
     const reloadedEvents = await reopenedStore.getEventsForUser(userId);
     expect(reloadedEvents).toHaveLength(2);
-    expect(reloadedEvents.find((e) => e.eventType === "READING_CREATED")?.clientEventId).toBe(readingClientId);
-    expect(reloadedEvents.find((e) => e.eventType === "PHOTO_UPLOADED")?.clientEventId).toBe(photoClientId);
+    expect(
+      reloadedEvents.find((e) => e.eventType === "READING_CREATED")
+        ?.clientEventId,
+    ).toBe(readingClientId);
+    expect(
+      reloadedEvents.find((e) => e.eventType === "PHOTO_UPLOADED")
+        ?.clientEventId,
+    ).toBe(photoClientId);
 
     // 9. Internet volta e inicia sync
     const transport = new FakeTransport();
@@ -282,13 +410,21 @@ describe("OfflineSyncService", () => {
     transport.reading = async (event) => {
       // 10. Leitura sincroniza e 11. Servidor devolve ReadingId
       expect(event.clientEventId).toBe(readingClientId);
-      return { status: 201, resourceId: serverReadingId, body: { id: serverReadingId } };
+      return {
+        status: 201,
+        resourceId: serverReadingId,
+        body: { id: serverReadingId },
+      };
     };
     transport.photo = async (event, readingId) => {
       // 12. Foto usa esse ReadingId e 13. Upload é confirmado
       expect(event.clientEventId).toBe(photoClientId);
       expect(readingId).toBe(serverReadingId);
-      return { status: 201, resourceId: "photo-srv-456", body: { id: "photo-srv-456" } };
+      return {
+        status: 201,
+        resourceId: "photo-srv-456",
+        body: { id: "photo-srv-456" },
+      };
     };
 
     const engine = new OfflineSyncService(reopenedStore, transport);
@@ -307,7 +443,9 @@ describe("OfflineSyncService", () => {
       eventRetentionMs: 7 * 24 * 60 * 60_000,
       now: new Date(),
     });
-    expect(await reopenedStore.getPhotoBlob(enqueued.photoEvent.payload.blobKey)).toBeUndefined();
+    expect(
+      await reopenedStore.getPhotoBlob(enqueued.photoEvent.payload.blobKey),
+    ).toBeUndefined();
     expect(await reopenedStore.getEventsForUser(userId)).toHaveLength(2);
     reopenedStore.close();
   });
@@ -323,7 +461,11 @@ describe("OfflineSyncService", () => {
       if (observedClientEventIds.length < 3) {
         throw new SyncTransportError("instabilidade temporária", 503);
       }
-      return { status: 200, resourceId: "reading-res-ok", body: { id: "reading-res-ok" } };
+      return {
+        status: 200,
+        resourceId: "reading-res-ok",
+        body: { id: "reading-res-ok" },
+      };
     };
 
     const engine = new OfflineSyncService(store, transport);
@@ -337,8 +479,14 @@ describe("OfflineSyncService", () => {
 
     expect(observedClientEventIds).toHaveLength(3);
     // Todos os 3 envios usaram RIGOROSAMENTE o mesmo ClientEventId gerado na criação
-    expect(observedClientEventIds.every((id) => id === queued.readingEvent.clientEventId)).toBe(true);
-    expect((await store.getEvent(queued.readingEvent.localEventId))?.status).toBe("SYNCED");
+    expect(
+      observedClientEventIds.every(
+        (id) => id === queued.readingEvent.clientEventId,
+      ),
+    ).toBe(true);
+    expect(
+      (await store.getEvent(queued.readingEvent.localEventId))?.status,
+    ).toBe("SYNCED");
   });
 
   it("valida idempotência de foto: replay, timeout simulado e conflito com evidência existente", async () => {
@@ -348,7 +496,11 @@ describe("OfflineSyncService", () => {
     let photoAttempts = 0;
     const photoClientIds: string[] = [];
 
-    transport.reading = async () => ({ status: 200, resourceId: "reading-fixed-id", body: null });
+    transport.reading = async () => ({
+      status: 200,
+      resourceId: "reading-fixed-id",
+      body: null,
+    });
     transport.photo = async (event) => {
       photoAttempts += 1;
       photoClientIds.push(event.clientEventId);
@@ -373,7 +525,9 @@ describe("OfflineSyncService", () => {
       queued.photoEvent.clientEventId,
       queued.photoEvent.clientEventId,
     ]);
-    expect((await store.getEvent(queued.photoEvent.localEventId))?.status).toBe("SYNCED");
+    expect((await store.getEvent(queued.photoEvent.localEventId))?.status).toBe(
+      "SYNCED",
+    );
   });
 
   it("401 pausa sincronização, preserva fila e blob, e retoma com mesmo ClientEventId após reautenticação", async () => {
@@ -387,7 +541,11 @@ describe("OfflineSyncService", () => {
       if (!authenticated) {
         throw new SyncTransportError("Sessão expirada.", 401);
       }
-      return { status: 201, resourceId: "reading-reauth-id", body: { id: "reading-reauth-id" } };
+      return {
+        status: 201,
+        resourceId: "reading-reauth-id",
+        body: { id: "reading-reauth-id" },
+      };
     };
 
     const engine = new OfflineSyncService(store, transport, {
@@ -401,23 +559,31 @@ describe("OfflineSyncService", () => {
     expect(run1.authenticationRequired).toBe(true);
     expect(authRequiredFired).toBe(true);
 
-    const eventDuring401 = await store.getEvent(queued.readingEvent.localEventId);
+    const eventDuring401 = await store.getEvent(
+      queued.readingEvent.localEventId,
+    );
     expect(eventDuring401?.status).toBe("FAILED_RETRYABLE");
     expect(eventDuring401?.status).not.toBe("FAILED_PERMANENT");
     // Blob preservado
-    expect(await store.getPhotoBlob(queued.photoEvent.payload.blobKey)).toBeDefined();
+    expect(
+      await store.getPhotoBlob(queued.photoEvent.payload.blobKey),
+    ).toBeDefined();
 
     // Simula reautenticação do usuário
     authenticated = true;
     const run2 = await engine.sync("user-1", true);
     expect(run2.synced).toBe(2);
 
-    const eventAfterAuth = await store.getEvent(queued.readingEvent.localEventId);
+    const eventAfterAuth = await store.getEvent(
+      queued.readingEvent.localEventId,
+    );
     expect(eventAfterAuth?.status).toBe("SYNCED");
-    expect(eventAfterAuth?.clientEventId).toBe(queued.readingEvent.clientEventId);
+    expect(eventAfterAuth?.clientEventId).toBe(
+      queued.readingEvent.clientEventId,
+    );
   });
 
-  it("valida sequência exata de backoff: 5s, 30s, 2min, 10min, 30min", async () => {
+  it("valida backoff exponencial com teto de 30 minutos", async () => {
     const store = createStore();
     const queued = await store.enqueueReadingWithPhoto(await input());
     const transport = new FakeTransport();
@@ -429,18 +595,23 @@ describe("OfflineSyncService", () => {
     let currentTime = baseTime;
     const engine = new OfflineSyncService(store, transport, {
       now: () => currentTime,
+      random: () => 0,
     });
 
-    const expectedDelaysMs = [5_000, 30_000, 120_000, 600_000, 1_800_000, 1_800_000];
+    const expectedDelaysMs = [5_000, 10_000, 20_000, 40_000, 80_000, 160_000];
 
     for (let attempt = 0; attempt < expectedDelaysMs.length; attempt++) {
       await engine.sync("user-1", true);
       const event = await store.getEvent(queued.readingEvent.localEventId);
       expect(event?.retryCount).toBe(attempt + 1);
-      const expectedNext = new Date(currentTime.getTime() + expectedDelaysMs[attempt]).toISOString();
+      const expectedNext = new Date(
+        currentTime.getTime() + expectedDelaysMs[attempt],
+      ).toISOString();
       expect(event?.nextAttemptAt).toBe(expectedNext);
       // Avança o tempo
-      currentTime = new Date(currentTime.getTime() + expectedDelaysMs[attempt] + 1_000);
+      currentTime = new Date(
+        currentTime.getTime() + expectedDelaysMs[attempt] + 1_000,
+      );
     }
   });
 
@@ -480,7 +651,10 @@ describe("OfflineSyncService", () => {
 
     const transport = new FakeTransport();
     transport.reading = async () => {
-      throw new SyncTransportError("Este dispositivo foi revogado. A fila local permanece preservada para revisao.", 403);
+      throw new SyncTransportError(
+        "Este dispositivo foi revogado. A fila local permanece preservada para revisao.",
+        403,
+      );
     };
 
     const engine = new OfflineSyncService(store, transport);
@@ -491,7 +665,9 @@ describe("OfflineSyncService", () => {
 
     const readingEvent = await store.getEvent(queued.readingEvent.localEventId);
     const photoEvent = await store.getEvent(queued.photoEvent.localEventId);
-    const photoBlob = await store.getPhotoBlob(queued.photoEvent.payload.blobKey);
+    const photoBlob = await store.getPhotoBlob(
+      queued.photoEvent.payload.blobKey,
+    );
 
     expect(readingEvent?.status).toBe("FAILED_PERMANENT");
     expect(readingEvent?.clientEventId).toBe(readingClientId);
@@ -510,8 +686,12 @@ describe("OfflineSyncService", () => {
       now: new Date(),
     });
 
-    expect(await store.getPhotoBlob(queued.photoEvent.payload.blobKey)).toBeDefined();
-    expect(await store.getEvent(queued.readingEvent.localEventId)).toBeDefined();
+    expect(
+      await store.getPhotoBlob(queued.photoEvent.payload.blobKey),
+    ).toBeDefined();
+    expect(
+      await store.getEvent(queued.readingEvent.localEventId),
+    ).toBeDefined();
     expect(await store.getEvent(queued.photoEvent.localEventId)).toBeDefined();
   });
 
@@ -529,7 +709,10 @@ describe("OfflineSyncService", () => {
       body: { id: serverReadingId },
     });
     transport.photo = async () => {
-      throw new SyncTransportError("Este dispositivo foi revogado. A fila local foi preservada, mas nao pode ser sincronizada.", 403);
+      throw new SyncTransportError(
+        "Este dispositivo foi revogado. A fila local foi preservada, mas nao pode ser sincronizada.",
+        403,
+      );
     };
 
     const engine = new OfflineSyncService(store, transport);
@@ -540,7 +723,9 @@ describe("OfflineSyncService", () => {
 
     const readingEvent = await store.getEvent(queued.readingEvent.localEventId);
     const photoEvent = await store.getEvent(queued.photoEvent.localEventId);
-    const photoBlob = await store.getPhotoBlob(queued.photoEvent.payload.blobKey);
+    const photoBlob = await store.getPhotoBlob(
+      queued.photoEvent.payload.blobKey,
+    );
 
     expect(readingEvent?.status).toBe("SYNCED");
     expect(readingEvent?.serverReadingId).toBe(serverReadingId);
@@ -559,6 +744,127 @@ describe("OfflineSyncService", () => {
     });
 
     // Blob da foto com falha permanente NÃO pode ser apagado
-    expect(await store.getPhotoBlob(queued.photoEvent.payload.blobKey)).toBeDefined();
+    expect(
+      await store.getPhotoBlob(queued.photoEvent.payload.blobKey),
+    ).toBeDefined();
+  });
+});
+
+describe("recuperação e limites da Fase 12", () => {
+  it("mantém o pai sincronizado enquanto a fotografia estiver pendente", async () => {
+    const store = createStore();
+    const queued = await store.enqueueReadingWithPhoto(await input());
+    await store.markSynced(
+      queued.readingEvent.localEventId,
+      "2026-01-01T00:00:00Z",
+      "server-id",
+    );
+    await store.removeSyncedDataWhenSafe({
+      blobRetentionMs: 0,
+      eventRetentionMs: 0,
+      now: new Date("2026-11-01"),
+    });
+    expect(
+      await store.getEvent(queued.readingEvent.localEventId),
+    ).toBeDefined();
+    expect(
+      await store.getPhotoBlob(queued.photoEvent.payload.blobKey),
+    ).toBeDefined();
+    const result = await new OfflineSyncService(
+      store,
+      new FakeTransport(),
+    ).sync("user-1");
+    expect(result.synced).toBe(1);
+  });
+
+  it("serializa abas pela transação IndexedDB e recupera lease expirado", async () => {
+    const store = createStore();
+    const other = new IndexedDbOfflineStore(databases.at(-1)!.name);
+    try {
+      const acquired = await Promise.all([
+        store.acquireSyncLease("tab-a", 1000, 120_000),
+        other.acquireSyncLease("tab-b", 1000, 120_000),
+      ]);
+      expect(acquired.filter(Boolean)).toHaveLength(1);
+      await other.releaseSyncLease("not-the-owner");
+      expect(await other.acquireSyncLease("tab-c", 1001, 120_000)).toBe(false);
+      expect(await other.acquireSyncLease("tab-c", 121001, 120_000)).toBe(true);
+      await store.enqueueReadingWithPhoto(await input());
+      const result = await new OfflineSyncService(
+        store,
+        new FakeTransport(),
+      ).sync("user-1");
+      // Synthetic expired lease does not prevent the wall-clock recovery.
+      expect(result.synced).toBe(2);
+    } finally {
+      other.close();
+    }
+  });
+
+  it("respeita Retry-After e jitter sem repetir no mesmo ciclo", async () => {
+    const store = createStore();
+    const queued = await store.enqueueReadingWithPhoto(await input());
+    const transport = new FakeTransport();
+    transport.reading = async () => {
+      throw new SyncTransportError("limite", 429, null, 90_000);
+    };
+    const now = new Date("2026-11-11T12:00:00Z");
+    const result = await new OfflineSyncService(store, transport, {
+      now: () => now,
+      random: () => 1,
+    }).sync("user-1");
+    expect(result.processed).toBe(1);
+    expect(
+      (await store.getEvent(queued.readingEvent.localEventId))?.nextAttemptAt,
+    ).toBe("2026-11-11T12:01:30.000Z");
+    expect(transport.calls).toHaveLength(1);
+    await new OfflineSyncService(store, transport, { now: () => now }).sync(
+      "user-1",
+      true,
+    );
+    expect(transport.calls).toHaveLength(1);
+  });
+
+  it("cancelamento após envio preserva o evento e a foto para retomada", async () => {
+    const store = createStore();
+    const queued = await store.enqueueReadingWithPhoto(await input());
+    const controller = new AbortController();
+    const transport = new FakeTransport();
+    transport.reading = async () => {
+      controller.abort();
+      throw new SyncTransportError("conexão interrompida após persistir", null);
+    };
+    const result = await new OfflineSyncService(store, transport).sync(
+      "user-1",
+      false,
+      controller.signal,
+    );
+    expect(result.processed).toBe(1);
+    expect(
+      (await store.getEvent(queued.readingEvent.localEventId))?.status,
+    ).toBe("FAILED_RETRYABLE");
+    expect(
+      await store.getPhotoBlob(queued.photoEvent.payload.blobKey),
+    ).toBeDefined();
+    const resumed = await new OfflineSyncService(
+      store,
+      new FakeTransport(),
+    ).sync("user-1", true);
+    expect(resumed.synced).toBe(2);
+    expect(
+      (await store.getEvent(queued.readingEvent.localEventId))?.clientEventId,
+    ).toBe(queued.readingEvent.clientEventId);
+  });
+
+  it("limita o ciclo e permite retomar os eventos restantes", async () => {
+    const store = createStore();
+    for (let index = 0; index < 26; index++)
+      await store.enqueueReadingWithPhoto(await input());
+    const engine = new OfflineSyncService(store, new FakeTransport());
+    const first = await engine.sync("user-1");
+    expect(first.processed).toBe(50);
+    const second = await engine.sync("user-1");
+    expect(second.synced).toBe(2);
+    expect((await store.getQueueSnapshot("user-1")).synced).toBe(52);
   });
 });

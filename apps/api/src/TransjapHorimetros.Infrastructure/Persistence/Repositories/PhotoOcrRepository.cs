@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using System.Text.Json;
 using TransjapHorimetros.Application.Common;
 using TransjapHorimetros.Application.Exceptions;
@@ -95,7 +96,11 @@ public sealed class PhotoOcrRepository(TransjapDbContext db) : IPhotoOcrReposito
             // SaveChanges may have accepted the tracked insert before a transaction commit failed.
             // If the retry found no committed row, explicitly restore Added for the new transaction.
             db.Entry(result).State = EntityState.Added;
-            await db.SaveChangesAsync(ct);
+            try { await db.SaveChangesAsync(ct); }
+            catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+            {
+                throw new ConflictException("Chave de reprocessamento já utilizada em outra operação.");
+            }
             await transaction.CommitAsync(ct);
             return result;
         });

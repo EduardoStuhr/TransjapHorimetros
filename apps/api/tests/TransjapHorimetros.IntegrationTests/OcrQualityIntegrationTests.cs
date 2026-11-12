@@ -95,6 +95,55 @@ public sealed class OcrQualityIntegrationTests(TransjapApiFactory factory) : ICl
     }
 
     [Fact]
+    public async Task ConcurrentReuseOfAKeyForDifferentEvidenceReturnsConflict()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        var first = await Upload(client);
+        var second = await Upload(client);
+        await Task.Delay(1100);
+        var key = Guid.NewGuid();
+        async Task<HttpResponseMessage> Send(Guid reading)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, Route(reading) + "/reprocess");
+            request.Headers.Add("Idempotency-Key", key.ToString());
+            return await client.SendAsync(request);
+        }
+        var responses = await Task.WhenAll(Send(first), Send(second));
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.OK);
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        Assert.Equal(1, await db.PhotoOcrResults.CountAsync(r => r.RequestId == key));
+        Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.Action == "PHOTO_OCR_REPROCESSED"));
+    }
+
+    [Fact]
+    public async Task RepeatedFailuresGenerateOneReviewAlertAndReplayDoesNotProcessAgain()
+    {
+        await factory.ResetDatabaseAsync();
+        factory.Services.GetRequiredService<FakePhotoOcrProvider>().Scenario = "500";
+        using var client = factory.CreateClient();
+        var id = await Upload(client);
+        await Task.Delay(1100);
+        var key = Guid.NewGuid();
+        async Task<HttpResponseMessage> Send()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, Route(id) + "/reprocess");
+            request.Headers.Add("Idempotency-Key", key.ToString());
+            return await client.SendAsync(request);
+        }
+        (await Send()).EnsureSuccessStatusCode();
+        (await Send()).EnsureSuccessStatusCode();
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        Assert.Equal(2, await db.PhotoOcrResults.CountAsync(r => r.Status == PhotoOcrStatus.Failed));
+        Assert.Equal(1, await db.Anomalies.CountAsync(a => a.Type == AnomalyType.LowOcrConfidence));
+        Assert.Equal(2, await db.AuditLogs.CountAsync(a => a.Action == "PHOTO_OCR_FAILED"));
+        Assert.Equal(2, factory.Services.GetRequiredService<FakePhotoOcrProvider>().Calls);
+    }
+
+    [Fact]
     public async Task OperatorsCanOnlyReadTheirOwnEvidenceAndCannotReadAdministrativeOcr()
     {
         await factory.ResetDatabaseAsync();

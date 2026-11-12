@@ -58,7 +58,7 @@ Displays mecânicos, reflexos, poeira, perspectiva e baixa iluminação continua
 
 ## Testes e implantação
 
-Testes novos cobrem formatos, ambiguidade, limite de candidatos, confiança ausente, contexto de unidades, cancelamento de slot, autorização de fotos, detalhes administrativos, worker assíncrono, recuperação de claims e reprocessamento idempotente sem reabrir alertas resolvidos. As suítes anteriores permanecem como regressão.
+Testes novos cobrem formatos, ambiguidade, limite de candidatos, confiança ausente, contexto de unidades, cancelamento de slot, autorização de fotos, detalhes administrativos, worker assíncrono, recuperação de claims, chave reutilizada concorrentemente entre evidências, falhas recorrentes e reprocessamento idempotente sem reabrir alertas resolvidos. As suítes anteriores permanecem como regressão.
 
 A primeira execução [43277918404](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43277918404) aprovou 257 testes unitários .NET, 219 testes SQL e 108 frontend, além de lint e builds. A revisão final adiciona limites de resolução e de stream, com teste de preservação da evidência e de ausência de chamada HTTP para arquivo excessivo. A execução correspondente ao HEAD do PR #23 confirma essa revisão. SQL Server real descartável é executado pela CI. O ambiente local não possui SQL Server. Não foram utilizados dados ou fotografias reais de produção.
 

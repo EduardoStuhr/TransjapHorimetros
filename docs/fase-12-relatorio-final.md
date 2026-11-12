@@ -44,6 +44,7 @@ Foto é gravada antes do metadata SQL. Uma falha ambígua pode deixar objeto sem
 - 401 interrompe o ciclo e solicita sessão, mantendo dados.
 - 400, 403, 404, 409, 413 e 422 exigem intervenção.
 - 408, 425, 429, 5xx e falha de comunicação permitem nova tentativa controlada.
+- Uma resposta de leitura 2xx sem identificador é confirmação incompleta e permanece disponível para retentativa. O teste adicional dessa recuperação está nos Checks do PR #22.
 - SYNCING interrompido é recuperado após aquisição exclusiva do lease. A interface reavalia envios interrompidos após 121 segundos. Mensagens entre abas atualizam o snapshot persistido e não mantêm o estado local de envio bloqueado após o fechamento de outra aba.
 - Foto só é enviada após confirmação do pai.
 - Falha OCR preserva foto e leitura. Um PROCESSING inicial após término abrupto exige consulta e reprocessamento administrativo após o intervalo de segurança. Não foi criado worker automático.

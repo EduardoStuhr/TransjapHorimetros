@@ -751,6 +751,35 @@ describe("OfflineSyncService", () => {
 });
 
 describe("recuperação e limites da Fase 12", () => {
+  it("mantém resposta incompleta disponível para nova tentativa com o mesmo evento", async () => {
+    const store = createStore();
+    const queued = await store.enqueueReadingWithPhoto(await input());
+    const transport = new FakeTransport();
+    transport.reading = async () => ({
+      status: 201,
+      resourceId: null,
+      body: null,
+    });
+    const result = await new OfflineSyncService(store, transport).sync(
+      "user-1",
+    );
+    expect(result.retryableFailures).toBe(1);
+    expect(
+      (await store.getEvent(queued.readingEvent.localEventId))?.status,
+    ).toBe("FAILED_RETRYABLE");
+    expect(
+      await store.getPhotoBlob(queued.photoEvent.payload.blobKey),
+    ).toBeDefined();
+    const resumed = await new OfflineSyncService(
+      store,
+      new FakeTransport(),
+    ).sync("user-1", true);
+    expect(resumed.synced).toBe(2);
+    expect(
+      (await store.getEvent(queued.readingEvent.localEventId))?.clientEventId,
+    ).toBe(queued.readingEvent.clientEventId);
+  });
+
   it("mantém o pai sincronizado enquanto a fotografia estiver pendente", async () => {
     const store = createStore();
     const queued = await store.enqueueReadingWithPhoto(await input());

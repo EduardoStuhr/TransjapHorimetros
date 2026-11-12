@@ -217,7 +217,7 @@ export class OfflineSyncService {
       if (!readingId)
         throw new SyncTransportError(
           "O servidor não informou o identificador da leitura.",
-          409,
+          502,
         );
       const syncedAt = this.now().toISOString();
       await this.store.markSynced(event.localEventId, syncedAt, readingId);

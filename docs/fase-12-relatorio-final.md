@@ -56,7 +56,18 @@ Testes SQL adicionais cobrem payload divergente, seis reenvios simultâneos, con
 
 Build Release local com zero avisos e zero erros, 229 testes unitários .NET, 104 testes frontend, lint e build Next.js aprovados.
 
-A execução [43218214417](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43218214417) aprovou backend e frontend no commit ca5906d. Executou 228 unitários .NET, 206 testes SQL Server e 104 frontend, todos sem falhas ou testes ignorados. A revisão final acrescenta cobertura do rollback/commit perdido na transação da leitura e da tentativa de replay após revogação. A execução 43218743352 também aprovou 209 testes SQL após esses acréscimos. A revisão final inclui conflito de metadados inválidos e teste da preservação do blob referenciado após retentativa do próprio commit. Conferir a execução correspondente ao HEAD final no PR #22.
+A execução [43219603177](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43219603177) aprovou o código e a suíte completa no commit e46ababaf7a0ed349f78d5377525d0981ebe655e.
+
+| Verificação | Resultado |
+| --- | --- |
+| Build Release backend | Aprovado, zero avisos e zero erros |
+| Testes unitários .NET | 229 aprovados, zero falhas e zero ignorados |
+| Integração SQL Server 2022 descartável | 212 aprovados, zero falhas e zero ignorados |
+| Testes frontend | 104 aprovados em 12 arquivos |
+| Lint e build de produção frontend | Aprovados |
+| Total de testes | 545 aprovados |
+
+As execuções anteriores também passaram. A revisão final confirma recuperação de commit, bloqueio de replay após revogação, conflito de metadados inválidos e uploads simultâneos com preservação do hash e auditoria única. O PR #22 concentra os Checks e a revisão para aprovação.
 
 O teste SQL de timeout mantém um app lock na conexão independente, confirma 503 com Retry-After, verifica zero leituras, libera o lock e repete com sucesso. A injeção de falha de auditoria ocorre somente no banco descartável. Os testes de commit usam interceptor antes/depois da confirmação e verificam exatamente uma leitura e uma auditoria.
 
@@ -86,4 +97,4 @@ Após aprovação, publicar API e frontend pelos workflows existentes. Verificar
 - Revogação é validada a cada tentativa. Operação já admitida pode terminar durante revogação. Novas tentativas recebem 403.
 - Fase 16 cobre testes físicos de QR, câmera, OCR com imagens reais e conectividade em campo.
 
-Prontidão depende de CI verde no commit final e revisão do PR. Implantação e aceite em produção dependem de aprovação posterior.
+Código e testes aprovados para revisão e homologação em ambiente isolado. O PR #22 requer aprovação antes do merge. Implantação e aceite em produção dependem da aprovação e da verificação técnica posterior.

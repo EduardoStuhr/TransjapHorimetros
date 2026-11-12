@@ -270,11 +270,12 @@ public sealed class ReadingService(
 
     private void EnsureSameEvent(HourMeterReading existing, CreateReadingRequest request, Guid? registeredDeviceId)
     {
+        var deviceId = string.IsNullOrWhiteSpace(request.DeviceId) ? null : request.DeviceId.Trim();
         if (existing.MachineId != request.MachineId || existing.WorkSiteId != request.WorkSiteId
             || existing.Value != request.Value || existing.ReadingType != request.ReadingType
             || existing.CapturedAtDevice != request.CapturedAtDevice.ToUniversalTime()
             || existing.CorrectionOfReadingId != request.CorrectionOfReadingId
-            || existing.DeviceId != HourMeterReading.NormalizeDeviceId(request.DeviceId)
+            || existing.DeviceId != deviceId
             || (existing.CreatedByUserId.HasValue && existing.CreatedByUserId != currentUser!.UserId)
             || (existing.RegisteredDeviceId.HasValue && existing.RegisteredDeviceId != registeredDeviceId))
             throw new ConflictException("O ClientEventId já foi utilizado com outro conteúdo, autor ou dispositivo.");

@@ -159,6 +159,18 @@ public sealed class PhotoEvidenceServiceTests
     }
 
     [Fact]
+    public async Task Upload_UniqueFailureAfterOwnCommit_DoesNotDeleteReferencedObject()
+    {
+        var context = CreateContext();
+        context.UnitOfWork.OnSave = () => throw new UniqueConstraintException("pk_photo_evidence",
+            new IOException("simulated retry after commit"));
+        var result = await UploadAsync(context, Guid.NewGuid());
+        Assert.True(result.IsExisting);
+        Assert.Equal(1, context.Storage.UploadCount);
+        Assert.Equal(0, context.Storage.DeleteCount);
+    }
+
+    [Fact]
     public async Task Upload_CommitAcknowledgementLost_RetainsObject()
     {
         var context = CreateContext();

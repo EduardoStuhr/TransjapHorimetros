@@ -148,7 +148,6 @@ public sealed class PhotoEvidenceService(
         }
         catch (UniqueConstraintException)
         {
-            await TryDeleteUploadedBlobAsync(objectKey);
             unitOfWork.ClearChanges();
 
             var racedEvidence = request.ClientEventId.HasValue
@@ -159,6 +158,11 @@ public sealed class PhotoEvidenceService(
             racedEvidence ??= await photoEvidenceRepository.GetByReadingIdAsync(
                 readingId,
                 cancellationToken);
+
+            // A SaveChanges retry can encounter its own already committed row.
+            // Only a different winning object proves this upload can be compensated.
+            if (racedEvidence is not null && racedEvidence.StorageObjectKey != objectKey)
+                await TryDeleteUploadedBlobAsync(objectKey);
 
             if (racedEvidence is not null
                 && racedEvidence.ReadingId == readingId

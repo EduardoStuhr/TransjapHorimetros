@@ -9,7 +9,7 @@ Base c2c5353, merge do PR #21. Branch feat/fase-12-confiabilidade-integridade.
 | Mesmo ClientEventId aceitava outro conteúdo | Compara máquina, valor, tipo, data, obra, correção, autor e dispositivo. Divergência retorna 409. Autor legado ausente é preservado. |
 | Avaliações concorrentes da máquina | Transação SQL com sp_getapplock por máquina e timeout de 10s. Execution strategy refaz a operação completa em falha transitória. Índice único continua como garantia final. |
 | Retentativa da foto ignorava arquivo | Comprovação de dispositivo e SHA-256 precedem replay. Mesmo evento compara também autor, captura e DeviceId. Corrida compara hash e leitura. |
-| Falha de confirmação SQL podia apagar blob válido | Em commit incerto retém objeto com log de IDs e correlação. Só a violação única com rollback conhecido compensa o upload perdedor. |
+| Falha de confirmação SQL podia apagar blob válido | Em commit incerto retém objeto com log de IDs e correlação. Na violação única, consulta o registro vencedor antes de compensar. Só remove um objeto diferente daquele já referenciado pelo SQL. |
 | Retenção removia pai de foto pendente | Evento de leitura permanece enquanto houver filho sem confirmação. |
 | Lock fallback limitado à aba | Lease persistido em transação IndexedDB, expira em 120s e renova antes de cada evento. Web Locks permanece complementar. |
 | 409 tratado como sucesso por ter ID | Conflito requer intervenção. Confirmação usa 2xx com identificador. |
@@ -54,9 +54,9 @@ Testes frontend adicionais cobrem lease concorrente e expirado, retenção do pa
 
 Testes SQL adicionais cobrem payload divergente, seis reenvios simultâneos, confirmação perdida, duas leituras distintas, rollback de auditoria, timeout de lock com 503 e recuperação. A suíte existente cobre decisões concorrentes, upload repetido, falha OCR e revogação. A CI executa SQL Server 2022 descartável com o guard existente de nomes de banco. O ambiente local não dispõe de SQL Server ou Docker.
 
-Build Release local com zero avisos e zero erros, 228 testes unitários .NET, 104 testes frontend, lint e build Next.js aprovados.
+Build Release local com zero avisos e zero erros, 229 testes unitários .NET, 104 testes frontend, lint e build Next.js aprovados.
 
-A execução [43218214417](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43218214417) aprovou backend e frontend no commit ca5906d. Executou 228 unitários .NET, 206 testes SQL Server e 104 frontend, todos sem falhas ou testes ignorados. A revisão final acrescenta cobertura do rollback/commit perdido na transação da leitura e da tentativa de replay após revogação. Conferir a execução correspondente ao HEAD final no PR #22.
+A execução [43218214417](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43218214417) aprovou backend e frontend no commit ca5906d. Executou 228 unitários .NET, 206 testes SQL Server e 104 frontend, todos sem falhas ou testes ignorados. A revisão final acrescenta cobertura do rollback/commit perdido na transação da leitura e da tentativa de replay após revogação. A execução 43218743352 também aprovou 209 testes SQL após esses acréscimos. A revisão final inclui conflito de metadados inválidos e teste da preservação do blob referenciado após retentativa do próprio commit. Conferir a execução correspondente ao HEAD final no PR #22.
 
 O teste SQL de timeout mantém um app lock na conexão independente, confirma 503 com Retry-After, verifica zero leituras, libera o lock e repete com sucesso. A injeção de falha de auditoria ocorre somente no banco descartável. Os testes de commit usam interceptor antes/depois da confirmação e verificam exatamente uma leitura e uma auditoria.
 

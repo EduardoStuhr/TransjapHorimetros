@@ -17,6 +17,7 @@ public sealed class ReliabilityIntegrationTests(TransjapApiFactory factory) : IC
     [InlineData("value")]
     [InlineData("capturedAtDevice")]
     [InlineData("deviceId")]
+    [InlineData("invalidDeviceId")]
     [InlineData("readingType")]
     [InlineData("workSiteId")]
     public async Task DivergentPayloadReturnsConflictWithoutChangingHistory(string field)
@@ -26,9 +27,10 @@ public sealed class ReliabilityIntegrationTests(TransjapApiFactory factory) : IC
         var request = await Request(client);
         var first = await client.PostAsJsonAsync("/api/v1/readings", request);
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
-        request[field] = field switch
+        request[field == "invalidDeviceId" ? "deviceId" : field] = field switch
         {
             "value" => 101m,
+            "invalidDeviceId" => new string('x', 101),
             "capturedAtDevice" => DateTimeOffset.UtcNow.AddDays(-2),
             "readingType" => "OPENING",
             "workSiteId" => Guid.NewGuid(),

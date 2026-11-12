@@ -2,7 +2,7 @@
 
 12/11/2026, a partir das 15h43 (Brasília). Escopo de produção: consultas de disponibilidade, logs e metadados. Escopo funcional: dados sintéticos e SQL Server descartável da CI. Os testes físicos ficaram para a Fase 16.
 
-**Parecer: FASE 13 APROVADA COM RESSALVAS. A homologação de produção continua aberta até comprovar o schema e a operação do worker.**
+**Parecer atualizado às 16h16 de Brasília: FASE 13 REPROVADA para encerramento em produção. O banco publicado não contém a migration exigida pelo código.**
 
 | Verificação | Evidência | Resultado |
 |---|---|---|
@@ -11,7 +11,7 @@
 | API e SQL | GET /health e /health/ready retornaram HTTP 200, HEALTHY para self e sqlserver. Trace IDs c9208c1335a147ea91fa146fd5140b1a e 475c0554471f43abac38974dd27fc84c. A verificação de integridade gerenciada do App Service da API aparecia como não configurada. | Disponibilidade e conectividade confirmadas |
 | Deploy do frontend | [Build e deploy](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43280923321) aprovados no mesmo merge. Publicação confirmada às 15h35min03s. Portal mostrou Em execução e Node 26 íntegro. GET / seguiu para /login?returnTo=%2F com HTTP 200. | Confirmado |
 | Logs do frontend | O fluxo de logs em janela de 60 minutos exibiu 119 entradas e a mensagem de inicialização “Ready in 0ms”. Houve avisos de certificados duplicados durante rehash. A página de login respondeu. | Inicialização confirmada |
-| Azure SQL | Editor aberto para pg-transjap-horimetros / transjap_horimetros. O servidor recusou autenticação Microsoft Entra. O editor solicitou autenticação SQL. | Histórico, seis colunas e índice ainda sem resultado de SELECT |
+| Azure SQL | SELECT autenticado no banco transjap_horimetros. Histórico dbo com 11 migrations, última 20261111170305_AddReadingReviews. A versão da migration da Fase 13 retornou NULL. Catálogo de dbo.photo_ocr_results com zero das seis colunas esperadas e zero índice ux_photo_ocr_request. | FALHOU |
 | Integração SQL | [CI aprovada](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43280223532). O job backend registrou 258 testes unitários e 222 de integração aprovados, zero falhas e zero ignorados, com SQL Server 2022 descartável. | Confirmado em isolamento |
 | Frontend e regressão | CI com 108 testes de frontend, lint e build. Reexecução local sobre árvore idêntica ao merge: 258 unitários e 108 de frontend aprovados, build Release sem erros ou avisos, build de produção do Next.js concluído. Os 222 testes de integração são resultado da CI. | 588 aprovados na CI, 0 falhas. A reexecução local de 366 não aumenta esse total. |
 
@@ -25,7 +25,7 @@ O detalhe de leitura e o painel OCR apresentam valor digitado, valor extraído, 
 
 ## Conferência do schema em produção
 
-A migration 20261112180316_AddOcrQualityMetadata sucede 20261111170305_AddReadingReviews. O script incremental do EF prevê seis colunas anuláveis em photo_ocr_results e um índice único filtrado. Não cria tabela e não atualiza leituras existentes. O resultado esperado abaixo vem do código. Execute a consulta no banco de destino para obter o resultado observado.
+A migration 20261112180316_AddOcrQualityMetadata sucede 20261111170305_AddReadingReviews. O script incremental do EF prevê seis colunas anuláveis em photo_ocr_results e um índice único filtrado. Não cria tabela e não atualiza leituras existentes. O resultado esperado abaixo vem do código. A consulta permite repetir a conferência após a correção.
 
 ```sql
 SELECT @@SERVERNAME AS servidor, DB_NAME() AS banco;
@@ -59,3 +59,11 @@ O App Service exibiu 482 entradas na janela de 60 minutos consultada. Às 14h51m
 Às 15h50min29s o EF registrou as consultas de recuperação de análises interrompidas e de busca de fotos pendentes, ambas concluídas em aproximadamente 2 ms. A varredura do worker retomou. Essas consultas usam campos antigos, portanto não demonstram a presença das seis colunas nem o processamento completo de uma imagem na instância publicada.
 
 Para encerrar: conferir histórico, colunas e índice no editor SQL autenticado, verificar se os timeouts voltaram a ocorrer e confrontar os horários com conexões e métricas do Azure SQL. Se persistirem, investigar demora de conexão e disponibilidade do banco antes de ajustar parâmetros. Para comprovar o ciclo completo com o provedor efetivo, usar ambiente isolado equivalente com evidência sintética ou observar passivamente um processamento autorizado. Nenhuma alteração de banco, configuração, plano, merge ou deploy foi realizada na homologação.
+
+## Verificação direta do Azure SQL às 16h16 de Brasília
+
+O servidor retornou pg-transjap-horimetros e o banco transjap_horimetros. O catálogo confirmou dbo para as duas tabelas. As 11 entradas de histórico coincidem, em ordem, com todas as predecessoras da migration da Fase 13 no commit publicado. A consulta COUNT_BIG em dbo.photo_ocr_results retornou 1. A visão geral do banco informou ponto de restauração mais antigo em 05/11/2026 às 19h17 UTC. A recuperação foi verificada pelo metadado do serviço. A restauração em banco separado não foi exercitada.
+
+O schema incompatível pode causar falha ao consultar ou persistir um resultado OCR que use as novas colunas. A varredura periódica e o health consultam campos diferentes. O timeout de conexão observado continua sendo uma ocorrência distinta.
+
+**Plano sujeito a autorização de produção.** Registrar horário UTC e reconferir destino, recuperação, histórico, catálogo e resultado OCR existente imediatamente antes da mudança. Aplicar somente o incremental EF da última migration aplicada até 20261112180316_AddOcrQualityMetadata, em transação. O script revisado contém seis ADD de colunas anuláveis, CREATE UNIQUE INDEX filtrado e INSERT no histórico EF, versão 10.0.12. O lote não contém UPDATE, DELETE ou DROP. Há risco de bloqueio temporário por DDL. Em caso de falha, interromper, conferir o estado da transação e o catálogo antes de qualquer nova tentativa. Após o commit, conferir tipos, nulabilidade, índice e filtro, histórico, preservação da linha existente, health e logs da API e do worker.

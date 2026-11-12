@@ -40,6 +40,22 @@ public sealed class OcrQualityIntegrationTests(TransjapApiFactory factory) : ICl
     }
 
     [Fact]
+    public async Task HighResolutionEvidenceIsPreservedAndNotSentToTheProvider()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        var id = await Upload(client, oversized: true);
+        var result = await client.GetFromJsonAsync<JsonElement>(Route(id));
+        Assert.Equal("FAILED", result.GetProperty("status").GetString());
+        Assert.Equal("OCR_IMAGE_LIMIT", result.GetProperty("errorCode").GetString());
+        Assert.Equal(0, factory.Services.GetRequiredService<FakePhotoOcrProvider>().Calls);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        Assert.Equal(14000, (await db.PhotoEvidences.SingleAsync(p => p.ReadingId == id)).Width);
+        Assert.Equal(100m, (await db.HourMeterReadings.SingleAsync(r => r.Id == id)).Value);
+    }
+
+    [Fact]
     public async Task ReprocessKeyIsIdempotentAndResolvedAlertsStayResolved()
     {
         await factory.ResetDatabaseAsync();
@@ -122,7 +138,7 @@ public sealed class OcrQualityIntegrationTests(TransjapApiFactory factory) : ICl
     }
 
     internal static string Route(Guid id) => $"/api/v1/readings/{id}/photo/ocr";
-    internal static async Task<Guid> Upload(HttpClient client)
+    internal static async Task<Guid> Upload(HttpClient client, bool oversized = false)
     {
         var machine = await client.GetFromJsonAsync<JsonElement>("/api/v1/machines/by-fleet/68");
         using var created = await client.PostAsJsonAsync("/api/v1/readings", new {
@@ -132,7 +148,9 @@ public sealed class OcrQualityIntegrationTests(TransjapApiFactory factory) : ICl
         created.EnsureSuccessStatusCode();
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         using var form = new MultipartFormDataContent();
-        var file = new ByteArrayContent([0xff,0xd8,0xff,0xc0,0,0x11,8,0,1,0,2,3,1,0x11,0,2,0x11,0,3,0x11,0,0xff,0xd9]);
+        byte[] image = [0xff,0xd8,0xff,0xc0,0,0x11,8,0,1,0,2,3,1,0x11,0,2,0x11,0,3,0x11,0,0xff,0xd9];
+        if (oversized) { image[9] = 0x36; image[10] = 0xb0; }
+        var file = new ByteArrayContent(image);
         file.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
         form.Add(file, "file", "synthetic-meter.jpg");
         using var upload = await client.PostAsync($"/api/v1/readings/{id}/photo", form);

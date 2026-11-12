@@ -52,7 +52,7 @@ Os controles de autenticação, CSRF, tamanho, tipo de arquivo, hash e rate limi
 
 ## Pré-processamento e avaliação
 
-Foi avaliada a introdução de rotação, contraste, recorte e perspectiva. Não há corpus autorizado representativo que demonstre ganho. Não foram adicionadas transformações ou dependências de imagem pesadas. O motor existente recebe a evidência original validada. O teste de extração usa respostas OCR sintéticas e não mede acurácia de visão em fotografias reais.
+Foi avaliada a introdução de rotação, contraste, recorte e perspectiva. Não há corpus autorizado representativo que demonstre ganho. Não foram adicionadas transformações ou dependências de imagem pesadas. O motor existente recebe a evidência original validada. O OCR limita cada dimensão a 12000 pixels e a imagem a 50 milhões de pixels, configuráveis. Evidências maiores são preservadas e recebem falha controlada antes de consultar o provider. O adaptador também limita a leitura do stream a 10 MB e a resposta externa a 1 MB, mesmo se o storage estiver inconsistente. O teste de extração usa respostas OCR sintéticas e não mede acurácia de visão em fotografias reais.
 
 Displays mecânicos, reflexos, poeira, perspectiva e baixa iluminação continuam sujeitos ao motor e à qualidade da fotografia. Candidatos e revisão humana evitam interpretar números ambíguos como certeza. A Fase 16 avaliará captura e OCR em campo.
 
@@ -60,7 +60,7 @@ Displays mecânicos, reflexos, poeira, perspectiva e baixa iluminação continua
 
 Testes novos cobrem formatos, ambiguidade, limite de candidatos, confiança ausente, contexto de unidades, cancelamento de slot, autorização de fotos, detalhes administrativos, worker assíncrono, recuperação de claims e reprocessamento idempotente sem reabrir alertas resolvidos. As suítes anteriores permanecem como regressão.
 
-Resultados locais e CI serão registrados após execução. SQL Server real descartável é executado pela CI. O ambiente local não possui SQL Server. Não foram utilizados dados ou fotografias reais de produção.
+A primeira execução [43277918404](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43277918404) aprovou 257 testes unitários .NET, 219 testes SQL e 108 frontend, além de lint e builds. A revisão final adiciona limites de resolução e de stream, com teste de preservação da evidência e de ausência de chamada HTTP para arquivo excessivo. A execução correspondente ao HEAD do PR #23 confirma essa revisão. SQL Server real descartável é executado pela CI. O ambiente local não possui SQL Server. Não foram utilizados dados ou fotografias reais de produção.
 
 A implantação requer autorização para a migration incremental antes de publicar a API nova. Gerar o script EF entre AddReadingReviews e AddOcrQualityMetadata, revisar, conferir destino, PITR e contagens, aplicar sob autorização e validar o histórico. O script Up acrescenta campos e índice, sem modificar leituras ou fotografias. Rollback de código pode manter as colunas opcionais. Down remove os metadados novos e exige recuperação/backup desses dados antes de ser considerado.
 

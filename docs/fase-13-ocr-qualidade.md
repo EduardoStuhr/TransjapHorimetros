@@ -4,7 +4,7 @@ Base f44650d, merge do PR #22, conferida antes de alterar código em 12/11/2026.
 
 | Área | Classificação | Evidência e decisão |
 | --- | --- | --- |
-| Evidência original, hash e validação de arquivo | Existente e adequada | PhotoFileValidator limita bytes, inspeciona assinatura e dimensões. Storage e metadata são imutáveis. |
+| Evidência original, hash e validação de arquivo | Existente e adequada | PhotoFileValidator limita bytes e inspeciona assinatura e dimensões. Limite de resolução para OCR ainda precisa ser definido. Storage e metadata são imutáveis. |
 | Motor | Existente e adequada | AzureAiVisionOcrProvider com HTTPS, managed identity ou segredo e resposta limitada a 1 MB. Fake local não fabrica valores. |
 | Extração | Existente, precisa de melhorias | Não aceita milhares brasileiros/internacionais. Rejeita ambiguidades mas não explica nem preserva candidatos. |
 | Confiança | Existente, precisa de melhorias | Usa confiança da palavra numérica, mas null acaba em SUCCEEDED. Tornar revisão necessária sem inventar score. |

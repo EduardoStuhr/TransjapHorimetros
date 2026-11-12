@@ -15,6 +15,10 @@ export function ocrReviewReason(reason: string | null | undefined) {
       "A imagem contém muitos números para uma seleção segura.",
     NO_VALUE: "Nenhum valor válido de medidor foi identificado.",
     UNIT_MISMATCH: "A unidade encontrada não corresponde à unidade da máquina.",
+    OCR_IMAGE_LIMIT:
+      "A foto excede o limite de resolução para análise automática. A evidência original permanece disponível.",
+    OCR_IMAGE_TOO_LARGE:
+      "O arquivo excede o limite de tamanho para análise automática.",
     OCR_INTERRUPTED:
       "A análise anterior foi interrompida. A supervisão pode reprocessar a evidência.",
   };

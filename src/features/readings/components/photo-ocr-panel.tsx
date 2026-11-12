@@ -190,15 +190,15 @@ export function PhotoOcrPanel({
           </ul>
         </div>
       )}
-      {canReprocess && result?.rawText && (
+      {canReprocess && result && (
         <details className="text-sm">
           <summary>Texto reconhecido e versão da análise</summary>
           <p className="mt-2">
             {result.provider} · {result.providerModel ?? "Modelo não informado"}{" "}
-            · {result.algorithmVersion ?? "Algoritmo legado"}
+            · {result.algorithmVersion ?? "Versão não registrada"}
           </p>
           <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-slate-50 p-3 font-mono text-xs">
-            {result.rawText}
+            {result.rawText ?? "Nenhum texto reconhecido foi registrado."}
           </pre>
         </details>
       )}

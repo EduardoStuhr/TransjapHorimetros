@@ -92,6 +92,10 @@ public sealed class PhotoOcrService(IPhotoEvidenceRepository photos, IReadingRep
         var entered = false;
         try
         {
+            if (photo.Width > options.MaximumImageDimension || photo.Height > options.MaximumImageDimension
+                || (long?)photo.Width * photo.Height > options.MaximumImagePixels
+                || photo.FileSizeBytes > PhotoEvidenceOptions.AbsoluteMaximumFileSizeBytes)
+                throw new OcrProviderException("OCR_IMAGE_LIMIT");
             await gate.EnterAsync(deadline.Token);
             entered = true;
             for (var attempt = 0; ; attempt++)

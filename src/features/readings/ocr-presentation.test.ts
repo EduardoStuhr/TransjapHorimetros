@@ -79,6 +79,9 @@ describe("painel de qualidade OCR", () => {
         }),
       );
     expect(render(null)).toContain("Aguardando reconhecimento");
+    expect(
+      render({ ...result, status: "FAILED", reviewReason: "OCR_IMAGE_LIMIT" }),
+    ).toContain("limite de resolução");
     expect(render(null, true)).toContain("temporariamente indisponível");
     expect(render({ ...result, status: "PROCESSING" })).toContain(
       "Processando",

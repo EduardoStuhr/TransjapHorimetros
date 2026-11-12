@@ -54,7 +54,11 @@ Testes frontend adicionais cobrem lease concorrente e expirado, retenção do pa
 
 Testes SQL adicionais cobrem payload divergente, seis reenvios simultâneos, confirmação perdida, duas leituras distintas, rollback de auditoria, timeout de lock com 503 e recuperação. A suíte existente cobre decisões concorrentes, upload repetido, falha OCR e revogação. A CI executa SQL Server 2022 descartável com o guard existente de nomes de banco. O ambiente local não dispõe de SQL Server ou Docker.
 
-Resultados locais e CI serão consolidados após execução.
+Build Release local com zero avisos e zero erros, 228 testes unitários .NET, 104 testes frontend, lint e build Next.js aprovados.
+
+A execução [43218214417](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43218214417) aprovou backend e frontend no commit ca5906d. Executou 228 unitários .NET, 206 testes SQL Server e 104 frontend, todos sem falhas ou testes ignorados. A revisão final acrescenta cobertura do rollback/commit perdido na transação da leitura e da tentativa de replay após revogação. Conferir a execução correspondente ao HEAD final no PR #22.
+
+O teste SQL de timeout mantém um app lock na conexão independente, confirma 503 com Retry-After, verifica zero leituras, libera o lock e repete com sucesso. A injeção de falha de auditoria ocorre somente no banco descartável. Os testes de commit usam interceptor antes/depois da confirmação e verificam exatamente uma leitura e uma auditoria.
 
 ## Diagnóstico operacional
 

@@ -1,4 +1,8 @@
 using System.Net;
+using System.Data.Common;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
+using TransjapHorimetros.Infrastructure.Persistence.Repositories;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -136,6 +140,70 @@ public sealed class ReliabilityIntegrationTests(TransjapApiFactory factory) : IC
         Assert.Equal(0, await db.HourMeterReadings.CountAsync());
         await transaction.RollbackAsync();
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/v1/readings", request)).StatusCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TransactionRetryPreservesOneReadingWhenCommitAcknowledgementIsLost(bool afterCommit)
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        var request = await Request(client);
+        using var scope = factory.Services.CreateScope();
+        var connection = scope.ServiceProvider.GetRequiredService<TransjapDbContext>().Database.GetConnectionString()!;
+        TestDatabaseGuard.EnsureSafeTestDatabase(TestDatabaseGuard.TestingEnvironmentName, connection);
+        var options = new DbContextOptionsBuilder<TransjapDbContext>().UseSqlServer(connection)
+            .ReplaceService<IExecutionStrategyFactory, RetryFactory>()
+            .AddInterceptors(new CommitFailure(afterCommit)).Options;
+        await using var db = new TransjapDbContext(options);
+        var repository = new TransjapRepository(db);
+        var machine = (Guid)request["machineId"];
+        var eventId = (Guid)request["clientEventId"];
+        var id = await repository.ExecuteForMachineAsync(machine, async () =>
+        {
+            var existing = await db.HourMeterReadings.SingleOrDefaultAsync(r => r.ClientEventId == eventId);
+            if (existing is not null) return existing.Id;
+            var now = DateTimeOffset.UtcNow;
+            var reading = new TransjapHorimetros.Domain.Entities.HourMeterReading(machine, null, 100,
+                TransjapHorimetros.Domain.Enums.ReadingType.Intermediate,
+                TransjapHorimetros.Domain.Enums.ReadingStatus.Validated, now, now, now, eventId);
+            db.HourMeterReadings.Add(reading);
+            db.AuditLogs.Add(new TransjapHorimetros.Domain.Entities.AuditLog("CREATE_READING",
+                "HourMeterReading", reading.Id.ToString(), null, "{}", now, "commit-recovery"));
+            await repository.SaveChangesAsync(default);
+            return reading.Id;
+        }, default);
+        Assert.Equal(1, await db.HourMeterReadings.CountAsync(r => r.ClientEventId == eventId));
+        Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.EntityId == id.ToString()));
+    }
+
+    public sealed class RetryFactory(ExecutionStrategyDependencies dependencies) : IExecutionStrategyFactory
+    {
+        public IExecutionStrategy Create() => new CommitRetry(dependencies);
+    }
+
+    private sealed class CommitRetry(ExecutionStrategyDependencies dependencies)
+        : ExecutionStrategy(dependencies, 1, TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => exception is TimeoutException;
+    }
+
+    private sealed class CommitFailure(bool afterCommit) : DbTransactionInterceptor
+    {
+        private bool failed;
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
+            TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+        {
+            if (!afterCommit && !failed) { failed = true; throw new TimeoutException("isolated pre-commit failure"); }
+            return ValueTask.FromResult(result);
+        }
+        public override Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            if (afterCommit && !failed) { failed = true; throw new TimeoutException("isolated lost acknowledgement"); }
+            return Task.CompletedTask;
+        }
     }
 
     private static async Task<Dictionary<string, object>> Request(HttpClient client)

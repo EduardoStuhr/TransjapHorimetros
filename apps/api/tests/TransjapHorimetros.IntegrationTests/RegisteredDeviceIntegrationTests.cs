@@ -340,6 +340,35 @@ public sealed class RegisteredDeviceIntegrationTests(DeviceIdentityApiFactory fa
     }
 
     [Fact]
+    public async Task RevokedDeviceCannotReplayAnAlreadyPersistedReading()
+    {
+        await factory.ResetDatabaseAsync();
+        SetDeviceEnforcement(true);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var local = $"web-{Guid.NewGuid():D}";
+        using var op = factory.CreateClientForRole(AppRoles.Operator);
+        using var manager = factory.CreateClientForRole(AppRoles.Manager);
+        var (deviceId, _) = await RegisterAndAuthorizeDeviceAsync(op, manager, local, key);
+        var (challenge, payload) = await CreateChallengeAsync(op, local);
+        var token = await VerifyChallengeAndGetTokenAsync(op, challenge, SignPayload(key, payload));
+        var data = new { machineId = await GetFirstMachineIdAsync(), value = 100,
+            readingType = "INTERMEDIATE", capturedAtDevice = DateTimeOffset.UtcNow, clientEventId = Guid.NewGuid() };
+        async Task<HttpResponseMessage> Send()
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/readings") { Content = JsonContent.Create(data) };
+            request.Headers.Add("X-Device-Session", token);
+            return await op.SendAsync(request);
+        }
+        Assert.Equal(HttpStatusCode.Created, (await Send()).StatusCode);
+        (await manager.PostAsync($"/api/v1/devices/{deviceId}/revoke", null)).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Forbidden, (await Send()).StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        Assert.Equal(1, await db.HourMeterReadings.CountAsync());
+        Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.Action == "CREATE_READING"));
+    }
+
+    [Fact]
     public async Task ReadingPersistsRegisteredDeviceId()
     {
         await factory.ResetDatabaseAsync();

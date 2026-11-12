@@ -165,8 +165,11 @@ public sealed class PhotoEvidenceService(
                 && (string.Equals(
                         racedEvidence.Sha256,
                         file.Sha256,
-                        StringComparison.OrdinalIgnoreCase)
-                    ))
+                        StringComparison.OrdinalIgnoreCase))
+                && (!request.ClientEventId.HasValue || racedEvidence.ClientEventId != request.ClientEventId
+                    || (racedEvidence.CreatedByUserId == actorUserId
+                        && racedEvidence.CapturedAtDevice == request.CapturedAtDevice
+                        && racedEvidence.DeviceId == NormalizeDeviceId(request.DeviceId))))
             {
                 return new UploadPhotoEvidenceResult(ToResponse(racedEvidence), true);
             }

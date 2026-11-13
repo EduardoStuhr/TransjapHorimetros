@@ -10,6 +10,9 @@ export interface ReadingReview {
 }
 export interface OperationalSummary {
   totalMachines: number;
+  machinesWithReadings: number;
+  approvedReadings: number;
+  withoutRecentReading: number;
   activeMachines: number;
   readings: number;
   receivedToday: number;
@@ -63,8 +66,11 @@ export interface UtilizationReport {
   calculatedIntervals: number;
   unavailableIntervals: number;
   items: UtilizationRow[];
+  totalItems: number;
+  page: number;
+  pageSize: number;
 }
-export function getUtilization(filters: ReadingFilters) {
+export function getUtilization(filters: ReadingFilters, exportAll = false) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (!value) continue;
@@ -72,5 +78,6 @@ export function getUtilization(filters: ReadingFilters) {
     else if (key === "endDate") params.set("to", value + "T23:59:59.999Z");
     else params.set(key, value);
   }
+  if (exportAll) params.set("export", "true");
   return apiFetch<UtilizationReport>("/api/v1/operations/utilization?" + params);
 }

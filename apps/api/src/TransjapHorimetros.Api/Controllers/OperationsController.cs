@@ -21,8 +21,8 @@ public sealed class OperationsController(IOperationalService service) : Controll
 
     [HttpGet("utilization")]
     [Authorize(Policy = Policies.CanViewDashboard)]
-    public Task<UtilizationReport> Utilization([FromQuery] ReadingQuery query, CancellationToken ct) =>
-        service.GetUtilizationAsync(query, ct);
+    public Task<UtilizationReport> Utilization([FromQuery] ReadingQuery query, CancellationToken ct, [FromQuery] bool export = false) =>
+        service.GetUtilizationAsync(query, ct, export);
 
     [HttpGet("summary")]
     [Authorize(Policy = Policies.CanViewDashboard)]

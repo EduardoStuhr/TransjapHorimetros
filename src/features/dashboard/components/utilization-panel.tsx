@@ -7,7 +7,7 @@ import type { ReadingFilters } from "@/services/readings.service";
 const number = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 export async function UtilizationPanel({ filters }: { filters: ReadingFilters }) {
   const report = await getUtilization(filters);
-  const search = filterSearch(filters as Record<string, string | undefined>);
+  const search = filterSearch({ ...filters, page: undefined } as Record<string, string | undefined>);
   const machines = new Map<number, typeof report.items>();
   for (const item of report.items) {
     const group = machines.get(item.fleetNumber) ?? [];
@@ -31,6 +31,11 @@ export async function UtilizationPanel({ filters }: { filters: ReadingFilters })
       <a className="underline" href={"/api/reports/utilization/pdf?" + search}>PDF</a>
     </div>
     {report.items.length === 0 && <p>Sem leituras para os filtros informados.</p>}
+    <p>{report.totalItems} registros · Página {report.page} · Gráficos da página atual</p>
+    <nav aria-label="Paginação da utilização" className="flex gap-4">
+      {report.page > 1 && <Link className="underline" href={"?" + search + "&page=" + (report.page - 1)}>Anterior</Link>}
+      {report.page * report.pageSize < report.totalItems && <Link className="underline" href={"?" + search + "&page=" + (report.page + 1)}>Próxima</Link>}
+    </nav>
     <div className="grid gap-4 md:grid-cols-2">
       <Bars title="HOURS calculadas por frota" items={machineHours} />
       <Bars title="HOURS por obra atribuível" items={[...bySite].map(([label, value]) => ({ label, value }))} />

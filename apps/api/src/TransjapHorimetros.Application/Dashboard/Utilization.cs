@@ -41,4 +41,4 @@ public sealed record UtilizationRow(Guid MachineId, int FleetNumber, string Mode
     Guid ReadingId, DateTimeOffset At, decimal Initial, decimal Final, decimal? Hours,
     string Reason, Guid? WorkSiteId, string? WorkSite);
 public sealed record UtilizationReport(decimal? Hours, int CalculatedIntervals, int UnavailableIntervals,
-    IReadOnlyList<UtilizationRow> Items);
+    IReadOnlyList<UtilizationRow> Items, int TotalItems, int Page, int PageSize);

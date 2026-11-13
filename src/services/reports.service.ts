@@ -60,7 +60,7 @@ export async function getReportData(
   type: ReportType,
   filters: ReadingFilters = {},
 ): Promise<ReportData> {
-  if (type === "utilization") return { type, items: (await getUtilization(filters)).items, filters };
+  if (type === "utilization") return { type, items: (await getUtilization(filters, true)).items, filters };
   if (type === "anomalies") {
     return { type, items: await getAllAnomalies(filters), filters };
   }
@@ -100,6 +100,6 @@ export async function getReportAvailability(
   ]);
   return reportDefinitions.map((report) => ({
     type: report.type,
-    count: report.type === "utilization" ? utilization.items.length : report.type === "anomalies" ? anomalies.length : readings.totalItems,
+    count: report.type === "utilization" ? utilization.totalItems : report.type === "anomalies" ? anomalies.length : readings.totalItems,
   }));
 }

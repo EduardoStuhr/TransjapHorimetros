@@ -11,6 +11,7 @@ import type {
 } from "@/types/domain";
 
 export interface ReadingFilters {
+  page?: string;
   reviewed?: "true" | "false" | "";
   ocrStatus?: string;
   operatorId?: string;

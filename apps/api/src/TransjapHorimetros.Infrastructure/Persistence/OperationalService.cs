@@ -52,10 +52,15 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
             await db.Anomalies.CountAsync(a => a.Status == AnomalyStatus.Open && a.ReadingId.HasValue
                 && readings.Any(r => r.Id == a.ReadingId), ct),
             bySite, days.Select(d => new OperationalGroup(d.Day.ToString("yyyy-MM-dd"), d.Count)).ToArray(),
-            oldest.Select(m => new StaleMachine(m.FleetNumber, m.Model, m.LastReceivedAt)).ToArray());
+            oldest.Select(m => new StaleMachine(m.FleetNumber, m.Model, m.LastReceivedAt)).ToArray(),
+            await readings.Select(r => r.MachineId).Distinct().CountAsync(ct),
+            await readings.CountAsync(r => db.ReadingReviews.Any(v => v.ReadingId == r.Id && v.Approved)
+                || (r.Status == ReadingStatus.Validated && !db.ReadingReviews.Any(v => v.ReadingId == r.Id)), ct),
+            await machines.CountAsync(m => m.Status == MachineStatus.Active
+                && !db.HourMeterReadings.Any(r => r.MachineId == m.Id && r.CapturedAtDevice >= today.AddDays(-7)), ct));
     }
 
-    public async Task<UtilizationReport> GetUtilizationAsync(ReadingQuery q, CancellationToken ct)
+    public async Task<UtilizationReport> GetUtilizationAsync(ReadingQuery q, CancellationToken ct, bool export = false)
     {
         var to = q.To ?? clock.GetUtcNow();
         var from = q.From ?? to.AddDays(-30);
@@ -108,7 +113,10 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         }
         var calculated = rows.Count(r => r.Hours.HasValue);
         return new(calculated == 0 ? null : rows.Sum(r => r.Hours ?? 0),
-            calculated, rows.Count - calculated, rows.OrderBy(r => r.FleetNumber).ThenBy(r => r.At).ThenBy(r => r.ReadingId).ToArray());
+            calculated, rows.Count - calculated,
+            rows.OrderBy(r => r.FleetNumber).ThenBy(r => r.At).ThenBy(r => r.ReadingId)
+                .Skip(export ? 0 : (q.Page - 1) * q.PageSize).Take(export ? 10000 : q.PageSize).ToArray(),
+            rows.Count, q.Page, q.PageSize);
     }
 
     public async Task ReviewAnomalyAsync(Guid id, AnomalyReviewRequest request, string correlationId, CancellationToken ct)

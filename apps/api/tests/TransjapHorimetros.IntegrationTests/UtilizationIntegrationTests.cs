@@ -8,6 +8,36 @@ namespace TransjapHorimetros.IntegrationTests;
 public sealed class UtilizationIntegrationTests(TransjapApiFactory factory) : IClassFixture<TransjapApiFactory>
 {
     [Fact]
+    public async Task IntervalQueryPreservesNeighboursAndPaginatesWithoutLosingTotals()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+        var machine = await client.GetFromJsonAsync<JsonElement>("/api/v1/machines/by-fleet/68");
+        for (var i = 0; i < 3; i++)
+        {
+            var response = await client.PostAsJsonAsync("/api/v1/readings", new {
+                machineId = machine.GetProperty("id").GetGuid(), value = 100m + i * 0.11m,
+                readingType = "INTERMEDIATE", capturedAtDevice = DateTimeOffset.UtcNow.AddHours(-3 + i),
+                clientEventId = Guid.NewGuid()
+            });
+            response.EnsureSuccessStatusCode();
+            var reading = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (reading.GetProperty("status").GetString() is "PENDING" or "SUSPECT")
+            {
+                var review = await client.PostAsJsonAsync("/api/v1/operations/readings/" + reading.GetProperty("id").GetGuid() + "/review",
+                    new { approved = true, reason = "Registro sintético conferido" });
+                review.EnsureSuccessStatusCode();
+            }
+        }
+        var page = await client.GetFromJsonAsync<JsonElement>("/api/v1/operations/utilization?fleetNumber=68&pageSize=1&page=2");
+        Assert.Equal(3, page.GetProperty("totalItems").GetInt32());
+        Assert.Single(page.GetProperty("items").EnumerateArray());
+        Assert.Equal(0.22m, page.GetProperty("hours").GetDecimal());
+        var full = await client.GetFromJsonAsync<JsonElement>("/api/v1/operations/utilization?fleetNumber=68&export=true");
+        Assert.Equal(3, full.GetProperty("items").GetArrayLength());
+    }
+
+    [Fact]
     public async Task UtilizationIsProtectedAndPreservesEmptyStateAndPeriodValidation()
     {
         await factory.ResetDatabaseAsync();

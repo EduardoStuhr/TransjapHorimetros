@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const readingsFilterSchema = z
   .object({
+    reviewed: z.enum(["true", "false", ""]).optional(),
+    ocrStatus: z.enum(["", "PENDING", "PROCESSING", "SUCCEEDED", "LOW_CONFIDENCE", "NO_VALUE_DETECTED", "FAILED"]).optional(),
     operatorId: z.string().uuid().or(z.literal("")).optional(),
     meterUnit: z.enum(["HOURS", "KM", ""]),
     readingType: z.enum([
@@ -43,6 +45,8 @@ export const readingsFilterSchema = z
 export type ReadingsFilterValues = z.infer<typeof readingsFilterSchema>;
 
 export const emptyReadingsFilters: ReadingsFilterValues = {
+  reviewed: "",
+  ocrStatus: "",
   operatorId: "",
   endDate: "",
   meterUnit: "",

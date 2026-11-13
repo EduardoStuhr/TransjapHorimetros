@@ -272,6 +272,11 @@ public sealed class TransjapRepository(TransjapDbContext dbContext) :
         if (query.MeterUnit.HasValue) readings = readings.Where(r => r.MeterUnit == query.MeterUnit);
         if (query.ReadingType.HasValue) readings = readings.Where(r => r.ReadingType == query.ReadingType);
         if (query.HasPhotoEvidence.HasValue) readings = readings.Where(r => (r.PhotoEvidence != null) == query.HasPhotoEvidence.Value);
+        if (query.Reviewed.HasValue) readings = readings.Where(r => dbContext.ReadingReviews.Any(v => v.ReadingId == r.Id) == query.Reviewed);
+        if (query.OcrStatus.HasValue) readings = readings.Where(r => dbContext.PhotoOcrResults
+            .Where(o => dbContext.PhotoEvidences.Any(p => p.Id == o.PhotoEvidenceId && p.ReadingId == r.Id))
+            .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
+            .Select(o => (PhotoOcrStatus?)o.Status).FirstOrDefault() == query.OcrStatus);
         if (query.HasAnomaly.HasValue) readings = readings.Where(r => r.Anomalies.Any() == query.HasAnomaly.Value);
 
         if (query.From.HasValue)

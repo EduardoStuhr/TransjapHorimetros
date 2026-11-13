@@ -27,6 +27,8 @@ export interface OperationalSummary {
 export function getOperationalSummary(filters: ReadingFilters) {
   const params = new URLSearchParams();
   for (const key of [
+    "reviewed",
+    "ocrStatus",
     "machineId",
     "fleetNumber",
     "workSiteId",

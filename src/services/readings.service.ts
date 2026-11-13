@@ -11,6 +11,8 @@ import type {
 } from "@/types/domain";
 
 export interface ReadingFilters {
+  reviewed?: "true" | "false" | "";
+  ocrStatus?: string;
   operatorId?: string;
   endDate?: string;
   fleetNumber?: string;
@@ -135,6 +137,8 @@ export function buildReadingsPath(
     "readingType",
     "hasPhotoEvidence",
     "hasAnomaly",
+    "reviewed",
+    "ocrStatus",
   ] as const) {
     if (filters[key]) searchParams.set(key, filters[key]);
   }

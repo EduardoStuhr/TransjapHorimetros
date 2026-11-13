@@ -29,6 +29,7 @@ export const metadata: Metadata = {
 };
 
 const reportIcons = {
+  utilization: Gauge,
   readings: Gauge,
   machines: HardHat,
   worksites: Building2,

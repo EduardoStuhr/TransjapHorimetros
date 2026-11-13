@@ -1,3 +1,4 @@
+import { utilizationReason } from "./utilization-presentation";
 import ExcelJS from "exceljs";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
@@ -24,6 +25,7 @@ interface PreparedReport {
   period: string;
   rows: readonly Record<string, string | number>[];
   title: string;
+  summary?: string;
 }
 
 function getPeriod(values: readonly string[]) {
@@ -41,6 +43,9 @@ function prepareReport(data: ReportData): PreparedReport {
   if (data.type === "utilization") {
     return {
       title, period: getPeriod(data.items.map(i => i.at)),
+      summary: "HOURS calculadas: " + (data.items.some(i => i.hours != null)
+        ? data.items.reduce((sum, i) => sum + (i.hours ?? 0), 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })
+        : "Indisponível") + " · Intervalos sem cálculo: " + data.items.filter(i => i.hours == null).length,
       columns: [
         { key: "fleet", label: "Frota", width: 10 },
         { key: "date", label: "Data final UTC", width: 22 },
@@ -52,7 +57,7 @@ function prepareReport(data: ReportData): PreparedReport {
       ],
       rows: data.items.map(i => ({
         fleet: i.fleetNumber, date: i.at, initial: i.initial, final: i.final,
-        hours: i.hours ?? "", site: i.workSite ?? "Não atribuída", reason: i.reason,
+        hours: i.hours ?? "", site: i.workSite ?? "Não atribuída", reason: utilizationReason(i.reason),
       })),
     };
   }
@@ -207,6 +212,10 @@ export async function createExcelReport(data: ReportData) {
     }
   });
 
+  if (report.summary) {
+    const row = worksheet.addRow([report.summary]);
+    row.font = { bold: true };
+  }
   return workbook.xlsx.writeBuffer();
 }
 
@@ -258,6 +267,10 @@ export async function createPdfReport(data: ReportData) {
     y -= 8;
   };
   header();
+  if (report.summary) {
+    page.drawText(normalizePdfText(report.summary), { x: 32, y, font: bold, size: 10 });
+    y -= 24;
+  }
   for (const row of report.rows) {
     // Complete key/value rows avoid truncating evidence identifiers and operator names.
     for (const column of report.columns) {

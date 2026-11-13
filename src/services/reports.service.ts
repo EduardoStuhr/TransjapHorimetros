@@ -91,14 +91,15 @@ export async function getReportData(
 export async function getReportAvailability(
   filters: ReadingFilters = {},
 ): Promise<readonly ReportAvailability[]> {
-  const [readings, anomalies] = await Promise.all([
+  const [readings, anomalies, utilization] = await Promise.all([
     apiFetch<PagedApiResponse<HourMeterReading>>(
       buildReadingsPath(filters, 1, 1),
     ),
     getAllAnomalies(filters),
+    getUtilization(filters),
   ]);
   return reportDefinitions.map((report) => ({
     type: report.type,
-    count: report.type === "anomalies" ? anomalies.length : readings.totalItems,
+    count: report.type === "utilization" ? utilization.items.length : report.type === "anomalies" ? anomalies.length : readings.totalItems,
   }));
 }

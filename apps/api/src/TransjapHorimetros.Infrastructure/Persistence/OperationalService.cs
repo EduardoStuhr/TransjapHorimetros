@@ -26,6 +26,14 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         if (q.To.HasValue) readings = readings.Where(r => r.CapturedAtDevice <= q.To);
         if (q.ReadingType.HasValue) readings = readings.Where(r => r.ReadingType == q.ReadingType);
         if (q.HasAnomaly.HasValue) readings = readings.Where(r => r.Anomalies.Any() == q.HasAnomaly);
+        if (q.MeterUnit.HasValue) readings = readings.Where(r => r.MeterUnit == q.MeterUnit);
+        if (q.HasPhotoEvidence.HasValue) readings = readings.Where(r =>
+            db.PhotoEvidences.Any(p => p.ReadingId == r.Id) == q.HasPhotoEvidence);
+        if (q.Reviewed.HasValue) readings = readings.Where(r => db.ReadingReviews.Any(v => v.ReadingId == r.Id) == q.Reviewed);
+        if (q.OcrStatus.HasValue) readings = readings.Where(r => db.PhotoOcrResults
+            .Where(o => db.PhotoEvidences.Any(p => p.Id == o.PhotoEvidenceId && p.ReadingId == r.Id))
+            .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
+            .Select(o => (PhotoOcrStatus?)o.Status).FirstOrDefault() == q.OcrStatus);
         var today = new DateTimeOffset(clock.GetUtcNow().UtcDateTime.Date, TimeSpan.Zero);
         var bySite = await readings.GroupBy(r => r.WorkSite == null ? "Sem obra" : r.WorkSite.Name)
             .OrderByDescending(g => g.Count()).Take(100).Select(g => new OperationalGroup(g.Key, g.Count())).ToListAsync(ct);
@@ -65,6 +73,8 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
                 Fleet = r.Machine!.FleetNumber, r.Machine.Model, r.CreatedByUserId, r.Status, r.ReadingType,
                 Photo = db.PhotoEvidences.Any(p => p.ReadingId == r.Id),
                 Anomaly = r.Anomalies.Any(),
+                Ocr = db.PhotoOcrResults.Where(o => db.PhotoEvidences.Any(p => p.Id == o.PhotoEvidenceId && p.ReadingId == r.Id))
+                    .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id).Select(o => (PhotoOcrStatus?)o.Status).FirstOrDefault(),
                 Corrected = r.CorrectionOfReadingId != null || r.Corrections.Any(),
                 Approved = db.ReadingReviews.Where(v => v.ReadingId == r.Id).Select(v => (bool?)v.Approved).FirstOrDefault()
             }).Take(10001).ToListAsync(ct);
@@ -74,7 +84,7 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         {
             var intervals = Utilization.Calculate(group.Select(p => new UtilizationPoint(p.Id, p.CapturedAtDevice,
                 p.Value, p.MeterUnit, p.WorkSiteId,
-                p.Approved == true || (p.Approved == null && p.Status == ReadingStatus.Validated), p.Corrected)), from, to);
+                p.Approved == true || (p.Approved == null && p.Status == ReadingStatus.Validated && !p.Anomaly), p.Corrected)), from, to);
             var map = group.ToDictionary(p => p.Id);
             foreach (var interval in intervals)
             {
@@ -85,7 +95,9 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
                     || q.MeterUnit.HasValue && p.MeterUnit != q.MeterUnit
                     || q.ReadingType.HasValue && p.ReadingType != q.ReadingType
                     || q.HasAnomaly.HasValue && p.Anomaly != q.HasAnomaly
-                    || q.HasPhotoEvidence.HasValue && p.Photo != q.HasPhotoEvidence) continue;
+                    || q.HasPhotoEvidence.HasValue && p.Photo != q.HasPhotoEvidence
+                    || q.Reviewed.HasValue && p.Approved.HasValue != q.Reviewed
+                    || q.OcrStatus.HasValue && p.Ocr != q.OcrStatus) continue;
                 // A site-filtered report counts only intervals attributed to that site.
                 var hours = q.WorkSiteId.HasValue && interval.Site != q.WorkSiteId ? null : interval.Difference;
                 rows.Add(new(p.MachineId, p.Fleet, p.Model, p.Id, p.CapturedAtDevice,

@@ -1,8 +1,29 @@
 # Homologação da Fase 13 — qualidade do OCR
 
+## Resultado final em produção — APROVADA
+
+Em 13/11/2026, entre 13h54min11s e 13h55min17s UTC (10h54–10h55 de Brasília), foi aplicado uma única vez o [script do PR #25](https://github.com/EduardoStuhr/TransjapHorimetros/blob/e1b8f168102d5f5eb0d76656eeaac4f8c79b9834/scripts/sql/fase-13-ocr.sql). Azure SQL informou sucesso em 400 ms. SHA-256 do arquivo: `1d0d7ba301ec0488d961a80e2372ad77408471f7e9fa4dd92258debdfe23d128`. Conteúdo idêntico na main após o merge 79df94e. O script usou XACT_ABORT, uma transação, seis ADD, índice via sp_executesql e INSERT no histórico EF seguido de COMMIT.
+
+| Verificação | Antes | Depois |
+|---|---|---|
+| Servidor e banco | pg-transjap-horimetros / transjap_horimetros | Mesmo destino |
+| Histórico dbo.__EFMigrationsHistory | 11 entradas, última AddReadingReviews | 12 entradas, última 20261112180316_AddOcrQualityMetadata. Uma entrada para a migration com EF 10.0.12 |
+| dbo.photo_ocr_results | 19 campos originais, zero das seis colunas novas | AlgorithmVersion e ReviewReason nvarchar(64), CandidatesJson nvarchar(4000), BelowPreviousReading bit, PreviousReadingValue decimal(12,2) e RequestId uniqueidentifier. As seis aceitam NULL |
+| ux_photo_ocr_request | Ausente | Único, habilitado, chave RequestId na posição 1, filtro ([RequestId] IS NOT NULL) |
+| Resultados OCR | 1 | 1 |
+| SHA-256 dos 19 campos originais | 5AC0B42F0A0C78B55156A08DFB956C832B8D5A80D915FE50C899299E10368313 | Idêntico |
+
+O pré-voo registrou a sessão SQL 52, zero resultados pendentes ou em processamento e zero locks visíveis de outras sessões na tabela na amostragem. A verificação posterior usou a sessão 55. A visão geral indicou recuperação point-in-time desde 06/11/2026 às 13h53 UTC. Essa evidência é do catálogo do serviço. Não houve ensaio de restauração.
+
+A primeira sondagem HTTP anterior à execução expirou aos 20 segundos. A segunda respondeu 200, com SQL saudável (trace 771397f1c93d433aa0cb321f4c8353d1). Após o commit, /health e /health/ready responderam HTTP 200 com sqlserver HEALTHY (traces fb8ed51184314b77a599dd510dc29087 e c1f3795f3c6440dbb40f38b9e55231f4). A raiz web encaminhou para login e respondeu 200. O fluxo de logs da API, consultado com janela de 10 minutos, exibiu 160 entradas. Na amostra, 66 mensagens de execução SQL referenciaram photo_ocr_results, com varredura do worker até 13h56min55s UTC. Sem erro de coluna, timeout SQL ou falha de persistência identificados nessa janela.
+
+A [CI da correção](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43435535109) passou com 589 testes, inclusive reprodução do erro anterior, rollback induzido e preservação. Os deploys existentes do merge foram aprovados para [API](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43436271304) e [frontend](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43436271302). A verificação em produção observou o worker sem criar uma leitura ou enviar fotografia. Acurácia em campo e testes físicos ficam para a Fase 16.
+
+## Histórico das verificações anteriores
+
 12/11/2026, a partir das 15h43 (Brasília). Escopo de produção: consultas de disponibilidade, logs e metadados. Escopo funcional: dados sintéticos e SQL Server descartável da CI. Os testes físicos ficaram para a Fase 16.
 
-**Parecer atualizado às 16h16 de Brasília: FASE 13 REPROVADA para encerramento em produção. O banco publicado não contém a migration exigida pelo código.**
+**Parecer histórico de 12/11 às 16h16 de Brasília: REPROVADA naquele momento pela ausência da migration.**
 
 | Verificação | Evidência | Resultado |
 |---|---|---|

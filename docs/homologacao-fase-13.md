@@ -67,3 +67,17 @@ O servidor retornou pg-transjap-horimetros e o banco transjap_horimetros. O cat�
 O schema incompatível pode causar falha ao consultar ou persistir um resultado OCR que use as novas colunas. A varredura periódica e o health consultam campos diferentes. O timeout de conexão observado continua sendo uma ocorrência distinta.
 
 **Plano sujeito a autorização de produção.** Registrar horário UTC e reconferir destino, recuperação, histórico, catálogo e resultado OCR existente imediatamente antes da mudança. Aplicar somente o incremental EF da última migration aplicada até 20261112180316_AddOcrQualityMetadata, em transação. O script revisado contém seis ADD de colunas anuláveis, CREATE UNIQUE INDEX filtrado e INSERT no histórico EF, versão 10.0.12. O lote não contém UPDATE, DELETE ou DROP. Há risco de bloqueio temporário por DDL. Em caso de falha, interromper, conferir o estado da transação e o catálogo antes de qualquer nova tentativa. Após o commit, conferir tipos, nulabilidade, índice e filtro, histórico, preservação da linha existente, health e logs da API e do worker.
+
+## Tentativa autorizada de 13/11/2026 às 10h32 (Brasília)
+
+No destino confirmado pg-transjap-horimetros / transjap_horimetros, o Portal apresentou ponto de restauração mais antigo de 06/11/2026 às 13h31 UTC. O SHA-256 do script incremental conferiu com o revisado. O editor recebeu o lote transacional com SET XACT_ABORT ON. O SQL recusou a execução com `Invalid column name 'RequestId'.` A expressão do índice filtrado referencia a coluna que o mesmo lote adiciona. A explicação consistente com o erro é a resolução do nome na compilação do lote.
+
+| Medida | Antes | Depois |
+|---|---|---|
+| Migrations no histórico | 11 | 11 |
+| Última migration | AddReadingReviews | AddReadingReviews |
+| Colunas novas / índice novo | 0 / 0 | 0 / 0 |
+| Registros OCR | 1 | 1 |
+| SHA-256 dos campos preexistentes do registro OCR | 5AC0B42F…10368313 | 5AC0B42F…10368313 |
+
+A API retornou HTTP 200 em /health/ready, com sqlserver HEALTHY, trace e6222590844141d586caaaca35b7e243. A aplicação foi interrompida. A migration segue ausente. Para nova tentativa, validar primeiro em SQL Server descartável a execução do mesmo CREATE UNIQUE INDEX via sys.sp_executesql após os ALTER TABLE, mantendo uma única transação e o registro no histórico ao final. Repetir a conferência de schema e integridade após eventual execução.

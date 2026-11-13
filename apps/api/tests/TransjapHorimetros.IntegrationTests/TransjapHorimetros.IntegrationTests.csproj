@@ -24,4 +24,7 @@
     <ProjectReference Include="..\..\src\TransjapHorimetros.Infrastructure\TransjapHorimetros.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../../../../scripts/sql/fase-13-ocr.sql" Link="fase-13-ocr.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

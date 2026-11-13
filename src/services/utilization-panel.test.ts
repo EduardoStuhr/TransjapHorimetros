@@ -8,6 +8,7 @@ describe("utilization panel", () => {
   it("renders empty state without presenting missing hours as zero", async () => {
     vi.mocked(getUtilization).mockResolvedValue({
       hours: null, calculatedIntervals: 0, unavailableIntervals: 0,
+      byFleet: [], byDay: [], bySite: [], unassignedHours: 0, unavailableByReason: {},
       totalItems: 0, page: 1, pageSize: 20, items: [],
     });
     const html = renderToStaticMarkup(await UtilizationPanel({ filters: {} }));
@@ -18,6 +19,7 @@ describe("utilization panel", () => {
   it("links the authorized detail and preserves filters across pagination and exports", async () => {
     vi.mocked(getUtilization).mockResolvedValue({
       hours: 10.5, calculatedIntervals: 1, unavailableIntervals: 0,
+      byFleet: [{ label: "Frota 999", value: 2 }], byDay: [], bySite: [], unassignedHours: 10.5, unavailableByReason: {},
       totalItems: 21, page: 1, pageSize: 20, items: [{
         machineId: "m", fleetNumber: 128, model: "D6", readingId: "r",
         at: "2026-11-13T00:00:00Z", initial: 100, final: 110.5, hours: 10.5,
@@ -29,6 +31,7 @@ describe("utilization panel", () => {
     expect(html).toContain("/horimetros/r");
     expect(html).toContain("fleetNumber=128");
     expect(html).toContain("Próxima");
+    expect(html).toContain("Frota 999");
     expect(html).toContain("Não atribuída");
   });
 });

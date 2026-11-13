@@ -2,7 +2,7 @@
 
 ## Auditoria inicial
 
-Base a767b16, merge da homologação da Fase 13. O serviço OperationalService já concentra resumo e decisões auditáveis. TransjapRepository possui filtros e paginação de leituras. A interface administrativa oferece detalhe da leitura, foto autorizada, OCR e histórico por frota. Os relatórios usam ExcelJS e pdf-lib com rotas autenticadas. A implementação acrescenta apuração de utilização a essa arquitetura. Produção permanece na versão previamente homologada.
+Base a767b16, merge da homologação da Fase 13. O serviço OperationalService já concentra resumo e decisões auditáveis. TransjapRepository possui filtros e paginação de leituras. A interface administrativa oferece detalhe da leitura, foto autorizada, OCR e histórico por frota. Os relatórios usam ExcelJS e pdf-lib com rotas autenticadas. A implementação acrescenta apuração de utilização a essa arquitetura.
 
 ## Regras implementadas
 
@@ -16,7 +16,7 @@ Período padrão de 30 dias, máximo de 366 dias. A consulta projeta campos espe
 
 ## Interface e exportações
 
-O dashboard apresenta horas calculáveis, intervalos indisponíveis, equipamentos com leituras, aprovadas e máquinas sem captura recente. O limiar de atenção é sete dias UTC e não representa inatividade. O histórico da apuração é paginado e leva ao detalhe autorizado. Os gráficos de barras por frota e obra descrevem a página atual.
+O dashboard apresenta horas calculáveis, intervalos indisponíveis, equipamentos com leituras, aprovadas e máquinas sem captura recente. O limiar de atenção é sete dias UTC e não representa inatividade. O histórico da apuração é paginado e leva ao detalhe autorizado. As barras por frota, obra e dia UTC e os motivos de indisponibilidade são agregados pelo servidor sobre o conjunto filtrado completo. A evolução e a tabela exibem somente a página indicada. A soma por obra acrescida das horas sem atribuição reconcilia com a soma por frota.
 
 Filtros combináveis de período, máquina, frota, obra, operador, status, tipo, unidade, fotografia, anomalia, existência de revisão e último status OCR. O resumo, o histórico de leituras e a apuração compartilham os novos filtros. Datas da tela são dias UTC explícitos.
 
@@ -24,13 +24,15 @@ O novo relatório utilization reutiliza Excel e PDF. Exporta todos os resultados
 
 ## Pontos ainda pendentes do escopo integral
 
-O PR continua em rascunho. Foram acrescentados filtro de captura recente, evolução por pontos cronológicos, barras diárias e motivos de atenção. Falta ensaio de carga e inspeção visual do novo painel em navegador. A paginação calcula até 10.000 registros em memória; períodos de grande volume exigem frota ou janela menor. Não há teste de desempenho para crescimento além desse limite. Esses itens impedem declarar a Fase 14 integralmente pronta.
+O PR #27 foi integrado à main no merge a2ff8c235ef874c40c7271c18f478fb4f209468d. A CI 43454750104 aprovou 602 testes. A branch corretiva acrescenta um ensaio com SQL Server descartável para 100, 1.000, 5.000, 10.000 e 10.001 leituras. O teto é verificado por contagem limitada antes da projeção detalhada e novamente antes da apuração. O critério para a CI é p95 inferior a 10 segundos para navegação com três consultas simultâneas e nenhum erro inesperado em 30 consultas por volume. É um teto de regressão do runner compartilhado.
+
+**Pendente de confirmação operacional.** Quando duas leituras consecutivas de uma máquina indicam a mesma obra, podemos considerar que todas as horas acumuladas entre elas pertencem a essa obra, mesmo sem registros intermediários?
 
 Testes físicos reservados à Fase 16. Qualquer publicação ou aplicação de migration exige autorização posterior.
 
 ## Evidências de execução
 
-A execução 43454178123 aprovou o backend Release, 265 testes unitários, 225 de integração com SQL Server 2022 descartável e 110 testes web. A revisão subsequente inclui filtro de captura recente e gráficos por dia e evolução, com mais dois testes SSR. Localmente, 112 testes web passaram, lint e build de produção concluíram. O PR #27 mantém a CI para verificar o commit final.
+A execução 43454178123 aprovou o backend Release, 265 testes unitários, 225 de integração com SQL Server 2022 descartável e 110 testes web. A revisão subsequente inclui filtro de captura recente e gráficos por dia e evolução, com mais dois testes SSR. Localmente, 112 testes web passaram, lint e build de produção concluíram. A CI final do PR #27 passou.
 
 Os testes específicos incluem ordem de captura versus chegada, precisão decimal, duplicidade de horário, rejeição ou suspeita não aprovada, correção, reinício, unidade KM, mudança de obra, falta de leitura inicial, período cruzado e dados vazios. A integração verifica acesso anônimo/operador, validação do período, soma de três leituras aprovadas, paginação e exportação completa. Excel é reaberto para validar números, filtros, total e texto que começa com igual. PDF é reaberto para validar a estrutura. SSR verifica estado vazio, links autorizados, filtros e navegação.
 

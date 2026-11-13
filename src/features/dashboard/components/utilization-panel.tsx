@@ -23,20 +23,6 @@ export async function UtilizationPanel({ filters }: { filters: ReadingFilters })
     group.push(item);
     machines.set(item.fleetNumber, group);
   }
-  const bySite = new Map<string, number>();
-  for (const i of report.items) {
-    if (i.hours != null) bySite.set(i.workSite ?? "Sem atribuição", (bySite.get(i.workSite ?? "Sem atribuição") ?? 0) + i.hours);
-  }
-  const byDay = new Map<string, number>();
-  const warnings = new Map<string, number>();
-  for (const item of report.items) {
-    const day = item.at.slice(0, 10);
-    if (item.hours != null) byDay.set(day, (byDay.get(day) ?? 0) + item.hours);
-    else warnings.set(utilizationReason(item.reason), (warnings.get(utilizationReason(item.reason)) ?? 0) + 1);
-  }
-  const machineHours = [...machines].map(([fleet, items]) => ({
-    label: "Frota " + fleet, value: items.reduce((sum, i) => sum + (i.hours ?? 0), 0),
-  }));
   return <section className="space-y-4 rounded border bg-white p-4" aria-label="Utilização calculável">
     <h3 className="text-lg font-bold">Utilização calculável</h3>
     <p>Somente intervalos completos entre leituras aceitas, em HOURS. Período padrão de 30 dias em UTC.</p>
@@ -46,19 +32,20 @@ export async function UtilizationPanel({ filters }: { filters: ReadingFilters })
       <a className="underline" href={"/api/reports/utilization/xlsx?" + search}>Excel</a>
       <a className="underline" href={"/api/reports/utilization/pdf?" + search}>PDF</a>
     </div>
-    {report.items.length === 0 && <p>Sem leituras para os filtros informados.</p>}
-    <p>{report.totalItems} registros · Página {report.page} · Gráficos da página atual</p>
+    {report.totalItems === 0 && <p>Sem leituras para os filtros informados.</p>}
+    <p>{report.totalItems} registros · Página {report.page} · Detalhes da página atual</p>
     <nav aria-label="Paginação da utilização" className="flex gap-4">
       {report.page > 1 && <Link className="underline" href={"?" + search + "&page=" + (report.page - 1)}>Anterior</Link>}
       {report.page * report.pageSize < report.totalItems && <Link className="underline" href={"?" + search + "&page=" + (report.page + 1)}>Próxima</Link>}
     </nav>
+    <p>Gráficos de todo o período filtrado. A atribuição por obra presume continuidade entre duas capturas na mesma obra. Horas sem atribuição: {number(report.unassignedHours)} HOURS.</p>
     <div className="grid gap-4 md:grid-cols-2">
-      <Bars title="HOURS calculadas por frota" items={machineHours} />
-      <Bars title="HOURS por obra atribuível" items={[...bySite].map(([label, value]) => ({ label, value }))} />
+      <Bars title="HOURS calculadas por frota" items={report.byFleet} />
+      <Bars title="HOURS por obra atribuível" items={report.bySite} />
     </div>
     <div className="grid gap-4 md:grid-cols-2">
-      <Bars title="HOURS por dia UTC, pela captura final" items={[...byDay].map(([label, value]) => ({ label, value }))} />
-      <ul aria-label="Intervalos que exigem atenção">{[...warnings].map(([reason, count]) => <li className="border-b py-2" key={reason}>{reason} · {count}</li>)}</ul>
+      <Bars title="HOURS por dia UTC, pela captura final" items={report.byDay} />
+      <ul aria-label="Intervalos que exigem atenção">{Object.entries(report.unavailableByReason).map(([reason, count]) => <li className="border-b py-2" key={reason}>{utilizationReason(reason)} · {count}</li>)}</ul>
     </div>
     <div className="max-h-96 space-y-4 overflow-auto">
       {[...machines].map(([fleet, items]) => <details key={fleet}>
@@ -84,7 +71,7 @@ function Bars({ title, items }: { title: string; items: { label: string; value: 
   return <figure>
     <figcaption className="font-bold">{title}</figcaption>
     {items.length === 0 && <p>Sem intervalos calculáveis.</p>}
-    <ul className="max-h-64 overflow-auto">{items.map(i => <li key={i.label} className="my-2" title={i.label + ": " + number(i.value) + " HOURS"}>
+    <ul className="max-h-64 overflow-auto">{items.map((i, index) => <li key={index} className="my-2" title={i.label + ": " + number(i.value) + " HOURS"}>
       <div className="flex justify-between"><span>{i.label}</span><span>{number(i.value)}</span></div>
       <div className="h-2 rounded bg-slate-100" aria-hidden="true"><div className="h-2 rounded bg-blue-700" style={{ width: (100 * i.value / maximum) + "%" }} /></div>
     </li>)}</ul>

@@ -40,5 +40,8 @@ public static class Utilization
 public sealed record UtilizationRow(Guid MachineId, int FleetNumber, string Model,
     Guid ReadingId, DateTimeOffset At, decimal Initial, decimal Final, decimal? Hours,
     string Reason, Guid? WorkSiteId, string? WorkSite);
+public sealed record HoursGroup(string Label, decimal Value);
 public sealed record UtilizationReport(decimal? Hours, int CalculatedIntervals, int UnavailableIntervals,
-    IReadOnlyList<UtilizationRow> Items, int TotalItems, int Page, int PageSize);
+    IReadOnlyList<UtilizationRow> Items, int TotalItems, int Page, int PageSize, IReadOnlyList<HoursGroup> ByFleet,
+    IReadOnlyList<HoursGroup> BySite, IReadOnlyList<HoursGroup> ByDay, decimal UnassignedHours,
+    IReadOnlyDictionary<string, int> UnavailableByReason);

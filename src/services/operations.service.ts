@@ -40,6 +40,8 @@ export function getOperationalSummary(filters: ReadingFilters) {
     "status",
     "readingType",
     "hasAnomaly",
+    "meterUnit",
+    "hasPhotoEvidence",
   ] as const) {
     if (filters[key]) params.set(key, filters[key]);
   }
@@ -62,7 +64,13 @@ export interface UtilizationRow {
   workSiteId: string | null;
   workSite: string | null;
 }
+interface HoursGroup { label: string; value: number }
 export interface UtilizationReport {
+  byFleet: HoursGroup[];
+  bySite: HoursGroup[];
+  byDay: HoursGroup[];
+  unassignedHours: number;
+  unavailableByReason: Record<string, number>;
   hours: number | null;
   calculatedIntervals: number;
   unavailableIntervals: number;

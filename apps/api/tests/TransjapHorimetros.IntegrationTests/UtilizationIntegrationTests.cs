@@ -34,6 +34,11 @@ public sealed class UtilizationIntegrationTests(TransjapApiFactory factory) : IC
         Assert.Single(page.GetProperty("items").EnumerateArray());
         Assert.Equal(0.22m, page.GetProperty("hours").GetDecimal());
         var full = await client.GetFromJsonAsync<JsonElement>("/api/v1/operations/utilization?fleetNumber=68&export=true");
+        foreach (var key in new[] { "byFleet", "bySite", "byDay", "unassignedHours", "unavailableByReason" })
+            Assert.Equal(full.GetProperty(key).GetRawText(), page.GetProperty(key).GetRawText());
+        Assert.Equal(0.22m, page.GetProperty("byFleet")[0].GetProperty("value").GetDecimal());
+        Assert.Equal(0.22m, page.GetProperty("unassignedHours").GetDecimal());
+        Assert.Equal(0.22m, page.GetProperty("byDay").EnumerateArray().Sum(x => x.GetProperty("value").GetDecimal()));
         Assert.Equal(3, full.GetProperty("items").GetArrayLength());
     }
 

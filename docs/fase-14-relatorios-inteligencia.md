@@ -59,3 +59,16 @@ Foram reabertos XLSX e PDF de 21 e 10.000 registros. Na primeira execução com 
 A política CanViewDashboard e a rota de exportação restringem acesso a supervisor, administrativo, gerente e administrador. A integração cobre 401 anônimo e 403 operador na API. A rota Next recusa exportação a operador mesmo com acesso direto. O novo contrato expõe agregações, contagens e identificadores das leituras paginadas. Fotografias, credenciais e e-mails de operadores não são necessários nesses dados. O ensaio usa base descartável protegida pelo TestDatabaseGuard.
 
 O aceite da hipótese de continuidade depende do responsável operacional. Testes físicos pertencem à Fase 16. Os resultados acima são de desenvolvimento e CI.
+
+### Medição com instrumentação
+
+A [execução 43458122793](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43458122793) passou com instrumentação por etapa. A coluna de consulta mede a leitura via EF, incluindo transporte e materialização. A coluna de apuração inclui agrupamento, filtros, agregação e paginação em memória. Os percentis são independentes. O serviço respeitou o token já cancelado e a consulta subsequente retornou 200.
+
+| Leituras | p50 API | p95 API | p95 consulta EF | p95 apuração | Memória do processo |
+|---:|---:|---:|---:|---:|---:|
+| 100 | 6 ms | 62 ms | 50,8 ms | 0,5 ms | 371 MiB |
+| 1.000 | 33 ms | 52 ms | 41,7 ms | 17,5 ms | 377 MiB |
+| 5.000 | 137 ms | 189 ms | 159,9 ms | 33,3 ms | 429 MiB |
+| 10.000 | 303 ms | 348 ms | 335,1 ms | 55,7 ms | 447 MiB |
+
+No mesmo runner de frontend, a exportação de 10.000 registros via Next levou 0,552 s para Excel e 3,090 s para PDF sobre a API simulada. A CI testa também a orientação de limite na página de relatórios e o HTTP 400 nas duas rotas de download. A medição de memória inclui o processo de testes e varia com a ordem dos testes. Cancelamento de comando SQL por falha de rede em produção e carga do Azure ficam fora da evidência deste ensaio.

@@ -19,11 +19,11 @@ class Handler(BaseHTTPRequestHandler):
             indices = range(n) if q.get('export') == ['true'] else range((page - 1) * 20, min(n, page * 20))
 
             def row(i):
-                return dict(machineId='demo', readingId=f'00000000-0000-4000-8000-{i:012}', model='Escavadeira', fleetNumber=84, initial=100 + max(0, i - 1) * 0.25, final=100 + i * 0.25, hours=0.25 if i else None, at=f'2026-11-12T{i // 3600:02}:{i // 60 % 60:02}:{i % 60:02}Z', reason='CALCULATED' if i else 'MISSING_INITIAL', workSite='São João' if i > 1 else None, workSiteId='s' if i > 1 else None)
+                return dict(machineId='demo', readingId=f'00000000-0000-4000-8000-{i:012}', model='Escavadeira', fleetNumber=int(q.get('fleetNumber', ['84'])[0]), initial=100 + max(0, i - 1) * 0.25, final=100 + i * 0.25, hours=0.25 if i else None, at=f'2026-11-12T{i // 3600:02}:{i // 60 % 60:02}:{i % 60:02}Z', reason='CALCULATED' if i else 'MISSING_INITIAL', workSite='São João' if i > 1 else None, workSiteId='s' if i > 1 else None)
 
             def group(label, v):
                 return [dict(label=label, value=v)] if n else []
-            d = dict(hours=(n - 1) * 0.25 if n else None, calculatedIntervals=max(0, n - 1), unavailableIntervals=int(bool(n)), unassignedHours=0.25 if n else 0, byFleet=group('Frota 84', (n - 1) * 0.25), bySite=group('São João', (n - 2) * 0.25), byDay=group('2026-11-12', (n - 1) * 0.25), unavailableByReason={'MISSING_INITIAL': 1} if n else {}, items=[row(i) for i in indices], totalItems=n, page=page, pageSize=20)
+            d = dict(hours=(n - 1) * 0.25 if n else None, calculatedIntervals=max(0, n - 1), unavailableIntervals=int(bool(n)), unassignedHours=0.25 if n else 0, byFleet=group('Frota ' + q.get('fleetNumber', ['84'])[0], (n - 1) * 0.25), bySite=group('São João', (n - 2) * 0.25), byDay=group('2026-11-12', (n - 1) * 0.25), unavailableByReason={'MISSING_INITIAL': 1} if n else {}, items=[row(i) for i in indices], totalItems=n, page=page, pageSize=20)
             if n > 10000:
                 status = 400
                 d = {'detail': 'Mais de 10.000 leituras. Reduza o período ou selecione uma frota.'}

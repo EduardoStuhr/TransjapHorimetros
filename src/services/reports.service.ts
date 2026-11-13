@@ -1,7 +1,7 @@
 import { getUtilization, type UtilizationRow } from "@/services/operations.service";
 import { getAllAnomalies } from "@/services/anomalies.service";
 import type { ReadingFilters } from "@/services/readings.service";
-import { apiFetch, type PagedApiResponse } from "@/services/api-client";
+import { ApiError, apiFetch, type PagedApiResponse } from "@/services/api-client";
 import { getAllReadings, buildReadingsPath } from "@/services/readings.service";
 import type { Anomaly, HourMeterReading } from "@/types/domain";
 
@@ -33,11 +33,12 @@ export type ReportType = (typeof reportDefinitions)[number]["type"];
 
 export interface ReportAvailability {
   count: number;
+  message?: string;
   type: ReportType;
 }
 
 export type ReportData = { filters?: ReadingFilters } & (
-  | { type: "utilization"; items: readonly UtilizationRow[] }
+  | { type: "utilization"; hours: number | null; unavailableIntervals: number; items: readonly UtilizationRow[] }
   | {
       items: readonly Anomaly[];
       type: "anomalies";
@@ -60,7 +61,10 @@ export async function getReportData(
   type: ReportType,
   filters: ReadingFilters = {},
 ): Promise<ReportData> {
-  if (type === "utilization") return { type, items: (await getUtilization(filters, true)).items, filters };
+  if (type === "utilization") {
+    const { items, hours, unavailableIntervals } = await getUtilization(filters, true);
+    return { type, items, hours, unavailableIntervals, filters };
+  }
   if (type === "anomalies") {
     return { type, items: await getAllAnomalies(filters), filters };
   }
@@ -96,10 +100,14 @@ export async function getReportAvailability(
       buildReadingsPath(filters, 1, 1),
     ),
     getAllAnomalies(filters),
-    getUtilization(filters),
+    getUtilization(filters).catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 400) return { totalItems: 0, message: error.message };
+      throw error;
+    }),
   ]);
   return reportDefinitions.map((report) => ({
     type: report.type,
+    message: report.type === "utilization" && "message" in utilization ? utilization.message : undefined,
     count: report.type === "utilization" ? utilization.totalItems : report.type === "anomalies" ? anomalies.length : readings.totalItems,
   }));
 }

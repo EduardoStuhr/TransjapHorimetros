@@ -37,3 +37,25 @@ A execução 43454178123 aprovou o backend Release, 265 testes unitários, 225 d
 Os testes específicos incluem ordem de captura versus chegada, precisão decimal, duplicidade de horário, rejeição ou suspeita não aprovada, correção, reinício, unidade KM, mudança de obra, falta de leitura inicial, período cruzado e dados vazios. A integração verifica acesso anônimo/operador, validação do período, soma de três leituras aprovadas, paginação e exportação completa. Excel é reaberto para validar números, filtros, total e texto que começa com igual. PDF é reaberto para validar a estrutura. SSR verifica estado vazio, links autorizados, filtros e navegação.
 
 Atenção para a hipótese de continuidade da obra e para os motivos em que não existe leitura inicial. Esses pontos precisam ser confirmados na homologação gerencial. A recuperação de falhas OCR e os testes das fases anteriores continuam na suíte de regressão.
+
+## Homologação em ambiente isolado · 13 de novembro de 2026
+
+O PR corretivo #28 reúne os testes e os ajustes. A API envia os totais decimais para a exportação e a página de relatórios apresenta a orientação de reduzir o período ou selecionar a frota quando a API responde 400. A listagem paginada e a exportação passam pelo mesmo serviço. O resumo envia à API também os filtros de unidade e evidência fotográfica.
+
+No [ensaio de integração](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43457151833), a API ASP.NET Core em TestServer consultou SQL Server 2022 em contêiner. Cada volume recebeu 30 consultas, em dez ondas de três, mais uma exportação integral. A medição da API inclui materialização e leitura do JSON pelo cliente de teste. A memória é o conjunto de trabalho do processo de testes, incluindo a API. Os números descrevem o runner Linux daquela execução.
+
+| Leituras | p50 API | p95 API | Memória do processo | Erros inesperados |
+|---:|---:|---:|---:|---:|
+| 100 | 7 ms | 125 ms | 232 MiB | 0 |
+| 1.000 | 33 ms | 54 ms | 242 MiB | 0 |
+| 5.000 | 157 ms | 307 ms | 278 MiB | 0 |
+| 10.000 | 303 ms | 376 ms | 323 MiB | 0 |
+| 10.001 | HTTP 400 na página e na exportação | | | 0 |
+
+A [inspeção Chrome](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/43457498687) exercitou o build de produção do Next.js com uma API simulada em loopback. As capturas de 1920 × 1080, 1366 × 768, 768 × 1024 e 390 × 844 estão no artefato fase14-inspecao. A largura do documento coincidiu com a viewport nas quatro resoluções. A frota sintética apresentou 5 HOURS no período, 4,75 na obra São João e 0,25 sem atribuição. O histórico abriu por equipamento e o total permaneceu em 5 HOURS na segunda página. Também foram exercitados o estado vazio e o aviso do limite.
+
+Foram reabertos XLSX e PDF de 21 e 10.000 registros. Na primeira execução com Chrome, os arquivos menores levaram 0,186 e 0,045 s, respectivamente. Com 10.000 registros foram 0,658 e 3,932 s. A verificação percorreu as 2.353 páginas do PDF maior e conferiu texto e limites físicos das páginas. Sem dados, as duas rotas responderam 404. A suíte verifica que texto iniciado por igual permanece uma string no Excel. O PDF detalhado desse volume é extenso para consulta manual.
+
+A política CanViewDashboard e a rota de exportação restringem acesso a supervisor, administrativo, gerente e administrador. A integração cobre 401 anônimo e 403 operador na API. A rota Next recusa exportação a operador mesmo com acesso direto. O novo contrato expõe agregações, contagens e identificadores das leituras paginadas. Fotografias, credenciais e e-mails de operadores não são necessários nesses dados. O ensaio usa base descartável protegida pelo TestDatabaseGuard.
+
+O aceite da hipótese de continuidade depende do responsável operacional. Testes físicos pertencem à Fase 16. Os resultados acima são de desenvolvimento e CI.

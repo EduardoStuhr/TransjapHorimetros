@@ -21,6 +21,8 @@ with sync_playwright() as pw:
         p.locator('summary').filter(has_text='Frota 84').first.click()
         p.get_by_text('Utilização calculável', exact=True).evaluate('el=>el.scrollIntoView()')
         p.screenshot(path=f'evidence/{w}.png')
+        assert p.evaluate('document.documentElement.scrollWidth') <= w
+        assert panel.locator('table a').first.get_attribute('href').startswith('/horimetros/')
         print(w, p.evaluate('document.documentElement.scrollWidth'), panel.locator('figure').count(), flush=True)
     p.get_by_role('link', name='Próxima').click()
     p.get_by_text('21 registros · Página 2', exact=False).wait_for()
@@ -28,15 +30,17 @@ with sync_playwright() as pw:
     for fleet, expected in [('900', 'Sem leituras'), ('901', 'Não foi possível apurar')]:
         p.goto(url + '/?fleetNumber=' + fleet)
         p.get_by_text(expected, exact=False).first.wait_for()
+    p.goto(url + '/relatorios?fleetNumber=901')
+    p.get_by_text('Reduza o período', exact=False).first.wait_for()
     p.goto(url + '/relatorios')
-    p.get_by_role('main').wait_for()
+    p.get_by_text('Utilização calculável', exact=True).scroll_into_view_if_needed()
     p.screenshot(path='evidence/relatorios.png')
-    for n in ['84', '900', '902']:
+    for n in ['84', '900', '901', '902']:
         for fmt in ['xlsx', 'pdf']:
             start = time.perf_counter()
             r = ctx.request.get(url + '/api/reports/utilization/' + fmt + '?fleetNumber=' + n, timeout=120000)
             print(n, fmt, r.status, round(time.perf_counter() - start, 3), flush=True)
-            assert r.status == (404 if n == '900' else 200)
+            assert r.status == {'900': 404, '901': 400}.get(n, 200)
             if r.ok:
                 open('evidence/frota-' + n + '.' + fmt, 'wb').write(r.body())
     ctx.add_cookies([dict(name='transjap_access_token', value='operator', url=url)])
@@ -53,7 +57,7 @@ for fleet, count in [('84', 21), ('902', 10000)]:
     assert values[-2][3] == 100 + (count - 1) * 0.25
     doc = fitz.open(f'evidence/frota-{fleet}.pdf')
     text = ''.join((page.get_text() for page in doc))
-    assert 'São João' in text and f'fleetNumber={fleet}' in text and (text.count('Frota: 84') == count)
+    assert 'São João' in text and f'fleetNumber={fleet}' in text and (text.count(f'Frota: {fleet}') == count)
     for page in doc:
         for x0, y0, x1, y1, *_ in page.get_text('blocks'):
             assert x0 >= 0 and y0 >= 0 and (x1 <= page.rect.width) and (y1 <= page.rect.height)

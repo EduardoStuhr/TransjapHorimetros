@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +14,10 @@ namespace TransjapHorimetros.Infrastructure.Persistence;
 
 public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor, TimeProvider clock) : IOperationalService
 {
+    private static readonly Meter Metrics = new("TransjapHorimetros.Operations");
+    private static readonly Histogram<double> QueryTime = Metrics.CreateHistogram<double>("utilization.query.duration", "ms");
+    private static readonly Histogram<double> CalculationTime = Metrics.CreateHistogram<double>("utilization.calculation.duration", "ms");
+
     public async Task<OperationalSummary> GetSummaryAsync(ReadingQuery q, CancellationToken ct)
     {
         if (q.From > q.To) throw new BadRequestException("O período está invertido.");
@@ -84,6 +90,7 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         // Preserve chronological neighbours before applying presentation filters.
         var query = db.HourMeterReadings.AsNoTracking()
             .Where(r => machines.Any(m => m.Id == r.MachineId) && r.CapturedAtDevice >= from && r.CapturedAtDevice <= to);
+        var queryStart = Stopwatch.GetTimestamp();
         const string limitMessage = "Mais de 10.000 leituras. Reduza o período ou selecione uma frota.";
         if (await query.Take(10001).CountAsync(ct) > 10000)
             throw new BadRequestException(limitMessage);
@@ -99,6 +106,8 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
                 Approved = db.ReadingReviews.Where(v => v.ReadingId == r.Id).Select(v => (bool?)v.Approved).FirstOrDefault()
             }).Take(10001).ToListAsync(ct);
         if (points.Count > 10000) throw new BadRequestException(limitMessage);
+        QueryTime.Record(Stopwatch.GetElapsedTime(queryStart).TotalMilliseconds);
+        var calculationStart = Stopwatch.GetTimestamp();
         var rows = new List<UtilizationRow>();
         foreach (var group in points.GroupBy(p => p.MachineId))
         {
@@ -132,7 +141,7 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         static HoursGroup[] Totals(IEnumerable<IGrouping<string, UtilizationRow>> groups) =>
             groups.OrderBy(g => g.Key, StringComparer.Ordinal)
                 .Select(g => new HoursGroup(g.Key, g.Sum(r => r.Hours!.Value))).ToArray();
-        return new(calculated == 0 ? null : rows.Sum(r => r.Hours ?? 0),
+        var report = new UtilizationReport(calculated == 0 ? null : rows.Sum(r => r.Hours ?? 0),
             calculated, rows.Count - calculated,
             rows.OrderBy(r => r.FleetNumber).ThenBy(r => r.At).ThenBy(r => r.ReadingId)
                 .Skip(export ? 0 : (int)Math.Min(10000L, (long)(q.Page - 1) * q.PageSize)).Take(export ? 10000 : q.PageSize).ToArray(),
@@ -144,6 +153,8 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
             Totals(eligible.GroupBy(r => r.At.UtcDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))),
             eligible.Where(r => !r.WorkSiteId.HasValue).Sum(r => r.Hours!.Value),
             rows.Where(r => !r.Hours.HasValue).GroupBy(r => r.Reason).ToDictionary(g => g.Key, g => g.Count()));
+        CalculationTime.Record(Stopwatch.GetElapsedTime(calculationStart).TotalMilliseconds);
+        return report;
     }
 
     public async Task ReviewAnomalyAsync(Guid id, AnomalyReviewRequest request, string correlationId, CancellationToken ct)

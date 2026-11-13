@@ -52,12 +52,11 @@ namespace TransjapHorimetros.Infrastructure.Persistence.Migrations
                 maxLength: 64,
                 nullable: true);
 
-            migrationBuilder.CreateIndex(
-                name: "ux_photo_ocr_request",
-                table: "photo_ocr_results",
-                column: "RequestId",
-                unique: true,
-                filter: "[RequestId] IS NOT NULL");
+            // The incremental SQL script can execute all operations as one batch.
+            // Compile the filtered index only after SQL Server has added RequestId.
+            migrationBuilder.Sql("""
+                EXEC sys.sp_executesql N'CREATE UNIQUE INDEX [ux_photo_ocr_request] ON [photo_ocr_results] ([RequestId]) WHERE [RequestId] IS NOT NULL;';
+                """);
         }
 
         /// <inheritdoc />

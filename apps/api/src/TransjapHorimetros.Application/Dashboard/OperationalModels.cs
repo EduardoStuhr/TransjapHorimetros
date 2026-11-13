@@ -19,10 +19,11 @@ public sealed record OperationalSummary(
     int TotalMachines, int ActiveMachines, int Readings, int ReceivedToday,
     int PendingReview, int SuspectReadings, int OpenAnomalies,
     IReadOnlyList<OperationalGroup> ByWorkSite, IReadOnlyList<OperationalGroup> ByDay,
-    IReadOnlyList<StaleMachine> OldestMachines);
+    IReadOnlyList<StaleMachine> OldestMachines, int MachinesWithReadings = 0, int ApprovedReadings = 0, int WithoutRecentReading = 0);
 
 public interface IOperationalService
 {
+    Task<UtilizationReport> GetUtilizationAsync(ReadingQuery query, CancellationToken ct, bool export = false);
     Task<OperationalSummary> GetSummaryAsync(ReadingQuery query, CancellationToken ct);
     Task ReviewAnomalyAsync(Guid id, AnomalyReviewRequest request, string correlationId, CancellationToken ct);
     Task<ReadingReview?> GetReviewAsync(Guid id, CancellationToken ct);

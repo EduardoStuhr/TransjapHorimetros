@@ -1,3 +1,4 @@
+import { UtilizationPanel } from "./utilization-panel";
 import Link from "next/link";
 import { OperationalFilters } from "@/components/shared/operational-filters";
 import { parseOperationalFilters } from "@/lib/operational-filters";
@@ -18,6 +19,9 @@ export async function OperationalSummaryPanel({
   const metrics = [
     ["Máquinas cadastradas", summary.totalMachines],
     ["Máquinas ativas", summary.activeMachines],
+    ["Com leituras no período", summary.machinesWithReadings],
+    ["Leituras aprovadas", summary.approvedReadings],
+    ["Sem captura nos últimos 7 dias UTC", summary.withoutRecentReading],
     ["Leituras no período", summary.readings],
     ["Recebidas hoje (UTC)", summary.receivedToday],
     ["Aguardando revisão", summary.pendingReview],
@@ -28,6 +32,7 @@ export async function OperationalSummaryPanel({
     <section className="space-y-4" aria-label="Supervisão operacional">
       <h2 className="text-lg font-bold">Supervisão operacional</h2>
       <OperationalFilters filters={filters} />
+      <UtilizationPanel filters={{ ...filters, page: typeof params.page === "string" && /^[1-9]\d{0,5}$/.test(params.page) ? params.page : "1" }} />
       <div className="grid gap-3 sm:grid-cols-4">
         {metrics.map(([label, value]) => (
           <div className="rounded border bg-white p-4" key={label}>

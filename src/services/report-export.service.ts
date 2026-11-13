@@ -1,3 +1,4 @@
+import { utilizationReason } from "./utilization-presentation";
 import ExcelJS from "exceljs";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
@@ -24,6 +25,7 @@ interface PreparedReport {
   period: string;
   rows: readonly Record<string, string | number>[];
   title: string;
+  summary?: string;
 }
 
 function getPeriod(values: readonly string[]) {
@@ -38,6 +40,27 @@ function getPeriod(values: readonly string[]) {
 function prepareReport(data: ReportData): PreparedReport {
   const title = getReportDefinition(data.type).title;
 
+  if (data.type === "utilization") {
+    return {
+      title, period: getPeriod(data.items.map(i => i.at)),
+      summary: "HOURS calculadas: " + (data.items.some(i => i.hours != null)
+        ? data.items.reduce((sum, i) => sum + (i.hours ?? 0), 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })
+        : "Indisponível") + " · Intervalos sem cálculo: " + data.items.filter(i => i.hours == null).length,
+      columns: [
+        { key: "fleet", label: "Frota", width: 10 },
+        { key: "date", label: "Data final UTC", width: 22 },
+        { key: "initial", label: "Inicial", width: 14 },
+        { key: "final", label: "Final", width: 14 },
+        { key: "hours", label: "HOURS", width: 14 },
+        { key: "site", label: "Obra", width: 28 },
+        { key: "reason", label: "Apuração", width: 30 },
+      ],
+      rows: data.items.map(i => ({
+        fleet: i.fleetNumber, date: i.at, initial: i.initial, final: i.final,
+        hours: i.hours ?? "", site: i.workSite ?? "Não atribuída", reason: utilizationReason(i.reason),
+      })),
+    };
+  }
   if (data.type === "anomalies") {
     return {
       title,
@@ -168,7 +191,7 @@ export async function createExcelReport(data: ReportData) {
     worksheet.getColumn(index + 1).width = column.width;
     if (["date", "received", "synced"].includes(column.key))
       worksheet.getColumn(index + 1).numFmt = "dd/mm/yyyy hh:mm";
-    if (["value", "previous", "difference", "ocr"].includes(column.key))
+    if (["value", "previous", "difference", "ocr", "initial", "final", "hours"].includes(column.key))
       worksheet.getColumn(index + 1).numFmt = "0.00";
   });
   worksheet.autoFilter = {
@@ -189,6 +212,10 @@ export async function createExcelReport(data: ReportData) {
     }
   });
 
+  if (report.summary) {
+    const row = worksheet.addRow([report.summary]);
+    row.font = { bold: true };
+  }
   return workbook.xlsx.writeBuffer();
 }
 
@@ -240,6 +267,10 @@ export async function createPdfReport(data: ReportData) {
     y -= 8;
   };
   header();
+  if (report.summary) {
+    page.drawText(normalizePdfText(report.summary), { x: 32, y, font: bold, size: 10 });
+    y -= 24;
+  }
   for (const row of report.rows) {
     // Complete key/value rows avoid truncating evidence identifiers and operator names.
     for (const column of report.columns) {

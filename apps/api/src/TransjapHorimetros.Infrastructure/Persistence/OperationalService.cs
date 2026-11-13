@@ -18,6 +18,12 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         var machines = db.Machines.AsNoTracking().AsQueryable();
         if (q.MachineId.HasValue) machines = machines.Where(m => m.Id == q.MachineId);
         if (q.FleetNumber.HasValue) machines = machines.Where(m => m.FleetNumber == q.FleetNumber);
+        if (q.WithoutRecentReading.HasValue)
+        {
+            var cutoff = clock.GetUtcNow().AddDays(-7);
+            machines = machines.Where(m => !db.HourMeterReadings.Any(r => r.MachineId == m.Id
+                && r.CapturedAtDevice >= cutoff) == q.WithoutRecentReading);
+        }
         var readings = db.HourMeterReadings.AsNoTracking().Where(r => machines.Any(m => m.Id == r.MachineId));
         if (q.WorkSiteId.HasValue) readings = readings.Where(r => r.WorkSiteId == q.WorkSiteId);
         if (q.OperatorId.HasValue) readings = readings.Where(r => r.CreatedByUserId == q.OperatorId);
@@ -26,6 +32,14 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         if (q.To.HasValue) readings = readings.Where(r => r.CapturedAtDevice <= q.To);
         if (q.ReadingType.HasValue) readings = readings.Where(r => r.ReadingType == q.ReadingType);
         if (q.HasAnomaly.HasValue) readings = readings.Where(r => r.Anomalies.Any() == q.HasAnomaly);
+        if (q.MeterUnit.HasValue) readings = readings.Where(r => r.MeterUnit == q.MeterUnit);
+        if (q.HasPhotoEvidence.HasValue) readings = readings.Where(r =>
+            db.PhotoEvidences.Any(p => p.ReadingId == r.Id) == q.HasPhotoEvidence);
+        if (q.Reviewed.HasValue) readings = readings.Where(r => db.ReadingReviews.Any(v => v.ReadingId == r.Id) == q.Reviewed);
+        if (q.OcrStatus.HasValue) readings = readings.Where(r => db.PhotoOcrResults
+            .Where(o => db.PhotoEvidences.Any(p => p.Id == o.PhotoEvidenceId && p.ReadingId == r.Id))
+            .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
+            .Select(o => (PhotoOcrStatus?)o.Status).FirstOrDefault() == q.OcrStatus);
         var today = new DateTimeOffset(clock.GetUtcNow().UtcDateTime.Date, TimeSpan.Zero);
         var bySite = await readings.GroupBy(r => r.WorkSite == null ? "Sem obra" : r.WorkSite.Name)
             .OrderByDescending(g => g.Count()).Take(100).Select(g => new OperationalGroup(g.Key, g.Count())).ToListAsync(ct);
@@ -44,7 +58,77 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
             await db.Anomalies.CountAsync(a => a.Status == AnomalyStatus.Open && a.ReadingId.HasValue
                 && readings.Any(r => r.Id == a.ReadingId), ct),
             bySite, days.Select(d => new OperationalGroup(d.Day.ToString("yyyy-MM-dd"), d.Count)).ToArray(),
-            oldest.Select(m => new StaleMachine(m.FleetNumber, m.Model, m.LastReceivedAt)).ToArray());
+            oldest.Select(m => new StaleMachine(m.FleetNumber, m.Model, m.LastReceivedAt)).ToArray(),
+            await readings.Select(r => r.MachineId).Distinct().CountAsync(ct),
+            await readings.CountAsync(r => db.ReadingReviews.Any(v => v.ReadingId == r.Id && v.Approved)
+                || (r.Status == ReadingStatus.Validated && !db.ReadingReviews.Any(v => v.ReadingId == r.Id)), ct),
+            await machines.CountAsync(m => m.Status == MachineStatus.Active
+                && !db.HourMeterReadings.Any(r => r.MachineId == m.Id && r.CapturedAtDevice >= today.AddDays(-7)), ct));
+    }
+
+    public async Task<UtilizationReport> GetUtilizationAsync(ReadingQuery q, CancellationToken ct, bool export = false)
+    {
+        var to = q.To ?? clock.GetUtcNow();
+        var from = q.From ?? to.AddDays(-30);
+        if (from > to || to - from > TimeSpan.FromDays(366))
+            throw new BadRequestException("Consulte um período de até 366 dias.");
+        var machines = db.Machines.AsNoTracking().AsQueryable();
+        if (q.MachineId.HasValue) machines = machines.Where(m => m.Id == q.MachineId);
+        if (q.FleetNumber.HasValue) machines = machines.Where(m => m.FleetNumber == q.FleetNumber);
+        if (q.WithoutRecentReading.HasValue)
+        {
+            var cutoff = clock.GetUtcNow().AddDays(-7);
+            machines = machines.Where(m => !db.HourMeterReadings.Any(r => r.MachineId == m.Id
+                && r.CapturedAtDevice >= cutoff) == q.WithoutRecentReading);
+        }
+        // Preserve chronological neighbours before applying presentation filters.
+        var query = db.HourMeterReadings.AsNoTracking()
+            .Where(r => machines.Any(m => m.Id == r.MachineId) && r.CapturedAtDevice >= from && r.CapturedAtDevice <= to);
+        var points = await query.OrderBy(r => r.MachineId).ThenBy(r => r.CapturedAtDevice).ThenBy(r => r.Id)
+            .Select(r => new { r.Id, r.MachineId, r.CapturedAtDevice, r.Value, r.MeterUnit, r.WorkSiteId,
+                Site = r.WorkSite == null ? null : r.WorkSite.Name,
+                Fleet = r.Machine!.FleetNumber, r.Machine.Model, r.CreatedByUserId, r.Status, r.ReadingType,
+                Photo = db.PhotoEvidences.Any(p => p.ReadingId == r.Id),
+                Anomaly = r.Anomalies.Any(),
+                Ocr = db.PhotoOcrResults.Where(o => db.PhotoEvidences.Any(p => p.Id == o.PhotoEvidenceId && p.ReadingId == r.Id))
+                    .OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id).Select(o => (PhotoOcrStatus?)o.Status).FirstOrDefault(),
+                Corrected = r.CorrectionOfReadingId != null || r.Corrections.Any(),
+                Approved = db.ReadingReviews.Where(v => v.ReadingId == r.Id).Select(v => (bool?)v.Approved).FirstOrDefault()
+            }).Take(10001).ToListAsync(ct);
+        if (points.Count > 10000) throw new BadRequestException("Mais de 10.000 leituras. Reduza o período ou selecione uma frota.");
+        var rows = new List<UtilizationRow>();
+        foreach (var group in points.GroupBy(p => p.MachineId))
+        {
+            var intervals = Utilization.Calculate(group.Select(p => new UtilizationPoint(p.Id, p.CapturedAtDevice,
+                p.Value, p.MeterUnit, p.WorkSiteId,
+                p.Approved == true || (p.Approved == null && p.Status == ReadingStatus.Validated && !p.Anomaly), p.Corrected)), from, to);
+            var map = group.ToDictionary(p => p.Id);
+            foreach (var interval in intervals)
+            {
+                var p = map[interval.ReadingId];
+                if (q.WorkSiteId.HasValue && p.WorkSiteId != q.WorkSiteId
+                    || q.OperatorId.HasValue && p.CreatedByUserId != q.OperatorId
+                    || q.Status.HasValue && p.Status != q.Status
+                    || q.MeterUnit.HasValue && p.MeterUnit != q.MeterUnit
+                    || q.ReadingType.HasValue && p.ReadingType != q.ReadingType
+                    || q.HasAnomaly.HasValue && p.Anomaly != q.HasAnomaly
+                    || q.HasPhotoEvidence.HasValue && p.Photo != q.HasPhotoEvidence
+                    || q.Reviewed.HasValue && p.Approved.HasValue != q.Reviewed
+                    || q.OcrStatus.HasValue && p.Ocr != q.OcrStatus) continue;
+                // A site-filtered report counts only intervals attributed to that site.
+                var hours = q.WorkSiteId.HasValue && interval.Site != q.WorkSiteId ? null : interval.Difference;
+                rows.Add(new(p.MachineId, p.Fleet, p.Model, p.Id, p.CapturedAtDevice,
+                    interval.Initial, interval.Final, hours,
+                    hours == null && interval.Reason == "CALCULATED" ? "SITE_UNCERTAIN" : interval.Reason,
+                    interval.Site, interval.Site == null ? null : p.Site));
+            }
+        }
+        var calculated = rows.Count(r => r.Hours.HasValue);
+        return new(calculated == 0 ? null : rows.Sum(r => r.Hours ?? 0),
+            calculated, rows.Count - calculated,
+            rows.OrderBy(r => r.FleetNumber).ThenBy(r => r.At).ThenBy(r => r.ReadingId)
+                .Skip(export ? 0 : (int)Math.Min(10000L, (long)(q.Page - 1) * q.PageSize)).Take(export ? 10000 : q.PageSize).ToArray(),
+            rows.Count, q.Page, q.PageSize);
     }
 
     public async Task ReviewAnomalyAsync(Guid id, AnomalyReviewRequest request, string correlationId, CancellationToken ct)

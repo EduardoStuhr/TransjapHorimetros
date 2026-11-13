@@ -13,12 +13,16 @@ public sealed class UtilizationIntegrationTests(TransjapApiFactory factory) : IC
         await factory.ResetDatabaseAsync();
         using var client = factory.CreateClient();
         var machine = await client.GetFromJsonAsync<JsonElement>("/api/v1/machines/by-fleet/68");
+        var siteResponse = await client.PostAsJsonAsync("/api/v1/worksites",
+            new { name = "Obra de homologação", code = "SYN", active = true });
+        siteResponse.EnsureSuccessStatusCode();
+        var site = (await siteResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         for (var i = 0; i < 3; i++)
         {
             var response = await client.PostAsJsonAsync("/api/v1/readings", new {
                 machineId = machine.GetProperty("id").GetGuid(), value = 100m + i * 0.11m,
                 readingType = "INTERMEDIATE", capturedAtDevice = DateTimeOffset.UtcNow.AddHours(-3 + i),
-                clientEventId = Guid.NewGuid()
+                workSiteId = i == 0 ? (Guid?)null : site, clientEventId = Guid.NewGuid()
             });
             response.EnsureSuccessStatusCode();
             var reading = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -37,7 +41,13 @@ public sealed class UtilizationIntegrationTests(TransjapApiFactory factory) : IC
         foreach (var key in new[] { "byFleet", "bySite", "byDay", "unassignedHours", "unavailableByReason" })
             Assert.Equal(full.GetProperty(key).GetRawText(), page.GetProperty(key).GetRawText());
         Assert.Equal(0.22m, page.GetProperty("byFleet")[0].GetProperty("value").GetDecimal());
-        Assert.Equal(0.22m, page.GetProperty("unassignedHours").GetDecimal());
+        Assert.Equal(0.11m, page.GetProperty("unassignedHours").GetDecimal());
+        Assert.Equal(0.11m, page.GetProperty("bySite")[0].GetProperty("value").GetDecimal());
+        var filtered = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/operations/utilization?fleetNumber=68&workSiteId={site}&meterUnit=HOURS&hasPhotoEvidence=false");
+        Assert.Equal(2, filtered.GetProperty("totalItems").GetInt32());
+        Assert.Equal(0.11m, filtered.GetProperty("hours").GetDecimal());
+        Assert.Equal(1, filtered.GetProperty("unavailableByReason").GetProperty("SITE_UNCERTAIN").GetInt32());
         Assert.Equal(0.22m, page.GetProperty("byDay").EnumerateArray().Sum(x => x.GetProperty("value").GetDecimal()));
         Assert.Equal(3, full.GetProperty("items").GetArrayLength());
     }
@@ -46,7 +56,7 @@ public sealed class UtilizationIntegrationTests(TransjapApiFactory factory) : IC
     public async Task UtilizationIsProtectedAndPreservesEmptyStateAndPeriodValidation()
     {
         await factory.ResetDatabaseAsync();
-        using var supervisor = factory.CreateClient();
+        using var supervisor = factory.CreateClientForRole(AppRoles.Supervisor);
         using var anonymous = factory.CreateAnonymousClient();
         using var op = factory.CreateClientForRole(AppRoles.Operator);
         const string route = "/api/v1/operations/utilization";

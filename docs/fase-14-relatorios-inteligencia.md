@@ -8,7 +8,7 @@ Base a767b16, merge da homologação da Fase 13. O serviço OperationalService j
 
 O endpoint administrativo GET /api/v1/operations/utilization usa a política CanViewDashboard. Considera captura em UTC e separa cada equipamento antes de ordenar os eventos. A chegada offline não governa o cálculo. Um intervalo exige dois registros aceitos, consecutivos e inteiramente dentro do período. A primeira captura no período fica sem cálculo, mesmo que haja histórico anterior. Não há interpolação, projeção nem estimativa para o fim do período. Ausência de evento não significa paralisação.
 
-Validated sem alerta e sem decisão contrária é elegível. Uma aprovação explícita também é elegível. Rejeições, suspeitas sem aprovação e limites de correção impedem cálculo nos intervalos adjacentes. Capturas simultâneas são ambíguas. Valores decrescentes geram NEGATIVE_OR_RESET e não produzem horas. KM e unidade ausente não produzem HOURS. O valor é digitado pelo operador, nunca substituído por OCR. Duas capturas consecutivas na mesma obra permitem atribuição sob a hipótese de continuidade entre esses registros. Mudança ou ausência de obra deixa horas sem atribuição. Essa hipótese deve ser confirmada pelos responsáveis operacionais.
+Validated sem alerta e sem decisão contrária é elegível. Uma aprovação explícita também é elegível. Rejeições, suspeitas sem aprovação e limites de correção impedem cálculo nos intervalos adjacentes. Capturas simultâneas são ambíguas. Valores decrescentes geram NEGATIVE_OR_RESET e não produzem horas. KM e unidade ausente não produzem HOURS. O valor é digitado pelo operador, nunca substituído por OCR. Em 13/11/2026 o responsável confirmou a convenção operacional de atribuir à mesma obra todas as horas calculáveis entre duas leituras consecutivas do mesmo equipamento que indiquem essa obra. Mudança ou ausência de obra deixa horas sem atribuição. A convenção não comprova localização contínua.
 
 Os filtros de obra e operador são aplicados depois de identificar os vizinhos. No filtro de obra, intervalos não atribuíveis ficam sem cálculo para aquela obra. A soma usa decimal no servidor e fica indisponível quando não há nenhum intervalo elegível. Zero é reservado à diferença efetivamente nula. Motivos de indisponibilidade acompanham cada resultado.
 
@@ -26,7 +26,7 @@ O novo relatório utilization reutiliza Excel e PDF. Exporta todos os resultados
 
 O PR #27 foi integrado à main no merge a2ff8c235ef874c40c7271c18f478fb4f209468d. A CI 43454750104 aprovou 602 testes. A branch corretiva acrescenta um ensaio com SQL Server descartável para 100, 1.000, 5.000, 10.000 e 10.001 leituras. O teto é verificado por contagem limitada antes da projeção detalhada e novamente antes da apuração. O critério para a CI é p95 inferior a 10 segundos para navegação com três consultas simultâneas e nenhum erro inesperado em 30 consultas por volume. É um teto de regressão do runner compartilhado.
 
-**Pendente de confirmação operacional.** Quando duas leituras consecutivas de uma máquina indicam a mesma obra, podemos considerar que todas as horas acumuladas entre elas pertencem a essa obra, mesmo sem registros intermediários?
+O responsável confirmou a regra operacional em 13/11/2026. O PR #28 foi integrado à main pelo merge 226d05628fcffe2746276392b650123b93de51a1.
 
 Testes físicos reservados à Fase 16. Qualquer publicação ou aplicação de migration exige autorização posterior.
 
@@ -36,7 +36,7 @@ A execução 43454178123 aprovou o backend Release, 265 testes unitários, 225 d
 
 Os testes específicos incluem ordem de captura versus chegada, precisão decimal, duplicidade de horário, rejeição ou suspeita não aprovada, correção, reinício, unidade KM, mudança de obra, falta de leitura inicial, período cruzado e dados vazios. A integração verifica acesso anônimo/operador, validação do período, soma de três leituras aprovadas, paginação e exportação completa. Excel é reaberto para validar números, filtros, total e texto que começa com igual. PDF é reaberto para validar a estrutura. SSR verifica estado vazio, links autorizados, filtros e navegação.
 
-Atenção para a hipótese de continuidade da obra e para os motivos em que não existe leitura inicial. Esses pontos precisam ser confirmados na homologação gerencial. A recuperação de falhas OCR e os testes das fases anteriores continuam na suíte de regressão.
+A convenção de atribuição foi aprovada e os motivos sem leitura inicial permanecem explícitos. A recuperação de falhas OCR e os testes das fases anteriores continuam na suíte de regressão.
 
 ## Homologação em ambiente isolado · 13 de novembro de 2026
 
@@ -58,7 +58,7 @@ Foram reabertos XLSX e PDF de 21 e 10.000 registros. Na primeira execução com 
 
 A política CanViewDashboard e a rota de exportação restringem acesso a supervisor, administrativo, gerente e administrador. A integração cobre 401 anônimo e 403 operador na API. A rota Next recusa exportação a operador mesmo com acesso direto. O novo contrato expõe agregações, contagens e identificadores das leituras paginadas. Fotografias, credenciais e e-mails de operadores não são necessários nesses dados. O ensaio usa base descartável protegida pelo TestDatabaseGuard.
 
-O aceite da hipótese de continuidade depende do responsável operacional. Testes físicos pertencem à Fase 16. Os resultados acima são de desenvolvimento e CI.
+A regra de atribuição recebeu aceite operacional em 13/11/2026. Testes físicos pertencem à Fase 16. Os resultados acima são de desenvolvimento e CI.
 
 ### Medição com instrumentação
 

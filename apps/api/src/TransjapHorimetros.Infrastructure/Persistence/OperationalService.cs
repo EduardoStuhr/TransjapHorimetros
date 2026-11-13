@@ -127,7 +127,7 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         return new(calculated == 0 ? null : rows.Sum(r => r.Hours ?? 0),
             calculated, rows.Count - calculated,
             rows.OrderBy(r => r.FleetNumber).ThenBy(r => r.At).ThenBy(r => r.ReadingId)
-                .Skip(export ? 0 : (q.Page - 1) * q.PageSize).Take(export ? 10000 : q.PageSize).ToArray(),
+                .Skip(export ? 0 : (int)Math.Min(10000L, (long)(q.Page - 1) * q.PageSize)).Take(export ? 10000 : q.PageSize).ToArray(),
             rows.Count, q.Page, q.PageSize);
     }
 

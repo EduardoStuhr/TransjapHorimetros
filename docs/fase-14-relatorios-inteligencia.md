@@ -27,3 +27,11 @@ O novo relatório utilization reutiliza Excel e PDF. Exporta todos os resultados
 O PR continua em rascunho. Foram acrescentados filtro de captura recente, evolução por pontos cronológicos, barras diárias e motivos de atenção. Falta ensaio de carga e inspeção visual do novo painel em navegador. A paginação calcula até 10.000 registros em memória; períodos de grande volume exigem frota ou janela menor. Não há teste de desempenho para crescimento além desse limite. Esses itens impedem declarar a Fase 14 integralmente pronta.
 
 Testes físicos reservados à Fase 16. Qualquer publicação ou aplicação de migration exige autorização posterior.
+
+## Evidências de execução
+
+A execução 43454178123 aprovou o backend Release, 265 testes unitários, 225 de integração com SQL Server 2022 descartável e 110 testes web. A revisão subsequente inclui filtro de captura recente e gráficos por dia e evolução, com mais dois testes SSR. Localmente, 112 testes web passaram, lint e build de produção concluíram. O PR #27 mantém a CI para verificar o commit final.
+
+Os testes específicos incluem ordem de captura versus chegada, precisão decimal, duplicidade de horário, rejeição ou suspeita não aprovada, correção, reinício, unidade KM, mudança de obra, falta de leitura inicial, período cruzado e dados vazios. A integração verifica acesso anônimo/operador, validação do período, soma de três leituras aprovadas, paginação e exportação completa. Excel é reaberto para validar números, filtros, total e texto que começa com igual. PDF é reaberto para validar a estrutura. SSR verifica estado vazio, links autorizados, filtros e navegação.
+
+Atenção para a hipótese de continuidade da obra e para os motivos em que não existe leitura inicial. Esses pontos precisam ser confirmados na homologação gerencial. A recuperação de falhas OCR e os testes das fases anteriores continuam na suíte de regressão.

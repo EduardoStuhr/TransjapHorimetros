@@ -1,3 +1,4 @@
+import { ApiError } from "@/services/api-client";
 import { utilizationReason } from "@/services/utilization-presentation";
 import Link from "next/link";
 import { getUtilization } from "@/services/operations.service";
@@ -6,7 +7,15 @@ import type { ReadingFilters } from "@/services/readings.service";
 
 const number = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 export async function UtilizationPanel({ filters }: { filters: ReadingFilters }) {
-  const report = await getUtilization(filters);
+  let report;
+  try {
+    report = await getUtilization(filters);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400) {
+      return <p role="alert">Não foi possível apurar esse período. Selecione uma frota e reduza a janela para até 366 dias e 10 mil leituras.</p>;
+    }
+    throw error;
+  }
   const search = filterSearch({ ...filters, page: undefined } as Record<string, string | undefined>);
   const machines = new Map<number, typeof report.items>();
   for (const item of report.items) {

@@ -28,13 +28,17 @@ interface PreparedReport {
   summary?: string;
 }
 
-function getPeriod(values: readonly string[]) {
+const utcDate = (value: string) => new Intl.DateTimeFormat("pt-BR", {
+  dateStyle: "short", timeStyle: "short", timeZone: "UTC",
+}).format(new Date(value));
+
+function getPeriod(values: readonly string[], format: (value: string) => string = formatDateTime) {
   if (values.length === 0) {
     return "Sem dados";
   }
 
   const ordered = values.toSorted();
-  return `${formatDateTime(ordered[0])} a ${formatDateTime(ordered.at(-1))}`;
+  return `${format(ordered[0])} a ${format(ordered[ordered.length - 1])}`;
 }
 
 function prepareReport(data: ReportData): PreparedReport {
@@ -42,10 +46,10 @@ function prepareReport(data: ReportData): PreparedReport {
 
   if (data.type === "utilization") {
     return {
-      title, period: getPeriod(data.items.map(i => i.at)),
-      summary: "HOURS calculadas: " + (data.items.some(i => i.hours != null)
-        ? data.items.reduce((sum, i) => sum + (i.hours ?? 0), 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })
-        : "Indisponível") + " · Intervalos sem cálculo: " + data.items.filter(i => i.hours == null).length,
+      title, period: getPeriod(data.items.map(i => i.at), utcDate),
+      summary: "HOURS calculadas: " + (data.hours == null
+        ? "Indisponível" : data.hours.toLocaleString("pt-BR", { maximumFractionDigits: 2 }))
+        + " · Intervalos sem cálculo: " + data.unavailableIntervals,
       columns: [
         { key: "fleet", label: "Frota", width: 10 },
         { key: "date", label: "Data final UTC", width: 22 },
@@ -214,6 +218,7 @@ export async function createExcelReport(data: ReportData) {
 
   if (report.summary) {
     const row = worksheet.addRow([report.summary]);
+    worksheet.mergeCells(row.number, 1, row.number, lastColumn);
     row.font = { bold: true };
   }
   return workbook.xlsx.writeBuffer();
@@ -229,6 +234,7 @@ function normalizePdfText(value: string | number) {
 
 export async function createPdfReport(data: ReportData) {
   const report = prepareReport(data);
+  const dateFormatter = data.type === "utilization" ? utcDate : formatDateTime;
   const document = await PDFDocument.create();
   const font = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
@@ -276,7 +282,7 @@ export async function createPdfReport(data: ReportData) {
     for (const column of report.columns) {
       const value =
         ["date", "received", "synced"].includes(column.key) && row[column.key]
-          ? formatDateTime(String(row[column.key]))
+          ? dateFormatter(String(row[column.key]))
           : row[column.key];
       const text = normalizePdfText(column.label + ": " + value);
       const lines = text.match(/.{1,120}/g) ?? [""];

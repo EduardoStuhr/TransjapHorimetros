@@ -1,4 +1,4 @@
-import { apiFetch } from "@/services/api-client";
+import { ApiError, apiFetch } from "@/services/api-client";
 import type { AuthUser } from "@/lib/auth/types";
 import { parseOperationalFilters } from "@/lib/operational-filters";
 import {
@@ -44,7 +44,14 @@ export async function GET(
   } catch {
     return Response.json({ message: "Filtros inválidos." }, { status: 400 });
   }
-  const data = await getReportData(reportType, filters);
+  let data;
+  try {
+    data = await getReportData(reportType, filters);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400)
+      return Response.json({ message: error.message }, { status: 400 });
+    throw error;
+  }
 
   if (data.items.length === 0) {
     return Response.json(

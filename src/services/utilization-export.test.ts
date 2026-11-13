@@ -6,7 +6,7 @@ import type { ReportData } from "./reports.service";
 import { utilizationReason } from "./utilization-presentation";
 
 const data: ReportData = {
-  type: "utilization",
+  type: "utilization", hours: 0.21, unavailableIntervals: 0,
   filters: { fleetNumber: "128", startDate: "2026-11-01", endDate: "2026-11-02" },
   items: [{
     machineId: "machine", fleetNumber: 128, model: "Máquina", readingId: "reading",

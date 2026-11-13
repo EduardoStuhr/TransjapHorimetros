@@ -63,8 +63,8 @@ export default async function ReportsPage({
       <div className="grid gap-4 md:grid-cols-2">
         {reportDefinitions.map((report) => {
           const Icon = reportIcons[report.type];
-          const itemCount =
-            availability.find((item) => item.type === report.type)?.count ?? 0;
+          const available = availability.find((item) => item.type === report.type);
+          const itemCount = available?.count ?? 0;
           const canExport = itemCount > 0;
 
           return (
@@ -122,7 +122,7 @@ export default async function ReportsPage({
                 </div>
                 {!canExport ? (
                   <p className="mt-3 text-sm text-slate-600">
-                    Não há dados reais disponíveis para exportar.
+                    {available?.message ?? "Não há dados reais disponíveis para exportar."}
                   </p>
                 ) : null}
               </CardContent>

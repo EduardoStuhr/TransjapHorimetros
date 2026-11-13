@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +14,10 @@ namespace TransjapHorimetros.Infrastructure.Persistence;
 
 public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor, TimeProvider clock) : IOperationalService
 {
+    private static readonly Meter Metrics = new("TransjapHorimetros.Operations");
+    private static readonly Histogram<double> QueryTime = Metrics.CreateHistogram<double>("utilization.query.duration", "ms");
+    private static readonly Histogram<double> CalculationTime = Metrics.CreateHistogram<double>("utilization.calculation.duration", "ms");
+
     public async Task<OperationalSummary> GetSummaryAsync(ReadingQuery q, CancellationToken ct)
     {
         if (q.From > q.To) throw new BadRequestException("O período está invertido.");
@@ -84,6 +90,10 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         // Preserve chronological neighbours before applying presentation filters.
         var query = db.HourMeterReadings.AsNoTracking()
             .Where(r => machines.Any(m => m.Id == r.MachineId) && r.CapturedAtDevice >= from && r.CapturedAtDevice <= to);
+        var queryStart = Stopwatch.GetTimestamp();
+        const string limitMessage = "Mais de 10.000 leituras. Reduza o período ou selecione uma frota.";
+        if (await query.Take(10001).CountAsync(ct) > 10000)
+            throw new BadRequestException(limitMessage);
         var points = await query.OrderBy(r => r.MachineId).ThenBy(r => r.CapturedAtDevice).ThenBy(r => r.Id)
             .Select(r => new { r.Id, r.MachineId, r.CapturedAtDevice, r.Value, r.MeterUnit, r.WorkSiteId,
                 Site = r.WorkSite == null ? null : r.WorkSite.Name,
@@ -95,10 +105,13 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
                 Corrected = r.CorrectionOfReadingId != null || r.Corrections.Any(),
                 Approved = db.ReadingReviews.Where(v => v.ReadingId == r.Id).Select(v => (bool?)v.Approved).FirstOrDefault()
             }).Take(10001).ToListAsync(ct);
-        if (points.Count > 10000) throw new BadRequestException("Mais de 10.000 leituras. Reduza o período ou selecione uma frota.");
+        if (points.Count > 10000) throw new BadRequestException(limitMessage);
+        QueryTime.Record(Stopwatch.GetElapsedTime(queryStart).TotalMilliseconds);
+        var calculationStart = Stopwatch.GetTimestamp();
         var rows = new List<UtilizationRow>();
         foreach (var group in points.GroupBy(p => p.MachineId))
         {
+            ct.ThrowIfCancellationRequested();
             var intervals = Utilization.Calculate(group.Select(p => new UtilizationPoint(p.Id, p.CapturedAtDevice,
                 p.Value, p.MeterUnit, p.WorkSiteId,
                 p.Approved == true || (p.Approved == null && p.Status == ReadingStatus.Validated && !p.Anomaly), p.Corrected)), from, to);
@@ -123,12 +136,25 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
                     interval.Site, interval.Site == null ? null : p.Site));
             }
         }
-        var calculated = rows.Count(r => r.Hours.HasValue);
-        return new(calculated == 0 ? null : rows.Sum(r => r.Hours ?? 0),
+        var eligible = rows.Where(r => r.Hours.HasValue).ToArray();
+        var calculated = eligible.Length;
+        static HoursGroup[] Totals(IEnumerable<IGrouping<string, UtilizationRow>> groups) =>
+            groups.OrderBy(g => g.Key, StringComparer.Ordinal)
+                .Select(g => new HoursGroup(g.Key, g.Sum(r => r.Hours!.Value))).ToArray();
+        var report = new UtilizationReport(calculated == 0 ? null : rows.Sum(r => r.Hours ?? 0),
             calculated, rows.Count - calculated,
             rows.OrderBy(r => r.FleetNumber).ThenBy(r => r.At).ThenBy(r => r.ReadingId)
                 .Skip(export ? 0 : (int)Math.Min(10000L, (long)(q.Page - 1) * q.PageSize)).Take(export ? 10000 : q.PageSize).ToArray(),
-            rows.Count, q.Page, q.PageSize);
+            rows.Count, q.Page, q.PageSize,
+            Totals(eligible.GroupBy(r => $"Frota {r.FleetNumber}")),
+            eligible.Where(r => r.WorkSiteId.HasValue).GroupBy(r => r.WorkSiteId)
+                .OrderBy(g => g.First().WorkSite).ThenBy(g => g.Key)
+                .Select(g => new HoursGroup(g.First().WorkSite!, g.Sum(r => r.Hours!.Value))).ToArray(),
+            Totals(eligible.GroupBy(r => r.At.UtcDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))),
+            eligible.Where(r => !r.WorkSiteId.HasValue).Sum(r => r.Hours!.Value),
+            rows.Where(r => !r.Hours.HasValue).GroupBy(r => r.Reason).ToDictionary(g => g.Key, g => g.Count()));
+        CalculationTime.Record(Stopwatch.GetElapsedTime(calculationStart).TotalMilliseconds);
+        return report;
     }
 
     public async Task ReviewAnomalyAsync(Guid id, AnomalyReviewRequest request, string correlationId, CancellationToken ct)

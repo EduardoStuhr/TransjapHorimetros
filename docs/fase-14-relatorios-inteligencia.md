@@ -24,6 +24,6 @@ O novo relatório utilization reutiliza Excel e PDF. Exporta todos os resultados
 
 ## Pontos ainda pendentes do escopo integral
 
-O PR continua em rascunho. Faltam filtro específico de equipamentos sem leitura recente, evolução em gráfico de linha, gráfico de horas por dia/semana e visualização dedicada de inconsistências. Falta ensaio de carga e inspeção visual do novo painel em navegador. A paginação calcula até 10.000 registros em memória; períodos de grande volume exigem frota ou janela menor. Não há teste de desempenho para crescimento além desse limite. Esses itens impedem declarar a Fase 14 integralmente pronta.
+O PR continua em rascunho. Foram acrescentados filtro de captura recente, evolução por pontos cronológicos, barras diárias e motivos de atenção. Falta ensaio de carga e inspeção visual do novo painel em navegador. A paginação calcula até 10.000 registros em memória; períodos de grande volume exigem frota ou janela menor. Não há teste de desempenho para crescimento além desse limite. Esses itens impedem declarar a Fase 14 integralmente pronta.
 
 Testes físicos reservados à Fase 16. Qualquer publicação ou aplicação de migration exige autorização posterior.

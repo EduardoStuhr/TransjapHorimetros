@@ -12,6 +12,7 @@ import type {
 
 export interface ReadingFilters {
   page?: string;
+  withoutRecentReading?: "true" | "false" | "";
   reviewed?: "true" | "false" | "";
   ocrStatus?: string;
   operatorId?: string;
@@ -138,6 +139,7 @@ export function buildReadingsPath(
     "readingType",
     "hasPhotoEvidence",
     "hasAnomaly",
+    "withoutRecentReading",
     "reviewed",
     "ocrStatus",
   ] as const) {

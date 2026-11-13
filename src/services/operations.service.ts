@@ -30,6 +30,7 @@ export interface OperationalSummary {
 export function getOperationalSummary(filters: ReadingFilters) {
   const params = new URLSearchParams();
   for (const key of [
+    "withoutRecentReading",
     "reviewed",
     "ocrStatus",
     "machineId",

@@ -6,6 +6,7 @@ namespace TransjapHorimetros.Application.Readings;
 
 public sealed record ReadingQuery
 {
+    public bool? WithoutRecentReading { get; init; }
     public bool? Reviewed { get; init; }
     public PhotoOcrStatus? OcrStatus { get; init; }
 

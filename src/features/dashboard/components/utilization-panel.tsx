@@ -18,6 +18,13 @@ export async function UtilizationPanel({ filters }: { filters: ReadingFilters })
   for (const i of report.items) {
     if (i.hours != null) bySite.set(i.workSite ?? "Sem atribuição", (bySite.get(i.workSite ?? "Sem atribuição") ?? 0) + i.hours);
   }
+  const byDay = new Map<string, number>();
+  const warnings = new Map<string, number>();
+  for (const item of report.items) {
+    const day = item.at.slice(0, 10);
+    if (item.hours != null) byDay.set(day, (byDay.get(day) ?? 0) + item.hours);
+    else warnings.set(utilizationReason(item.reason), (warnings.get(utilizationReason(item.reason)) ?? 0) + 1);
+  }
   const machineHours = [...machines].map(([fleet, items]) => ({
     label: "Frota " + fleet, value: items.reduce((sum, i) => sum + (i.hours ?? 0), 0),
   }));
@@ -40,9 +47,14 @@ export async function UtilizationPanel({ filters }: { filters: ReadingFilters })
       <Bars title="HOURS calculadas por frota" items={machineHours} />
       <Bars title="HOURS por obra atribuível" items={[...bySite].map(([label, value]) => ({ label, value }))} />
     </div>
+    <div className="grid gap-4 md:grid-cols-2">
+      <Bars title="HOURS por dia UTC, pela captura final" items={[...byDay].map(([label, value]) => ({ label, value }))} />
+      <ul aria-label="Intervalos que exigem atenção">{[...warnings].map(([reason, count]) => <li className="border-b py-2" key={reason}>{reason} · {count}</li>)}</ul>
+    </div>
     <div className="max-h-96 space-y-4 overflow-auto">
       {[...machines].map(([fleet, items]) => <details key={fleet}>
         <summary>Frota {fleet} · {items[0].model} · {items.length} registros</summary>
+        <Evolution items={items} />
         <table className="w-full text-left text-sm">
           <caption>Evolução cronológica · HOURS calculáveis</caption>
           <thead><tr><th>Captura UTC</th><th>Horímetro</th><th>Horas</th><th>Obra</th><th>Apuração</th></tr></thead>
@@ -67,5 +79,21 @@ function Bars({ title, items }: { title: string; items: { label: string; value: 
       <div className="flex justify-between"><span>{i.label}</span><span>{number(i.value)}</span></div>
       <div className="h-2 rounded bg-slate-100" aria-hidden="true"><div className="h-2 rounded bg-blue-700" style={{ width: (100 * i.value / maximum) + "%" }} /></div>
     </li>)}</ul>
+  </figure>;
+}
+
+function Evolution({ items }: { items: import("@/services/operations.service").UtilizationRow[] }) {
+  const values = items.map(i => i.final);
+  const min = Math.min(...values);
+  const span = Math.max(1, Math.max(...values) - min);
+  const start = new Date(items[0].at).getTime();
+  const duration = Math.max(1, new Date(items[items.length - 1].at).getTime() - start);
+  return <figure className="my-4">
+    <figcaption>Horímetro informado · {number(min)} a {number(Math.max(...values))}</figcaption>
+    <div className="relative mx-3 h-32 border-b border-l" role="img" aria-label="Capturas ordenadas no tempo. Valores exatos na tabela abaixo.">
+      {items.map(i => <span key={i.readingId} className="absolute h-2 w-2 rounded-full bg-blue-700"
+        title={new Date(i.at).toISOString() + " · " + number(i.final)}
+        style={{ left: (100 * (new Date(i.at).getTime() - start) / duration) + "%", bottom: (95 * (i.final - min) / span) + "%" }} />)}
+    </div>
   </figure>;
 }

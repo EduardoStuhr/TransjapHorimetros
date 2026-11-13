@@ -30,6 +30,11 @@ export async function OperationalFilters({
           />
         </label>
       ))}
+      <label className="text-sm">Captura nos últimos 7 dias
+        <select className="mt-1 block w-full rounded border p-2" name="withoutRecentReading" defaultValue={filters.withoutRecentReading}>
+          <option value="">Todas</option><option value="true">Sem captura recente</option><option value="false">Com captura recente</option>
+        </select>
+      </label>
       <label className="text-sm">Revisão
         <select className="mt-1 block w-full rounded border p-2" name="reviewed" defaultValue={filters.reviewed}>
           <option value="">Todas</option><option value="true">Com decisão</option><option value="false">Sem decisão</option>

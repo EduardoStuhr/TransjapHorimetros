@@ -18,6 +18,12 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         var machines = db.Machines.AsNoTracking().AsQueryable();
         if (q.MachineId.HasValue) machines = machines.Where(m => m.Id == q.MachineId);
         if (q.FleetNumber.HasValue) machines = machines.Where(m => m.FleetNumber == q.FleetNumber);
+        if (q.WithoutRecentReading.HasValue)
+        {
+            var cutoff = clock.GetUtcNow().AddDays(-7);
+            machines = machines.Where(m => !db.HourMeterReadings.Any(r => r.MachineId == m.Id
+                && r.CapturedAtDevice >= cutoff) == q.WithoutRecentReading);
+        }
         var readings = db.HourMeterReadings.AsNoTracking().Where(r => machines.Any(m => m.Id == r.MachineId));
         if (q.WorkSiteId.HasValue) readings = readings.Where(r => r.WorkSiteId == q.WorkSiteId);
         if (q.OperatorId.HasValue) readings = readings.Where(r => r.CreatedByUserId == q.OperatorId);
@@ -69,6 +75,12 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
         var machines = db.Machines.AsNoTracking().AsQueryable();
         if (q.MachineId.HasValue) machines = machines.Where(m => m.Id == q.MachineId);
         if (q.FleetNumber.HasValue) machines = machines.Where(m => m.FleetNumber == q.FleetNumber);
+        if (q.WithoutRecentReading.HasValue)
+        {
+            var cutoff = clock.GetUtcNow().AddDays(-7);
+            machines = machines.Where(m => !db.HourMeterReadings.Any(r => r.MachineId == m.Id
+                && r.CapturedAtDevice >= cutoff) == q.WithoutRecentReading);
+        }
         // Preserve chronological neighbours before applying presentation filters.
         var query = db.HourMeterReadings.AsNoTracking()
             .Where(r => machines.Any(m => m.Id == r.MachineId) && r.CapturedAtDevice >= from && r.CapturedAtDevice <= to);

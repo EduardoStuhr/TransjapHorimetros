@@ -38,6 +38,24 @@ function getPeriod(values: readonly string[]) {
 function prepareReport(data: ReportData): PreparedReport {
   const title = getReportDefinition(data.type).title;
 
+  if (data.type === "utilization") {
+    return {
+      title, period: getPeriod(data.items.map(i => i.at)),
+      columns: [
+        { key: "fleet", label: "Frota", width: 10 },
+        { key: "date", label: "Data final UTC", width: 22 },
+        { key: "initial", label: "Inicial", width: 14 },
+        { key: "final", label: "Final", width: 14 },
+        { key: "hours", label: "HOURS", width: 14 },
+        { key: "site", label: "Obra", width: 28 },
+        { key: "reason", label: "Apuração", width: 30 },
+      ],
+      rows: data.items.map(i => ({
+        fleet: i.fleetNumber, date: i.at, initial: i.initial, final: i.final,
+        hours: i.hours ?? "", site: i.workSite ?? "Não atribuída", reason: i.reason,
+      })),
+    };
+  }
   if (data.type === "anomalies") {
     return {
       title,
@@ -168,7 +186,7 @@ export async function createExcelReport(data: ReportData) {
     worksheet.getColumn(index + 1).width = column.width;
     if (["date", "received", "synced"].includes(column.key))
       worksheet.getColumn(index + 1).numFmt = "dd/mm/yyyy hh:mm";
-    if (["value", "previous", "difference", "ocr"].includes(column.key))
+    if (["value", "previous", "difference", "ocr", "initial", "final", "hours"].includes(column.key))
       worksheet.getColumn(index + 1).numFmt = "0.00";
   });
   worksheet.autoFilter = {

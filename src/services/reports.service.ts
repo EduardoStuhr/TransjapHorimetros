@@ -1,3 +1,4 @@
+import { getUtilization, type UtilizationRow } from "@/services/operations.service";
 import { getAllAnomalies } from "@/services/anomalies.service";
 import type { ReadingFilters } from "@/services/readings.service";
 import { apiFetch, type PagedApiResponse } from "@/services/api-client";
@@ -5,6 +6,7 @@ import { getAllReadings, buildReadingsPath } from "@/services/readings.service";
 import type { Anomaly, HourMeterReading } from "@/types/domain";
 
 export const reportDefinitions = [
+  { type: "utilization", title: "Utilização calculável", description: "Intervalos conservadores por frota e obra, em HOURS." },
   {
     type: "readings",
     title: "Relatório de horímetros",
@@ -35,13 +37,14 @@ export interface ReportAvailability {
 }
 
 export type ReportData = { filters?: ReadingFilters } & (
+  | { type: "utilization"; items: readonly UtilizationRow[] }
   | {
       items: readonly Anomaly[];
       type: "anomalies";
     }
   | {
       items: readonly HourMeterReading[];
-      type: Exclude<ReportType, "anomalies">;
+      type: Exclude<ReportType, "anomalies" | "utilization">;
     }
 );
 
@@ -57,6 +60,7 @@ export async function getReportData(
   type: ReportType,
   filters: ReadingFilters = {},
 ): Promise<ReportData> {
+  if (type === "utilization") return { type, items: (await getUtilization(filters)).items, filters };
   if (type === "anomalies") {
     return { type, items: await getAllAnomalies(filters), filters };
   }

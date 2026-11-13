@@ -19,6 +19,11 @@ public sealed class OperationsController(IOperationalService service) : Controll
         return Ok(new { reviewed = true });
     }
 
+    [HttpGet("utilization")]
+    [Authorize(Policy = Policies.CanViewDashboard)]
+    public Task<UtilizationReport> Utilization([FromQuery] ReadingQuery query, CancellationToken ct) =>
+        service.GetUtilizationAsync(query, ct);
+
     [HttpGet("summary")]
     [Authorize(Policy = Policies.CanViewDashboard)]
     public Task<OperationalSummary> Summary([FromQuery] ReadingQuery query, CancellationToken ct) =>

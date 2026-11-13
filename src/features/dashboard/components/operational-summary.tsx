@@ -1,3 +1,4 @@
+import { UtilizationPanel } from "./utilization-panel";
 import Link from "next/link";
 import { OperationalFilters } from "@/components/shared/operational-filters";
 import { parseOperationalFilters } from "@/lib/operational-filters";
@@ -28,6 +29,7 @@ export async function OperationalSummaryPanel({
     <section className="space-y-4" aria-label="Supervisão operacional">
       <h2 className="text-lg font-bold">Supervisão operacional</h2>
       <OperationalFilters filters={filters} />
+      <UtilizationPanel filters={filters} />
       <div className="grid gap-3 sm:grid-cols-4">
         {metrics.map(([label, value]) => (
           <div className="rounded border bg-white p-4" key={label}>

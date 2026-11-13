@@ -23,6 +23,7 @@ public sealed record OperationalSummary(
 
 public interface IOperationalService
 {
+    Task<UtilizationReport> GetUtilizationAsync(ReadingQuery query, CancellationToken ct);
     Task<OperationalSummary> GetSummaryAsync(ReadingQuery query, CancellationToken ct);
     Task ReviewAnomalyAsync(Guid id, AnomalyReviewRequest request, string correlationId, CancellationToken ct);
     Task<ReadingReview?> GetReviewAsync(Guid id, CancellationToken ct);

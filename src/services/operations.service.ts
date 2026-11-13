@@ -41,3 +41,34 @@ export function getOperationalSummary(filters: ReadingFilters) {
   if (filters.endDate) params.set("to", filters.endDate + "T23:59:59.999Z");
   return apiFetch<OperationalSummary>("/api/v1/operations/summary?" + params);
 }
+
+
+export interface UtilizationRow {
+  machineId: string;
+  fleetNumber: number;
+  model: string;
+  readingId: string;
+  at: string;
+  initial: number;
+  final: number;
+  hours: number | null;
+  reason: string;
+  workSiteId: string | null;
+  workSite: string | null;
+}
+export interface UtilizationReport {
+  hours: number | null;
+  calculatedIntervals: number;
+  unavailableIntervals: number;
+  items: UtilizationRow[];
+}
+export function getUtilization(filters: ReadingFilters) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (!value) continue;
+    if (key === "startDate") params.set("from", value + "T00:00:00Z");
+    else if (key === "endDate") params.set("to", value + "T23:59:59.999Z");
+    else params.set(key, value);
+  }
+  return apiFetch<UtilizationReport>("/api/v1/operations/utilization?" + params);
+}

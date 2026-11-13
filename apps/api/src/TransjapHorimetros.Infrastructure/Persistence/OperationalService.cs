@@ -47,6 +47,58 @@ public sealed class OperationalService(TransjapDbContext db, ICurrentUser actor,
             oldest.Select(m => new StaleMachine(m.FleetNumber, m.Model, m.LastReceivedAt)).ToArray());
     }
 
+    public async Task<UtilizationReport> GetUtilizationAsync(ReadingQuery q, CancellationToken ct)
+    {
+        var to = q.To ?? clock.GetUtcNow();
+        var from = q.From ?? to.AddDays(-30);
+        if (from > to || to - from > TimeSpan.FromDays(366))
+            throw new BadRequestException("Consulte um período de até 366 dias.");
+        var machines = db.Machines.AsNoTracking().AsQueryable();
+        if (q.MachineId.HasValue) machines = machines.Where(m => m.Id == q.MachineId);
+        if (q.FleetNumber.HasValue) machines = machines.Where(m => m.FleetNumber == q.FleetNumber);
+        // Preserve chronological neighbours before applying presentation filters.
+        var query = db.HourMeterReadings.AsNoTracking()
+            .Where(r => machines.Any(m => m.Id == r.MachineId) && r.CapturedAtDevice >= from && r.CapturedAtDevice <= to);
+        var points = await query.OrderBy(r => r.MachineId).ThenBy(r => r.CapturedAtDevice).ThenBy(r => r.Id)
+            .Select(r => new { r.Id, r.MachineId, r.CapturedAtDevice, r.Value, r.MeterUnit, r.WorkSiteId,
+                Site = r.WorkSite == null ? null : r.WorkSite.Name,
+                Fleet = r.Machine!.FleetNumber, r.Machine.Model, r.CreatedByUserId, r.Status, r.ReadingType,
+                Photo = db.PhotoEvidences.Any(p => p.ReadingId == r.Id),
+                Anomaly = r.Anomalies.Any(),
+                Corrected = r.CorrectionOfReadingId != null || r.Corrections.Any(),
+                Approved = db.ReadingReviews.Where(v => v.ReadingId == r.Id).Select(v => (bool?)v.Approved).FirstOrDefault()
+            }).Take(10001).ToListAsync(ct);
+        if (points.Count > 10000) throw new BadRequestException("Mais de 10.000 leituras. Reduza o período ou selecione uma frota.");
+        var rows = new List<UtilizationRow>();
+        foreach (var group in points.GroupBy(p => p.MachineId))
+        {
+            var intervals = Utilization.Calculate(group.Select(p => new UtilizationPoint(p.Id, p.CapturedAtDevice,
+                p.Value, p.MeterUnit, p.WorkSiteId,
+                p.Approved == true || (p.Approved == null && p.Status == ReadingStatus.Validated), p.Corrected)), from, to);
+            var map = group.ToDictionary(p => p.Id);
+            foreach (var interval in intervals)
+            {
+                var p = map[interval.ReadingId];
+                if (q.WorkSiteId.HasValue && p.WorkSiteId != q.WorkSiteId
+                    || q.OperatorId.HasValue && p.CreatedByUserId != q.OperatorId
+                    || q.Status.HasValue && p.Status != q.Status
+                    || q.MeterUnit.HasValue && p.MeterUnit != q.MeterUnit
+                    || q.ReadingType.HasValue && p.ReadingType != q.ReadingType
+                    || q.HasAnomaly.HasValue && p.Anomaly != q.HasAnomaly
+                    || q.HasPhotoEvidence.HasValue && p.Photo != q.HasPhotoEvidence) continue;
+                // A site-filtered report counts only intervals attributed to that site.
+                var hours = q.WorkSiteId.HasValue && interval.Site != q.WorkSiteId ? null : interval.Difference;
+                rows.Add(new(p.MachineId, p.Fleet, p.Model, p.Id, p.CapturedAtDevice,
+                    interval.Initial, interval.Final, hours,
+                    hours == null && interval.Reason == "CALCULATED" ? "SITE_UNCERTAIN" : interval.Reason,
+                    interval.Site, interval.Site == null ? null : p.Site));
+            }
+        }
+        var calculated = rows.Count(r => r.Hours.HasValue);
+        return new(calculated == 0 ? null : rows.Sum(r => r.Hours ?? 0),
+            calculated, rows.Count - calculated, rows.OrderBy(r => r.FleetNumber).ThenBy(r => r.At).ThenBy(r => r.ReadingId).ToArray());
+    }
+
     public async Task ReviewAnomalyAsync(Guid id, AnomalyReviewRequest request, string correlationId, CancellationToken ct)
     {
         if (actor.UserId is null || string.IsNullOrWhiteSpace(actor.Email))

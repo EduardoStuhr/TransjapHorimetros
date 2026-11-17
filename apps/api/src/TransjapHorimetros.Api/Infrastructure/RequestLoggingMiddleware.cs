@@ -32,9 +32,9 @@ public sealed class RequestLoggingMiddleware(
                 : LogLevel.Information;
             logger.Log(
                 level,
-                "HTTP {Method} {Path} respondeu {StatusCode} em {ElapsedMilliseconds} ms.",
+                "HTTP {Method} {Route} respondeu {StatusCode} em {ElapsedMilliseconds} ms.",
                 context.Request.Method,
-                context.Request.Path.Value,
+                route,
                 context.Response.StatusCode,
                 stopwatch.Elapsed.TotalMilliseconds);
         }

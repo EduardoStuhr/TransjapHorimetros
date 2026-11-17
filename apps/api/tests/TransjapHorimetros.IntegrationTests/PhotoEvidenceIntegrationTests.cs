@@ -1,3 +1,9 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using TransjapHorimetros.Infrastructure.Persistence;
+using Xunit.Abstractions;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -6,7 +12,7 @@ using TransjapHorimetros.Domain.Security;
 
 namespace TransjapHorimetros.IntegrationTests;
 
-public sealed class PhotoEvidenceIntegrationTests(TransjapApiFactory factory)
+public sealed class PhotoEvidenceIntegrationTests(TransjapApiFactory factory, ITestOutputHelper output)
     : IClassFixture<TransjapApiFactory>
 {
     private const string Password = "Test!Password2026";
@@ -134,6 +140,67 @@ public sealed class PhotoEvidenceIntegrationTests(TransjapApiFactory factory)
             form);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(10)]
+    [InlineData(30)]
+    public async Task ConcurrentOperatorsCanLoginSyncReplayAndUpload(int users)
+    {
+        await factory.ResetDatabaseAsync();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
+        var machines = await db.Machines.OrderBy(m => m.FleetNumber).Select(m => m.Id).Take(users).ToListAsync();
+        Assert.Equal(users, machines.Count);
+        var emails = new List<string>();
+        for (var i = 0; i < users; i++)
+        {
+            var email = $"operator.{Guid.NewGuid():N}@tests.local";
+            await factory.CreateUserAsync(email, Password, true, AppRoles.Operator);
+            emails.Add(email);
+        }
+        var samples = new ConcurrentDictionary<string, ConcurrentBag<double>>();
+        async Task<HttpResponseMessage> Measure(string name, Func<Task<HttpResponseMessage>> send)
+        {
+            var timer = Stopwatch.StartNew();
+            var response = await send();
+            samples.GetOrAdd(name, _ => new()).Add(timer.Elapsed.TotalMilliseconds);
+            return response;
+        }
+        await Task.WhenAll(emails.Select(async (email, i) =>
+        {
+            using var client = factory.CreateAnonymousClient();
+            for (var iteration = 0; iteration < 5; iteration++)
+            {
+                using var login = await Measure("login", () => client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = Password }));
+                login.EnsureSuccessStatusCode();
+                var auth = await login.Content.ReadFromJsonAsync<JsonElement>();
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.GetProperty("accessToken").GetString());
+                var request = new { machineId = machines[i], value = 100 + iteration, readingType = "INTERMEDIATE",
+                    capturedAtDevice = DateTimeOffset.UtcNow, clientEventId = Guid.NewGuid() };
+                using var sync = await Measure("sync", () => client.PostAsJsonAsync("/api/v1/readings", request));
+                Assert.Equal(HttpStatusCode.Created, sync.StatusCode);
+                var reading = await sync.Content.ReadFromJsonAsync<JsonElement>();
+                using var replay = await Measure("replay", () => client.PostAsJsonAsync("/api/v1/readings", request));
+                Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+                var repeated = await replay.Content.ReadFromJsonAsync<JsonElement>();
+                var id = reading.GetProperty("id").GetGuid();
+                Assert.Equal(id, repeated.GetProperty("id").GetGuid());
+                using var form = CreatePhotoForm(CreateJpeg(), "image/jpeg");
+                using var upload = await Measure("upload", () => client.PostAsync($"/api/v1/readings/{id}/photo", form));
+                Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+            }
+        }));
+        Assert.Equal(users * 5, await db.HourMeterReadings.CountAsync());
+        foreach (var (operation, values) in samples.OrderBy(entry => entry.Key))
+        {
+            var sorted = values.Order().ToArray();
+            var p50 = sorted[(int)Math.Ceiling(sorted.Length * .50) - 1];
+            var p95 = sorted[(int)Math.Ceiling(sorted.Length * .95) - 1];
+            output.WriteLine($"LOAD15 users={users} operation={operation} samples={sorted.Length} p50={p50:F1} p95={p95:F1}ms");
+        }
     }
 
     private static async Task<Guid> CreateReadingAsync(HttpClient client)

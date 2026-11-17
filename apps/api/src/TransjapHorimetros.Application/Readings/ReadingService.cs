@@ -106,11 +106,20 @@ public sealed class ReadingService(
         if (request.ClientEventId == Guid.Empty)
             throw new ApplicationValidationException(nameof(request.ClientEventId), "O ClientEventId é obrigatório.");
 
-        return await unitOfWork.ExecuteForMachineAsync(request.MachineId,
+        var saved = await unitOfWork.ExecuteForMachineAsync(request.MachineId,
             () => CreateSerializedAsync(request, correlationId, cancellationToken, deviceSessionToken), cancellationToken);
+        // Release the write transaction before projecting anomaly, OCR and correction details.
+        if (saved.Existing)
+            return new CreateReadingResult(await GetByIdAsync(saved.Id, cancellationToken), true);
+
+        var persisted = await readingRepository.GetByIdAsync(saved.Id, cancellationToken)
+            ?? throw new InvalidOperationException("A leitura persistida não pôde ser recarregada.");
+        var summaries = await SummariesAsync([saved.Id], true, cancellationToken);
+        return new CreateReadingResult(ReadingMappings.ToResponse(persisted, saved.Machine, saved.Site,
+            summaries.GetValueOrDefault(saved.Id)), false);
     }
 
-    private async Task<CreateReadingResult> CreateSerializedAsync(CreateReadingRequest request, string correlationId,
+    private async Task<(Guid Id, bool Existing, Machine? Machine, WorkSite? Site)> CreateSerializedAsync(CreateReadingRequest request, string correlationId,
         CancellationToken cancellationToken, string? deviceSessionToken)
     {
         if (currentUser?.UserId is null || string.IsNullOrWhiteSpace(currentUser.Email))
@@ -123,7 +132,7 @@ public sealed class ReadingService(
         if (existing is not null)
         {
             EnsureSameEvent(existing, request, registeredDeviceId);
-            return new CreateReadingResult(await GetByIdAsync(existing.Id, cancellationToken), true);
+            return (existing.Id, true, null, null);
         }
         Validate(request);
         var machine = await machineRepository.GetByIdAsync(request.MachineId, false, cancellationToken)
@@ -255,17 +264,13 @@ public sealed class ReadingService(
             if (existing is not null)
             {
                 EnsureSameEvent(existing, request, registeredDeviceId);
-                return new CreateReadingResult(await GetByIdAsync(existing.Id, cancellationToken), true);
+                return (existing.Id, true, null, null);
             }
 
             throw;
         }
 
-        var persistedReading = await readingRepository.GetByIdAsync(reading.Id, cancellationToken)
-            ?? throw new InvalidOperationException("A leitura persistida não pôde ser recarregada.");
-        var summaries = await SummariesAsync([persistedReading.Id], true, cancellationToken);
-        return new CreateReadingResult(ReadingMappings.ToResponse(persistedReading, machine, workSite,
-            summaries.GetValueOrDefault(persistedReading.Id)), false);
+        return (reading.Id, false, machine, workSite);
     }
 
     private void EnsureSameEvent(HourMeterReading existing, CreateReadingRequest request, Guid? registeredDeviceId)

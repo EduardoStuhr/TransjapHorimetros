@@ -241,8 +241,8 @@ if (app.Environment.IsDevelopment() && !deviceIdentityOptions.EnforceForReadings
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseExceptionHandler();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseExceptionHandler();
 
 if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
 {
@@ -272,7 +272,8 @@ app.MapHealthChecks("/health/ready", HealthResponseWriter.Options(registration =
 app.MapHealthChecks("/health/live", HealthResponseWriter.Options(registration =>
     registration.Tags.Contains("live"))).AllowAnonymous();
 
-if (builder.Configuration.GetValue<bool?>("Database:ApplyMigrationsOnStartup") ?? true)
+if ((app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+    && builder.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
     await app.Services.MigrateAndSeedAsync();
 }

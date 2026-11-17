@@ -83,3 +83,22 @@ O npm audit de dependências de produção registrou duas entradas moderadas rel
 O ensaio local de rollback do frontend serviu primeiro o standalone 16.4.6 e depois o artefato anterior 16.4.3 no mesmo endereço, com fixture isolada. Ambos carregaram o login e entregaram PDF legível de cinco páginas para a frota 84. Este teste cobre compatibilidade da rota. A versão anterior tem alerta de segurança e exige avaliação antes de eventual uso real.
 
 O handler passa a responder 503 com Retry-After quando a estratégia EF esgota as tentativas transitórias. O middleware de métricas envolve o handler para registrar o status final e usa o template da rota no log, evitando identificadores no caminho.
+
+### Parecer técnico de 17/11/2026
+
+**Fase 15 PENDENTE em produção.** A verificação posterior no Portal encontrou o App Service da API em execução, verificação de integridade do App Service não configurada, log do PhotoOcrWorker com erro SQL 42119 e referência à cota gratuita. As configurações individuais exibidas foram ASPNETCORE_ENVIRONMENT=Production e Database__ApplyMigrationsOnStartup=false. O frontend redirecionou a raiz para o login e respondeu HTTP 200 nessa página. Os workflows da API (44092836786) e web (44092836544) concluíram com sucesso para 0b202132. O SHA carregado pelos processos permanece sem comprovação independente.
+
+A [CI 44096801024](https://github.com/EduardoStuhr/TransjapHorimetros/actions/runs/44096801024) passou no commit 3118a0d. Foram 265 testes unitários do backend, 230 de integração e 113 do frontend, total de 608, zero falhas. Inclui build Release, lint, build Next.js, inspeção Chrome, carga dos operadores e ensaio da base restaurada. No ensaio, a guarda em Production impediu a criação de banco mesmo com a flag ligada. A API candidata e a anterior passaram no ready e na rejeição de leitura anônima contra a cópia, com igualdade das tabelas após cada inicialização.
+
+| Operadores | Login p50/p95 ms | Sync p50/p95 ms | Replay p50/p95 ms | Foto p50/p95 ms |
+|---:|---:|---:|---:|---:|
+| 1 | 62,7 / 67,7 | 11,1 / 37,5 | 6,1 / 6,6 | 13,8 / 14,9 |
+| 5 | 117,7 / 187,7 | 31,3 / 55,6 | 16,8 / 25,0 | 40,3 / 74,8 |
+| 10 | 186,2 / 293,1 | 50,7 / 111,3 | 28,8 / 58,4 | 73,2 / 113,0 |
+| 30 | 398,7 / 850,2 | 205,0 / 536,9 | 120,1 / 313,3 | 276,7 / 632,6 |
+
+Cada operador fez cinco sequências. Os 230 replays retornaram os IDs originais e a contagem final por cenário correspondeu aos eventos distintos. A verificação automática de startup, backup e restore rodou somente na instância SQL descartável.
+
+No artefato fase15-query-plans da mesma CI, o plano real do lookup por ClientEventId usou Index Seek em ux_hour_meter_readings_client_event_id, lendo uma linha. Para TOP 20 por máquina e HOURS, o SQL usou ix_readings_capture_order e 20 buscas no índice clusterizado. O scan leu 20 linhas para retornar 20 nesse conjunto concentrado em uma máquina. Esse plano não fundamenta um índice adicional para a distribuição de produção.
+
+Para encerrar, confirmar a recuperação da cota e do ready, funcionamento de consulta autenticada e do worker, obter os SHAs reais dos serviços e validar a política externa de aprovação e a disponibilidade de artefatos de recuperação. A aprovação de publicação e qualquer mudança de plano ou infraestrutura são decisões separadas. A Fase 16 mantém os testes de campo.

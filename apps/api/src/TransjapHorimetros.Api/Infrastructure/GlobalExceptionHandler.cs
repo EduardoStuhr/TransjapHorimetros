@@ -44,6 +44,7 @@ public sealed class GlobalExceptionHandler(
                 StatusCodes.Status409Conflict,
                 "Conflict",
                 exception.Message),
+            Microsoft.EntityFrameworkCore.Storage.RetryLimitExceededException or
             SqlException { Number: -2 or 1205 or 51012 } or IOException or TimeoutException => (
                 StatusCodes.Status503ServiceUnavailable,
                 "Service unavailable",

@@ -241,8 +241,8 @@ if (app.Environment.IsDevelopment() && !deviceIdentityOptions.EnforceForReadings
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseExceptionHandler();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseExceptionHandler();
 
 if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
 {

@@ -66,3 +66,20 @@ No build 16.4.6, a carga local da rota de relatórios gerou 230 XLSX e 230 PDF m
     pdf users=30 n=150 p50=325.9 p95=352.0ms
 
 A primeira execução de carga reproduziu erro 500 no POST da leitura a 30 operadores. O TRX da execução 44095429390 registrou deadlock SQL 1205 e esgotamento de cinco retries em ReadingSummaryRepository.GetAsync durante a transação de escrita. Com 10 operadores, o p95 de sync chegou a 17.219,5 ms. A correção move a consulta de apresentação de anomalias, OCR e correções para depois do commit. A decisão, a leitura e a auditoria continuam na transação protegida por máquina. Se a resposta se perder após o commit, o cliente pode reenviar o mesmo ClientEventId.
+
+### Revisão de segurança e operação
+
+| Área | Evidência de implementação ou teste | Limite |
+|---|---|---|
+| Autenticação | JWT valida assinatura, emissor, audiência e expiração. Login e refresh admitem acesso anônimo. Logout e me exigem autenticação. O rate limiter de login usa IP. | A factory de carga eleva o limite para medir o caminho de sucesso. |
+| Permissões | A política padrão exige usuário autenticado. Gestão de usuários requer Admin. Dispositivos exigem Manager/Admin. Dashboard, anomalias e histórico OCR exigem perfil de supervisão. | A leitura efetiva de configurações e logs do App Service continua pendente. |
+| Fotos | EvidenceAccess verifica autoria para operador e retorna 404 quando fora do escopo. O serviço valida o arquivo e confere autoria e leitura no replay. Os testes cobrem tamanho, tipo, ausência de token, papel e conteúdo imutável. | A carga substitui o storage por memória, com JPEG sintético mínimo. |
+| OCR | Histórico e reprocessamento usam política administrativa. O serviço verifica ator no replay manual e persiste tentativas e auditoria. | A integração usa provedor isolado. |
+| Dados e logs | Middleware registra rota, status, duração e correlação. Metadados de storage ficam fora da resposta de evidência. Problemas inesperados recebem mensagem pública genérica. | Logs efetivos no Azure e retenção externa exigem conferência. |
+| Frontend | A CI testa filtros, estado vazio, erro de volume, paginação e larguras de 390 a 1920 px. O painel tem tabela com legenda e alternativa textual ao gráfico. O fallback de carregamento usa status acessível e a falha global anuncia o erro. | Testes físicos ficam na Fase 16. |
+
+O npm audit de dependências de produção registrou duas entradas moderadas relacionadas ao mesmo aviso no uuid transitivo de exceljs (GHSA-w5hq-g745-h8pq), sem altas ou críticas. O código instalado do ExcelJS importa v4, enquanto o aviso envolve v3/v5/v6 com buffer fornecido. A dependência permanece sinalizada.
+
+O ensaio local de rollback do frontend serviu primeiro o standalone 16.4.6 e depois o artefato anterior 16.4.3 no mesmo endereço, com fixture isolada. Ambos carregaram o login e entregaram PDF legível de cinco páginas para a frota 84. Este teste cobre compatibilidade da rota. A versão anterior tem alerta de segurança e exige avaliação antes de eventual uso real.
+
+O handler passa a responder 503 com Retry-After quando a estratégia EF esgota as tentativas transitórias. O middleware de métricas envolve o handler para registrar o status final e usa o template da rota no log, evitando identificadores no caminho.

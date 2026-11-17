@@ -14,6 +14,23 @@ export ConnectionStrings__DefaultConnection="${TEST_SQLSERVER_CONNECTION_STRING/
 export ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://127.0.0.1:4328
 export Authentication__Jwt__SigningKey="$(openssl rand -hex 32)"
 export Ocr__BackgroundProcessingEnabled=false Database__ApplyMigrationsOnStartup=false
+# A database absent from the disposable instance must stay absent even with a stale override.
+current_api="$PWD/apps/api/src/TransjapHorimetros.Api/bin/Release/net10.0"
+(
+    cd "$current_api"
+    export ConnectionStrings__DefaultConnection="${TEST_SQLSERVER_CONNECTION_STRING/transjap_horimetros_tests/fase15_absent_tests}"
+    export Database__ApplyMigrationsOnStartup=true
+    exec dotnet TransjapHorimetros.Api.dll
+) >"$temp_dir/guard.log" 2>&1 &
+api_pid=$!
+trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+curl --retry 10 --retry-all-errors --retry-delay 1 -fsS "$ASPNETCORE_URLS/health/live"
+kill "$api_pid"
+wait "$api_pid" || true
+trap - EXIT
+printf "%s\n" "IF DB_ID('fase15_absent_tests') IS NOT NULL THROW 51003, 'Unexpected startup migration.', 1;" > "$temp_dir/check.sql"
+sql "$temp_dir/check.sql"
+
 for api_dir in "$PWD/apps/api/src/TransjapHorimetros.Api/bin/Release/net10.0" "$temp_dir/base-api"; do
     (cd "$api_dir" && exec dotnet TransjapHorimetros.Api.dll) >"$temp_dir/server.log" 2>&1 &
     api_pid=$!

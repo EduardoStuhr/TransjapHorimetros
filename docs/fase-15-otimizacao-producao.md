@@ -43,3 +43,11 @@ A execução [44088973812](https://github.com/EduardoStuhr/TransjapHorimetros/ac
 | 30 | 150 | 248,1 / 463,7 | 111,4 / 225,1 | 55,2 / 207,2 | 124,5 / 237,5 | 0 | 394 MiB |
 
 A primeira amostra inclui aquecimento, especialmente perceptível na concorrência 1. Tempo de CPU agregado do processo por cenário foi 322, 815, 1.768 e 5.223 ms, respectivamente. Não foi medida CPU do contêiner SQL. A instrumentação existente registra tempos de consulta da utilização na suíte de volume, mas não foram coletados por concorrência neste experimento. A comparação antes/depois e os cenários de autenticação, sincronização e geração de relatórios continuam pendentes.
+
+## Etapa final de 17/11/2026
+
+Às 13h37 UTC, a API respondeu HTTP 200 em /health/live e HTTP 503 em /health e /health/ready. A resposta de readiness indicou self HEALTHY e sqlserver UNHEALTHY, com a descrição “SQL Server indisponível.” e o traceId 6564c6a6de5e43d7a04740dad5f20f90. O frontend respondeu HTTP 307 na raiz. A causa da falha, a duração, as versões efetivamente implantadas e as configurações do App Service exigem evidência do Azure. Consultar o runbook antes de qualquer recuperação.
+
+A revisão identificou que appsettings.Production.json já desabilitava migrations, mas uma sobrescrita de configuração podia habilitá-las. A branch restringe a chamada conjunta de migration e seed a Development e Testing. Uma base nova de produção deve ser provisionada e populada mediante procedimento separado.
+
+O build local apontou uma vulnerabilidade na versão 16.4.3 do Next.js. A revisão atualiza o runtime para o patch 16.4.6. A carga de exportações usa arquivos gerados pela rota real do Next, uma fixture HTTP local de 21 intervalos e cinco solicitações por usuário. O teste de operadores usa login por senha, replay do mesmo ClientEventId e upload multipart de JPEG sintético com armazenamento em memória e SQL Server descartável. O cenário não mede a latência do Blob Storage, do Azure AI nem o tempo em rede móvel.

@@ -4,9 +4,6 @@
 name: Build and deploy ASP.Net Core app to Azure Web App - api-transjap-horimetros
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
@@ -36,6 +33,7 @@ jobs:
           path: ${{env.DOTNET_ROOT}}/myapp
 
   deploy:
+    if: github.ref == 'refs/heads/main' && github.sha == vars.APPROVED_API_SHA
     runs-on: ubuntu-latest
     needs: build
     permissions:

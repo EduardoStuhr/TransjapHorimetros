@@ -64,3 +64,5 @@ No build 16.4.6, a carga local da rota de relatórios gerou 230 XLSX e 230 PDF m
     pdf users=5 n=25 p50=55.0 p95=93.5ms
     pdf users=10 n=50 p50=86.3 p95=108.5ms
     pdf users=30 n=150 p50=325.9 p95=352.0ms
+
+A primeira execução de carga reproduziu erro 500 no POST da leitura a 30 operadores. O TRX da execução 44095429390 registrou deadlock SQL 1205 e esgotamento de cinco retries em ReadingSummaryRepository.GetAsync durante a transação de escrita. Com 10 operadores, o p95 de sync chegou a 17.219,5 ms. A correção move a consulta de apresentação de anomalias, OCR e correções para depois do commit. A decisão, a leitura e a auditoria continuam na transação protegida por máquina. Se a resposta se perder após o commit, o cliente pode reenviar o mesmo ClientEventId.

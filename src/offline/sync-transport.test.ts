@@ -245,6 +245,24 @@ describe("BrowserSyncTransport", () => {
     );
   });
 
+  it("interrompe a leitura da resposta quando o corpo demora demais", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (_url: string, init: RequestInit) => ({
+      text: () => new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      }),
+    })));
+    try {
+      const pending = new BrowserSyncTransport().createReading(readingEvent);
+      const assertion = expect(pending).rejects.toMatchObject({ status: null });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("trata erro de rede sem HTTP status gerando SyncTransportError(status=null)", async () => {
     const fetchMock = vi
       .fn()

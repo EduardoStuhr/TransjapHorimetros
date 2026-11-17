@@ -95,8 +95,10 @@ async function requestWithTimeout(input: RequestInfo | URL, init: RequestInit) {
   if (init.signal?.aborted) controller.abort();
   const timeout = setTimeout(abort, 30_000);
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    const response = await fetch(input, { ...init, signal: controller.signal });
+    return await parseResponse(response);
   } catch (error) {
+    if (error instanceof SyncTransportError) throw error;
     const message =
       error instanceof DOMException && error.name === "AbortError"
         ? "A conexão demorou demais. A tentativa será repetida."
@@ -163,7 +165,7 @@ export class BrowserSyncTransport implements SyncTransport {
         clientEventId: event.clientEventId,
       }),
     });
-    return parseResponse(response);
+    return response;
   }
 
   async uploadPhoto(
@@ -196,6 +198,6 @@ export class BrowserSyncTransport implements SyncTransport {
         },
       },
     );
-    return parseResponse(response);
+    return response;
   }
 }

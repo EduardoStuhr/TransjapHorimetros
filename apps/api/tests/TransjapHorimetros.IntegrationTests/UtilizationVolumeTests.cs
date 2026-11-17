@@ -78,6 +78,45 @@ public sealed class UtilizationVolumeTests(TransjapApiFactory factory, ITestOutp
                     return watch.Elapsed.TotalMilliseconds;
                 })));
             }
+            if (count == 1000)
+            {
+                // All measurements use the same dataset, representing a reproducible baseline.
+                var routes = new[] {
+                    "/api/v1/operations/summary",
+                    $"/api/v1/operations/utilization?machineId={machineId}&pageSize=20",
+                    $"/api/v1/readings?machineId={machineId}&pageSize=20",
+                    $"/api/v1/operations/utilization?machineId={machineId}&export=true"
+                };
+                foreach (var concurrency in new[] { 1, 5, 10, 30 })
+                {
+                    var samplesByRoute = new ConcurrentDictionary<string, ConcurrentBag<double>>();
+                    var errors = 0;
+                    var cpuStart = Process.GetCurrentProcess().TotalProcessorTime;
+                    var wall = Stopwatch.StartNew();
+                    await Task.WhenAll(Enumerable.Range(0, concurrency).Select(async _ =>
+                    {
+                        for (var repeat = 0; repeat < 5; repeat++)
+                        {
+                            foreach (var endpoint in routes)
+                            {
+                                var timer = Stopwatch.StartNew();
+                                using var response = await client.GetAsync(endpoint);
+                                await response.Content.LoadIntoBufferAsync();
+                                samplesByRoute.GetOrAdd(endpoint, _ => new()).Add(timer.Elapsed.TotalMilliseconds);
+                                if (!response.IsSuccessStatusCode) Interlocked.Increment(ref errors);
+                            }
+                        }
+                    }));
+                    foreach (var endpoint in routes)
+                    {
+                        var durations = samplesByRoute[endpoint].Order().ToArray();
+                        var p50 = durations[(int)Math.Ceiling(durations.Length * 0.5) - 1];
+                        var p95 = durations[(int)Math.Ceiling(durations.Length * 0.95) - 1];
+                        output.WriteLine($"FASE15 concurrency={concurrency} samples={durations.Length} route={endpoint.Split('?')[0]} export={endpoint.Contains("export=true")} p50_ms={p50:F1} p95_ms={p95:F1} errors={errors} working_set_MiB={Environment.WorkingSet / 1048576} cpu_ms={(Process.GetCurrentProcess().TotalProcessorTime - cpuStart).TotalMilliseconds:F0} elapsed_ms={wall.Elapsed.TotalMilliseconds:F0}");
+                    }
+                    Assert.Equal(0, errors);
+                }
+            }
             times.Sort();
             var queryP95 = samples["utilization.query.duration"].Order().ElementAt(28);
             var calcP95 = samples["utilization.calculation.duration"].Order().ElementAt(28);

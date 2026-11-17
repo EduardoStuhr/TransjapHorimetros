@@ -51,3 +51,16 @@ A primeira amostra inclui aquecimento, especialmente perceptível na concorrênc
 A revisão identificou que appsettings.Production.json já desabilitava migrations, mas uma sobrescrita de configuração podia habilitá-las. A branch restringe a chamada conjunta de migration e seed a Development e Testing. Uma base nova de produção deve ser provisionada e populada mediante procedimento separado.
 
 O build local apontou uma vulnerabilidade na versão 16.4.3 do Next.js. A revisão atualiza o runtime para o patch 16.4.6. A carga de exportações usa arquivos gerados pela rota real do Next, uma fixture HTTP local de 21 intervalos e cinco solicitações por usuário. O teste de operadores usa login por senha, replay do mesmo ClientEventId e upload multipart de JPEG sintético com armazenamento em memória e SQL Server descartável. O cenário não mede a latência do Blob Storage, do Azure AI nem o tempo em rede móvel.
+
+A visão geral do banco no Portal Azure confirmou Status Paused, limites da oferta gratuita atingidos e 0 segundos restantes de vCore no mês. O esgotamento de cota é consistente com o 503 da API. Não há evidência de que o merge tenha causado o consumo. O portal oferece continuidade com encargos adicionais, que exige decisão de orçamento. A versão implantada, os logs do processo e a configuração efetiva continuam sem confirmação.
+
+No build 16.4.6, a carga local da rota de relatórios gerou 230 XLSX e 230 PDF medidos, além do aquecimento. Cada XLSX foi reaberto como ZIP com verificação de CRC e planilha presente. Cada PDF foi aberto e teve o filtro de frota conferido. Tempos de resposta em ms, p50/p95, por 1/5/10/30 usuários:
+
+    xlsx users=1 n=5 p50=28.3 p95=45.0ms
+    xlsx users=5 n=25 p50=70.6 p95=107.6ms
+    xlsx users=10 n=50 p50=75.5 p95=95.2ms
+    xlsx users=30 n=150 p50=236.8 p95=324.5ms
+    pdf users=1 n=5 p50=15.2 p95=20.4ms
+    pdf users=5 n=25 p50=55.0 p95=93.5ms
+    pdf users=10 n=50 p50=86.3 p95=108.5ms
+    pdf users=30 n=150 p50=325.9 p95=352.0ms

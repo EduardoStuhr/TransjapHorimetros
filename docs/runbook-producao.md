@@ -28,3 +28,5 @@ A reversão da publicação e qualquer ação sobre o banco em produção exigem
 ## Falha de readiness SQL observada em 17/11/2026
 
 Com live 200 e ready 503, suspenda publicações. Pesquise o traceId e a janela de tempo da ocorrência nos logs da API. Consulte Resource Health e métricas de conexões do Azure SQL, eventos de pausa/retomada, falhas de autenticação e conectividade do App Service. Confira somente o nome do banco e servidor, identidade e regras de rede aplicáveis. Registre códigos SQL sanitizados. Repita os GETs depois da análise e confirme uma consulta autenticada antes de encerrar o incidente. Reinício, rollback ou alteração de firewall exigem diagnóstico e autorização.
+
+O diagnóstico do portal mostrou Paused e zero segundos de vCore, com a oferta mensal esgotada. Confira a janela de renovação da oferta. Retomar com cobrança requer aprovação financeira específica. Evite retries intensivos. Após a recuperação, confirme ready, consulta autenticada e consumo da cota.

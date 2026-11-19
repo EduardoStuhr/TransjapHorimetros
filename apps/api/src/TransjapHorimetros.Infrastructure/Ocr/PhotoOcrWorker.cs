@@ -14,22 +14,26 @@ public sealed class PhotoOcrWorker(IServiceScopeFactory scopes, OcrOptions optio
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var backoff = new OcrPollingBackoff(options);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(options.PollIntervalSeconds), stoppingToken);
-                await RunBatchAsync(stoppingToken);
+                await Task.Delay(backoff.Delay, stoppingToken);
+                backoff.RecordSuccess(await RunBatchAsync(stoppingToken));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
-            catch (Exception)
+            catch (Exception exception)
             {
-                logger.LogError("OCR background batch failed; confirmed photos remain available for the next scan.");
+                var code = OcrPollingBackoff.SqlError(exception);
+                backoff.RecordFailure(code);
+                logger.LogError("OCR batch unavailable. SqlError={SqlError} RetrySeconds={RetrySeconds}; confirmed photos remain pending.",
+                    code, backoff.Delay.TotalSeconds);
             }
         }
     }
 
-    private async Task RunBatchAsync(CancellationToken ct)
+    private async Task<bool> RunBatchAsync(CancellationToken ct)
     {
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TransjapDbContext>();
@@ -54,7 +58,9 @@ public sealed class PhotoOcrWorker(IServiceScopeFactory scopes, OcrOptions optio
             catch (Exception)
             {
                 logger.LogWarning("OCR job interrupted. ReadingId={ReadingId}", readingId);
+                throw;
             }
         }));
+        return stale.Length > 0 || pending.Length > 0;
     }
 }

@@ -41,6 +41,7 @@ jobs:
         with:
           name: node-app
           path: deploy
+          retention-days: 90
           include-hidden-files: true
           if-no-files-found: error
 

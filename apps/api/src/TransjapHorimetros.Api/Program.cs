@@ -266,6 +266,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapGet("/version", (HttpContext context) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    var version = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+    var sha = version?.Split('+').LastOrDefault();
+    return Results.Ok(new { commit = sha is not null && System.Text.RegularExpressions.Regex.IsMatch(sha, "^[0-9a-f]{40}$") ? sha : "unknown" });
+}).AllowAnonymous();
 app.MapHealthChecks("/health", HealthResponseWriter.Options()).AllowAnonymous();
 app.MapHealthChecks("/health/ready", HealthResponseWriter.Options(registration =>
     registration.Tags.Contains("ready"))).AllowAnonymous();

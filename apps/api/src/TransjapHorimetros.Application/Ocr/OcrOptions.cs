@@ -11,6 +11,9 @@ public sealed class OcrOptions
     public int ReprocessCooldownSeconds { get; set; } = 60;
     public bool BackgroundProcessingEnabled { get; set; } = true;
     public int PollIntervalSeconds { get; set; } = 5;
+    public int MaximumIdlePollIntervalSeconds { get; set; } = 300;
+    public int MaximumFailurePollIntervalSeconds { get; set; } = 300;
+    public int QuotaRetryIntervalSeconds { get; set; } = 3600;
     public int MaximumConcurrentProcessing { get; set; } = 2;
     public int MaximumImageDimension { get; set; } = 12000;
     public long MaximumImagePixels { get; set; } = 50_000_000;
@@ -22,6 +25,9 @@ public sealed class OcrOptions
             || MaximumDifferencePercentage < 0 || TimeoutSeconds is < 1 or > 120
             || MaximumRetries is < 0 or > 3 || ReprocessCooldownSeconds is < 1 or > 86400
             || PollIntervalSeconds is < 1 or > 60 || MaximumConcurrentProcessing is < 1 or > 4
+            || MaximumIdlePollIntervalSeconds < PollIntervalSeconds || MaximumIdlePollIntervalSeconds > 86400
+            || MaximumFailurePollIntervalSeconds < PollIntervalSeconds || MaximumFailurePollIntervalSeconds > 86400
+            || QuotaRetryIntervalSeconds is < 60 or > 86400
             || FailuresBeforeAlert is < 1 or > 10
             || MaximumImageDimension is < 64 or > 20000 || MaximumImagePixels is < 1 or > 100_000_000
             || Provider is not ("Fake" or "AzureAiVision"))

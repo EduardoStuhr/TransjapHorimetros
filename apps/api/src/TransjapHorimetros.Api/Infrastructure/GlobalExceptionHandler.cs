@@ -45,7 +45,7 @@ public sealed class GlobalExceptionHandler(
                 "Conflict",
                 exception.Message),
             Microsoft.EntityFrameworkCore.Storage.RetryLimitExceededException or
-            SqlException { Number: -2 or 1205 or 51012 } or IOException or TimeoutException => (
+            SqlException { Number: -2 or 1205 or 51012 or 42119 } or IOException or TimeoutException => (
                 StatusCodes.Status503ServiceUnavailable,
                 "Service unavailable",
                 "Serviço temporariamente indisponível. Preserve o evento e tente novamente."),

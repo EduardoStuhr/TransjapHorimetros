@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  env: {
+    BUILD_COMMIT_SHA: /^[0-9a-f]{40}$/.test(process.env.GITHUB_SHA ?? "")
+      ? process.env.GITHUB_SHA
+      : "unknown",
+  },
   async headers() {
     return [
       {
